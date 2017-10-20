@@ -4,21 +4,17 @@ import argparse
 import numpy as np
 import plyfile
 
-from util import run_subprocess
-
-TEMP_FILENAME = '/tmp/cube.ply'
-
 def points_of_cube_face(face_index, size, n_points):
     # Generate a collection of random points.
     points_of_face = np.random.rand(int(n_points / 6), 3) * size - size/2.
 
     # Modify one of the dimensions of the point so that it lies on a face of the cube.
     # If the face is even, place it at the bottom of the cube. Otherwise place it on top.
-    points_of_face[:, face // 2] = (float(face % 2) * size - size / 2.)
+    points_of_face[:, face_index // 2] = (float(face_index % 2) * size - size / 2.)
 
     return points_of_face
 
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('npoints', type=int, help='Number of points comprising the cube')
@@ -42,7 +38,8 @@ if __name__ == '__main__':
             p[i + face * n_points_per_face] = tuple(point)
 
     el = plyfile.PlyElement.describe(p, 'vertex', val_types={'x': 'f8', 'y': 'f8', 'z': 'f8'}, )
-    plyfile.PlyData([el]).write(TEMP_FILENAME)
+    plyfile.PlyData([el]).write(args.output)
 
-    # Convert the ply to pcd
-    run_subprocess('pcl_ply2pcd {} {}'.format(TEMP_FILENAME, args.output))
+
+if __name__ == '__main__':
+    cli()

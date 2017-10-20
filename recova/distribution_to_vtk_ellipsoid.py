@@ -85,18 +85,17 @@ def distribution_to_vtk_ellipsoid(mean, covariance, filename):
 
     save_evtk_unstructured_grid(filename, points_transformed, connectivity, offsets)
 
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('output', type=str, help='The name of the file where to export the plot')
+    parser.add_argument('--dims', type=str, default='0,1,2', help='Comma separated list of the dimensions to extract from the covariance matrix')
+    parsed_args = parser.parse_args()
 
-if __name__ == '__main__':
     input_dict = json.load(sys.stdin)
     mean = np.array(input_dict['mean'])
     covariance = np.array(input_dict['covariance'])
 
     mean_lie = se3_log(mean)
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('output', type=str, help='The name of the file where to export the plot')
-    parser.add_argument('--dims', type=str, default='0,1,2', help='Comma separated list of the dimensions to extract from the covariance matrix')
-    parsed_args = parser.parse_args()
 
     dims = parse_dims(parsed_args.dims)
 
@@ -105,3 +104,6 @@ if __name__ == '__main__':
 
     distribution_to_vtk_ellipsoid(mean_lie[dims], covariance, parsed_args.output)
 
+
+if __name__ == '__main__':
+    cli()
