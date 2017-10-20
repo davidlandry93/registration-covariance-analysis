@@ -13,7 +13,7 @@ import pyevtk
 import sys
 
 from pylie import se3_log
-from util import parse_dims
+from recova.util import parse_dims
 
 
 def make_ellipsoid_mesh(a,b,c, resolution_u = 10, resolution_v = 10):

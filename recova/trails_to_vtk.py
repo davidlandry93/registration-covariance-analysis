@@ -6,10 +6,9 @@ import numpy as np
 import pyevtk
 import sys
 
-from util import parse_dims
+from recova.util import parse_dims
 
-
-if __name__ == '__main__':
+def cli():
     json_data = json.load(sys.stdin)
 
     parser = argparse.ArgumentParser()
@@ -38,3 +37,8 @@ if __name__ == '__main__':
                               np.ascontiguousarray(particle_positions[:,dims[1]]),
                               np.ascontiguousarray(particle_positions[:,dims[2]]),
                               data = None)
+
+
+
+if __name__ == '__main__':
+    cli()

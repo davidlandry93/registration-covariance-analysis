@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+BATCHES_DIR=$HOME/dataset/registration_batches/fixed_forest/
+
+find $BATCHES_DIR |
+    parallel "cat {} | python results_to_vtk.py {}-results"
+
