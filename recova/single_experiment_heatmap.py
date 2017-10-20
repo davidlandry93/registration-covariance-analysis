@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-if __name__ == '__main__':
-    json_data = json.load(sys.stdin)
-
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('dim1', type=int)
     parser.add_argument('dim2', type=int)
     parser.add_argument('--n_bins', type=int, default=100)
     args = parser.parse_args()
+
+    json_data = json.load(sys.stdin)
 
     registrations = np.empty((len(json_data['data']),6))
     for i, registration in enumerate(json_data['data']):
@@ -29,9 +29,10 @@ if __name__ == '__main__':
     n_bins_dim_1 = int(span_dim_1 / (span_dim_1 + span_dim_2) * args.n_bins)
     n_bins_dim_2 = int(span_dim_2 / (span_dim_1 + span_dim_2) * args.n_bins)
 
-    print(registrations)
     counts, xedges, yedges, im = ax.hist2d(registrations[:,args.dim1], registrations[:,args.dim2], cmin=1, bins=args.n_bins)
     cbar = fig.colorbar(im, ax=ax)
 
-
     plt.show()
+
+if __name__ == '__main__':
+    cli()

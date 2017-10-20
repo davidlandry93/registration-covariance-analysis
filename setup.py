@@ -16,6 +16,9 @@ setup(
     entry_points = {
         'console_scripts': [
             'merge_json_result = recova.merge_json_result:cli',
+            'registration_heatmap = recova.single_experiment_heatmap:cli',
+            'registration_2d_plot = recova.single_experiment_plot:cli',
+            'registration2vtk = recova.results_to_vtk:cli',
             'trails2vtk = recova.trails_to_vtk:cli'
         ]
     }

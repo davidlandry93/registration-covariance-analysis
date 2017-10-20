@@ -11,7 +11,7 @@ import pyclustering.cluster.dbscan as dbscan
 import sys
 
 from pylie import se3_log
-from util import eprint
+from recova.util import eprint
 
 def lie_vectors_of_registrations(json_data, key='result'):
     """

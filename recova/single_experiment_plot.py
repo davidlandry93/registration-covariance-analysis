@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-if __name__ == '__main__':
+def cli():
     json_data = json.load(sys.stdin)
 
     parser = argparse.ArgumentParser()
@@ -26,3 +26,7 @@ if __name__ == '__main__':
     ax.scatter(registrations[:,args.dim1], registrations[:,args.dim2], s=0.5)
     plt.axis('equal')
     plt.show()
+
+
+if __name__ == '__main__':
+    cli()
