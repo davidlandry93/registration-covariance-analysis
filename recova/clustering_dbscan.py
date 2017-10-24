@@ -12,6 +12,7 @@ import sys
 
 from pylie import se3_log
 from recova.util import eprint
+from recova.trails_to_vtk import lie_tensor_of_trails
 
 def lie_vectors_of_registrations(json_data, key='result'):
     """
@@ -34,9 +35,17 @@ def lie_vectors_of_registrations(json_data, key='result'):
     return lie_results
 
 
-def dbscan_clustering(registration_dataset, radius=0.005, n=12):
+def dbscan_clustering(dataset, radius=0.005, n=12):
     """Augment dataset with clustering information using the dbscan algorithm"""
-    lie_matrix = lie_vectors_of_registrations(registration_dataset)
+
+    if ('metadata' in dataset and
+        'experiment' in dataset['metadata'] and
+        dataset['metadata']['experiment'] == 'trail_batch'):
+        lie_matrix = lie_tensor_of_trails(dataset)[-1]
+    else:
+        lie_matrix = lie_vectors_of_registrations(registration_dataset)
+
+    print(lie_matrix)
 
     clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
     clustering.process()
@@ -48,10 +57,10 @@ def dbscan_clustering(registration_dataset, radius=0.005, n=12):
         'outlier_ratio': len(clustering.get_noise()) / lie_matrix.shape[0]
     }
 
-    if 'statistics' in registration_dataset:
-        registration_dataset['statistics'].update(statistics_dict)
+    if 'statistics' in dataset:
+        dataset['statistics'].update(statistics_dict)
     else:
-        registration_dataset['statistics'] = statistics_dict
+        dataset['statistics'] = statistics_dict
 
     metadata_dict = {
         'clustering': {
@@ -61,13 +70,12 @@ def dbscan_clustering(registration_dataset, radius=0.005, n=12):
         }
     }
 
-    if 'metadata' in registration_dataset:
-        registration_dataset['metadata'].update(metadata_dict)
+    if 'metadata' in dataset:
+        dataset['metadata'].update(metadata_dict)
     else:
-        registration_dataset['metadata'] = metadata_dict
+        dataset['metadata'] = metadata_dict
 
-
-if __name__ == '__main__':
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--radius', type=float, default=0.005,
                         help='Radius that must contain enough neighbors for a point to be a core point.')
@@ -87,3 +95,8 @@ if __name__ == '__main__':
     eprint('N clusters: {}'.format(json_dataset['statistics']['n_clusters']))
     eprint('Outlier ratio: {}'.format(json_dataset['statistics']['outlier_ratio']))
     eprint('Cluster sizes: {}'.format(cluster_sizes))
+
+
+
+if __name__ == '__main__':
+    cli()

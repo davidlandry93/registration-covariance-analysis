@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+
 POSITIVE_STRINGS = ('yes', 'y', 't', 'true', '1')
 
 def eprint(*args, **kwargs):

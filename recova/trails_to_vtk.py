@@ -8,6 +8,19 @@ import sys
 
 from recova.util import parse_dims
 
+def lie_tensor_of_trails(registration_dataset):
+    n_iterations = len(registration_dataset['data'][0]['trail'])
+    n_particles = len(registration_dataset['data'])
+    positions_of_iterations = np.zeros((n_iterations, n_particles, 6))
+
+    for i in range(n_iterations):
+        positions_of_iterations[i] = np.zeros((n_particles, 6))
+        for j, trail in enumerate(registration_dataset['data']):
+            positions_of_iterations[i,j,:] = np.array(trail['trail'])[i]
+
+    return positions_of_iterations
+
+
 def cli():
     json_data = json.load(sys.stdin)
 
@@ -18,15 +31,7 @@ def cli():
 
     dims = parse_dims(parsed_args.dims)
 
-    n_iterations = len(json_data['data'][0]['trail'])
-    n_particles = len(json_data['data'])
-    positions_of_iterations = np.zeros((n_iterations, n_particles, 6))
-
-    for i in range(n_iterations):
-        positions_of_iterations[i] = np.zeros((n_particles, 6))
-        for j, trail in enumerate(json_data['data']):
-            positions_of_iterations[i,j,:] = np.array(trail['trail'])[i]
-
+    positions_of_iterations = lie_tensor_of_trails(json_data)
 
     for i, particle_positions in enumerate(positions_of_iterations):
         filename = parsed_args.output + '_{0:03d}'.format(i)

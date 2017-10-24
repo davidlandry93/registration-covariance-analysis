@@ -15,6 +15,7 @@ setup(
     scripts = ['bin/all_registration_to_vtk_ellipsoid'],
     entry_points = {
         'console_scripts': [
+            'clustering = recova.clustering_dbscan:cli',
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
             'generate_cube = recova.pointcloud_gen.cube:cli',
             'merge_json_result = recova.merge_json_result:cli',
