@@ -45,8 +45,6 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
     else:
         lie_matrix = lie_vectors_of_registrations(registration_dataset)
 
-    print(lie_matrix)
-
     clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
     clustering.process()
 
@@ -90,12 +88,11 @@ def cli():
     json.dump(json_dataset, sys.stdout)
 
     cluster_sizes = sorted(list(map(len, json_dataset['statistics']['clustering'])), reverse=True)
-    eprint(cluster_sizes)
 
+    eprint(cluster_sizes)
     eprint('N clusters: {}'.format(json_dataset['statistics']['n_clusters']))
     eprint('Outlier ratio: {}'.format(json_dataset['statistics']['outlier_ratio']))
     eprint('Cluster sizes: {}'.format(cluster_sizes))
-
 
 
 if __name__ == '__main__':

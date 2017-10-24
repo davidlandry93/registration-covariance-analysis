@@ -9,11 +9,13 @@ import sys
 from recova.clustering_dbscan import lie_vectors_of_registrations
 from pyevtk.hl import pointsToVTK
 from pylie import se3_log
+from recova.trails_to_vtk import lie_tensor_of_trails
 from recova.util import POSITIVE_STRINGS, empty_to_none
 
 
 def data_dict_of_registration_data(registration_data):
     data_dict = {}
+    lie_vectors = positions_of_registration_data(registration_data)
 
     if 'statistics' in registration_data:
         if 'clustering' in registration_data['statistics']:
@@ -23,7 +25,7 @@ def data_dict_of_registration_data(registration_data):
                 for point_index in cluster:
                     cluster_of_points[point_index] = i + 1
 
-            data_dict['cluster'] = np.ascontigiousarray(cluster_of_points)
+            data_dict['cluster'] = np.ascontiguousarray(cluster_of_points)
 
 
         if 'outlier' in registration_data['statistics']:
@@ -36,12 +38,24 @@ def data_dict_of_registration_data(registration_data):
     print(data_dict)
     return data_dict
 
-def results_to_vtk(registration_data, filename, dims, initial_estimates=False):
-    key = 'result'
-    if initial_estimates:
-        key = 'initial_estimate'
 
-    lie_vectors = lie_vectors_of_registrations(registration_data, key=key)
+def positions_of_registration_data(reg_data, initial_estimates=False):
+    if ('metadata' in reg_data and
+        'experiment' in reg_data['metadata'] and
+        'trail_batch' == reg_data['metadata']['experiment']):
+        lie_vectors = lie_tensor_of_trails(reg_data)[(0 if initial_estimates else -1)]
+    else:
+        key = 'result'
+        if initial_estimates:
+            key = 'initial_estimate'
+
+        lie_vectors = lie_vectors_of_registrations(registration_data, key=key)
+
+    return lie_vectors
+
+
+def results_to_vtk(registration_data, filename, dims, initial_estimates=False):
+    lie_vectors = positions_of_registration_data(registration_data, initial_estimates)
 
     pointsToVTK(filename,
                 np.ascontiguousarray(lie_vectors[:,dims[0]]),
