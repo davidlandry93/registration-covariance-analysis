@@ -2,24 +2,20 @@
 
 import argparse
 import json
+import multiprocessing
 import numpy as np
 import pyevtk
 import sys
 
-from recova.util import parse_dims
+from recova.registration_dataset import points_to_vtk, lie_tensor_of_trails, data_dict_of_registration_data
+from recova.util import parse_dims, empty_to_none
 
-def lie_tensor_of_trails(registration_dataset):
-    n_iterations = len(registration_dataset['data'][0]['trail'])
-    n_particles = len(registration_dataset['data'])
-    positions_of_iterations = np.zeros((n_iterations, n_particles, 6))
+def save_one_frame(points, output, data_dict, i):
+    filename = output + '_{0:03d}'.format(i)
+    print(filename)
+    data = empty_to_none(data_dict)
 
-    for i in range(n_iterations):
-        positions_of_iterations[i] = np.zeros((n_particles, 6))
-        for j, trail in enumerate(registration_dataset['data']):
-            positions_of_iterations[i,j,:] = np.array(trail['trail'])[i]
-
-    return positions_of_iterations
-
+    points_to_vtk(points[i], filename, data)
 
 def cli():
     json_data = json.load(sys.stdin)
@@ -33,16 +29,11 @@ def cli():
 
     positions_of_iterations = lie_tensor_of_trails(json_data)
 
-    for i, particle_positions in enumerate(positions_of_iterations):
-        filename = parsed_args.output + '_{0:03d}'.format(i)
-        print(filename)
+    lie_tensor = lie_tensor_of_trails(json_data)
+    data_dict = data_dict_of_registration_data(json_data)
 
-        pyevtk.hl.pointsToVTK(filename,
-                              np.ascontiguousarray(particle_positions[:,dims[0]]),
-                              np.ascontiguousarray(particle_positions[:,dims[1]]),
-                              np.ascontiguousarray(particle_positions[:,dims[2]]),
-                              data = None)
-
+    with multiprocessing.Pool() as pool:
+        pool.starmap(save_one_frame, [(lie_tensor[:,:,dims], parsed_args.output, data_dict, x) for x in range(len(lie_tensor))])
 
 
 if __name__ == '__main__':

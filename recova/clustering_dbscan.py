@@ -12,27 +12,7 @@ import sys
 
 from pylie import se3_log
 from recova.util import eprint
-from recova.trails_to_vtk import lie_tensor_of_trails
-
-def lie_vectors_of_registrations(json_data, key='result'):
-    """
-    Outputs the lie vectors of a json registration dataset.
-
-    :param json_data: A full registration dataset.
-    :param key: The key of the matrix to evaluate, inside the registration result.
-    :returns: A Nx6 numpy matrix containing the lie algebra representation of the results.
-    """
-    lie_results = np.empty((len(json_data['data']), 6))
-    for i, registration in enumerate(json_data['data']):
-        m = np.array(registration[key])
-
-        try:
-            lie_results[i,:] = se3_log(m)
-        except RuntimeError:
-            lie_results[i,:] = np.zeros(6)
-            eprint('Warning: failed conversion to lie algebra of matrix {}'.format(m))
-
-    return lie_results
+from recova.registration_dataset import lie_tensor_of_trails, lie_vectors_of_registrations
 
 
 def dbscan_clustering(dataset, radius=0.005, n=12):
