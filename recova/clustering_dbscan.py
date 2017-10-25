@@ -23,7 +23,7 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
         dataset['metadata']['experiment'] == 'trail_batch'):
         lie_matrix = lie_tensor_of_trails(dataset)[-1]
     else:
-        lie_matrix = lie_vectors_of_registrations(registration_dataset)
+        lie_matrix = lie_vectors_of_registrations(dataset)
 
     clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
     clustering.process()
@@ -40,18 +40,25 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
     else:
         dataset['statistics'] = statistics_dict
 
-    metadata_dict = {
+    original_metadata = (dataset['metadata'] if 'metadata' in dataset else {})
+    metadata_dict = original_metadata.update({
         'clustering': {
             'algorithm': 'dbscan',
-            'dbscan_radius': radius,
-            'dbscan_n': n
+            'radius': radius,
+            'n': n
         }
-    }
+    })
 
-    if 'metadata' in dataset:
-        dataset['metadata'].update(metadata_dict)
-    else:
-        dataset['metadata'] = metadata_dict
+    dataset['medata'] = metadata_dict
+
+    return {
+        'what': 'clustering',
+        'metadata': metadata_dict,
+        'statistics': {'n_clusters': len(clustering.get_clusters()),
+                       'outliers': clustering.get_noise(),
+                       'outlier_ratio': len(clustering.get_noise()) / lie_matrix.shape[0]},
+        'data': clustering.get_clusters()
+    }
 
 def cli():
     parser = argparse.ArgumentParser()

@@ -7,6 +7,25 @@ from pylie import se3_log
 from recova.util import empty_to_none, eprint
 
 
+def dataset_to_vtk(dataset, filename, dims=(0,1,2)):
+    positions = positions_of_registration_data(dataset)
+    data = empty_to_none(data_dict_of_registration_data(dataset))
+
+    points_to_vtk(positions[:,dims], filename, data=data)
+
+
+def registrations_of_dataset(dataset, key='result'):
+    """
+    A numpy array containing all the registration results contained in a dataset.
+    The registration results are in matrix form.
+    """
+    registrations = np.empty((len(dataset['data']), 4, 4))
+    for i, registration in enumerate(dataset['data']):
+        registrations[i] = registration['result']
+
+    return registrations
+
+
 def lie_vectors_of_registrations(json_data, key='result'):
     """
     Outputs the lie vectors of a json registration dataset.
