@@ -16,11 +16,12 @@ setup(
     entry_points = {
         'console_scripts': [
             'clustering = recova.clustering_dbscan:cli',
-            'clusterings = recova.clustering_dbscan_explore_radius:cli',
+            'clustering_batch = recova.clustering_batch:cli',
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
             'find_central_cluster = recova.find_center_cluster:cli',
             'generate_cube = recova.pointcloud_gen.cube:cli',
             'merge_json_result = recova.merge_json_result:cli',
+            'recov_plot = recova.recov_plot:cli',
             'registration_heatmap = recova.single_experiment_heatmap:cli',
             'registration_2d_plot = recova.single_experiment_plot:cli',
             'registration2covariance = recova.covariance_of_registrations:cli',

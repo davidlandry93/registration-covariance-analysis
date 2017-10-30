@@ -13,9 +13,13 @@ def find_central_cluster(dataset, clustering):
     norms = np.linalg.norm(lie_vectors, axis=1)
 
     cluster_distances = list(map(lambda x: norms[x[0]], clustering))
-    best_cluster = np.argmin(cluster_distances)
 
-    return clustering[best_cluster]
+    if cluster_distances:
+        best_cluster = clustering[np.argmin(cluster_distances)]
+    else:
+        best_cluster = []
+
+    return best_cluster
 
 def filter_with_cluster(dataset, cluster):
     new_data = []

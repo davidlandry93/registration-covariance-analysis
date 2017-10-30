@@ -6,17 +6,21 @@ Utilities to cluster a registration dataset using the DBSCAN algorithm.
 import argparse
 import json
 import numpy as np
-from pyclustering.cluster import cluster_visualizer
-import pyclustering.cluster.dbscan as dbscan
 import sys
+import time
+
+import pyclustering.cluster.dbscan as dbscan
 
 from pylie import se3_log
 from recova.util import eprint
 from recova.registration_dataset import lie_tensor_of_trails, lie_vectors_of_registrations
 
 
+
 def dbscan_clustering(dataset, radius=0.005, n=12):
-    """Augment dataset with clustering information using the dbscan algorithm"""
+    """
+    Return a data row describing a clustering that was run on dataset with the given parameters.
+    """
 
     if ('metadata' in dataset and
         'experiment' in dataset['metadata'] and
@@ -25,40 +29,23 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
     else:
         lie_matrix = lie_vectors_of_registrations(dataset)
 
-    clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
-    clustering.process()
+    lie_matrix[:,0:3] = rescale_hypersphere(lie_matrix[:,0:3], 2*np.pi)
 
-    statistics_dict = {
+    clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
+
+    start = time.clock()
+    clustering.process()
+    computation_time = time.clock() - start
+
+    return {
         'clustering': clustering.get_clusters(),
         'n_clusters': len(clustering.get_clusters()),
         'outliers': clustering.get_noise(),
-        'outlier_ratio': len(clustering.get_noise()) / lie_matrix.shape[0]
+        'outlier_ratio': len(clustering.get_noise()) / len(lie_matrix),
+        'computation_time': computation_time,
+        'density': radius * len(lie_matrix)
     }
 
-    if 'statistics' in dataset:
-        dataset['statistics'].update(statistics_dict)
-    else:
-        dataset['statistics'] = statistics_dict
-
-    original_metadata = (dataset['metadata'] if 'metadata' in dataset else {})
-    metadata_dict = original_metadata.update({
-        'clustering': {
-            'algorithm': 'dbscan',
-            'radius': radius,
-            'n': n
-        }
-    })
-
-    dataset['medata'] = metadata_dict
-
-    return {
-        'what': 'clustering',
-        'metadata': metadata_dict,
-        'statistics': {'n_clusters': len(clustering.get_clusters()),
-                       'outliers': clustering.get_noise(),
-                       'outlier_ratio': len(clustering.get_noise()) / lie_matrix.shape[0]},
-        'data': clustering.get_clusters()
-    }
 
 def cli():
     parser = argparse.ArgumentParser()
