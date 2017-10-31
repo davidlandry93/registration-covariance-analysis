@@ -20,6 +20,10 @@ def compute_one_perturbation(mean, registration):
 
 
 def distribution_of_registrations(registrations):
+    """
+    :arg registrations: An iterable of 4x4 SE(3) transformations.
+    :returns: mean, covariance. The mean and covariance of the distribution of registrations.
+    """
     mean = registrations[0]
 
     former_perturbation = np.full(6, np.inf)

@@ -19,13 +19,13 @@ def cli():
     parser.add_argument('--dim1', type=int, default=0)
     parser.add_argument('--dim2', type=int, default=1)
     parser.add_argument('--dim3', type=int, default=2)
-    parser.add_argument('--rotation', type=str, default='false', help='Print rotation dimensions instead of translation.')
+    parser.add_argument('--rotation', action='store_true', help='Print rotation dimensions instead of translation.')
     parser.add_argument('--initial-estimate', type=str, default='false', help='Print initial estimates instead of results.')
     args = parser.parse_args()
 
     json_data = json.load(sys.stdin)
 
-    if args.rotation in POSITIVE_STRINGS:
+    if args.rotation:
         dims = (3,4,5)
     else:
         dims = (args.dim1, args.dim2, args.dim3)

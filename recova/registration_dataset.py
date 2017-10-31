@@ -48,9 +48,8 @@ def lie_vectors_of_registrations(json_data, key='result'):
 
 
 def positions_of_registration_data(reg_data, initial_estimates=False):
-    if ('metadata' in reg_data and
-        'experiment' in reg_data['metadata'] and
-        'trail_batch' == reg_data['metadata']['experiment']):
+    if ('what' in reg_data and
+        'trails' == reg_data['what']):
         lie_vectors = lie_tensor_of_trails(reg_data)[(0 if initial_estimates else -1)]
     else:
         key = 'result'

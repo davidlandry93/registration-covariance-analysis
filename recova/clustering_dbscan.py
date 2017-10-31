@@ -19,19 +19,10 @@ from recova.registration_dataset import lie_tensor_of_trails, lie_vectors_of_reg
 
 def dbscan_clustering(dataset, radius=0.005, n=12):
     """
-    Return a data row describing a clustering that was run on dataset with the given parameters.
+    :arg dataset: A numpy matrix containing the N-D points to cluster.
+    :returns: A datarow representing the clustering.
     """
-
-    if ('metadata' in dataset and
-        'experiment' in dataset['metadata'] and
-        dataset['metadata']['experiment'] == 'trail_batch'):
-        lie_matrix = lie_tensor_of_trails(dataset)[-1]
-    else:
-        lie_matrix = lie_vectors_of_registrations(dataset)
-
-    lie_matrix[:,0:3] = rescale_hypersphere(lie_matrix[:,0:3], 2*np.pi)
-
-    clustering = dbscan.dbscan(lie_matrix.tolist(), radius, n, True)
+    clustering = dbscan.dbscan(dataset.tolist(), radius, n, True)
 
     start = time.clock()
     clustering.process()
@@ -41,9 +32,9 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
         'clustering': clustering.get_clusters(),
         'n_clusters': len(clustering.get_clusters()),
         'outliers': clustering.get_noise(),
-        'outlier_ratio': len(clustering.get_noise()) / len(lie_matrix),
+        'outlier_ratio': len(clustering.get_noise()) / len(dataset),
         'computation_time': computation_time,
-        'density': radius * len(lie_matrix)
+        'density': radius * len(dataset)
     }
 
 
@@ -56,16 +47,16 @@ def cli():
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
+    lie_vectors = lie_vectors_of_registrations(json_dataset)
+    clustering = dbscan_clustering(lie_vectors, args.radius, args.n)
 
-    dbscan_clustering(json_dataset, args.radius, args.n)
+    json.dump(clustering, sys.stdout)
 
-    json.dump(json_dataset, sys.stdout)
-
-    cluster_sizes = sorted(list(map(len, json_dataset['statistics']['clustering'])), reverse=True)
+    cluster_sizes = sorted(list(map(len, clustering['clustering'])), reverse=True)
 
     eprint(cluster_sizes)
-    eprint('N clusters: {}'.format(json_dataset['statistics']['n_clusters']))
-    eprint('Outlier ratio: {}'.format(json_dataset['statistics']['outlier_ratio']))
+    eprint('N clusters: {}'.format(clustering['n_clusters']))
+    eprint('Outlier ratio: {}'.format(clustering['outlier_ratio']))
     eprint('Cluster sizes: {}'.format(cluster_sizes))
 
 

@@ -20,20 +20,27 @@ def cli():
         with open(entry) as jsonfile:
             data = json.load(jsonfile)
 
+        if 'what' in data:
             if not what:
                 what = data['what']
             else:
                 if data['what'] != what:
                     raise RuntimeError('Merged files of different type')
 
-            metadata.update(data['metadata'])
-            merged_data.extend(data['data'])
+        metadata.update(data['metadata'])
+        merged_data.extend(data['data'])
+
+        if 'statistics' in data:
             statistics = merge_statistics(statistics, data['statistics'])
 
     output_dict = {
         'metadata': metadata,
         'data': merged_data
     }
+
+    if what:
+        output_dict['what'] = what
+
     json.dump(output_dict, sys.stdout)
 
 

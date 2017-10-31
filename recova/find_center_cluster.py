@@ -5,14 +5,31 @@ import json
 import numpy as np
 import sys
 
+from pylie import se3_log
+from recova.covariance_of_registrations import distribution_of_registrations
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint
+
+
+def distance_of_cluster(dataset, cluster):
+    filtered_dataset = filter_with_cluster(dataset, cluster)
+
+    registrations = [x['result'] for x in dataset['data']]
+    registrations = np.array(registrations)
+
+    mean, covariance = distribution_of_registrations(registrations)
+
+    perturbation = np.linalg.dot(np.linalg.inv(np.array(dataset['metadata']['ground_truth'])), mean)
+    norm = np.norm(se3_log(perturbation))
+    print(norm)
+    return norm
 
 def find_central_cluster(dataset, clustering):
     lie_vectors = lie_vectors_of_registrations(dataset)
     norms = np.linalg.norm(lie_vectors, axis=1)
 
-    cluster_distances = list(map(lambda x: norms[x[0]], clustering))
+    cluster_distances = list(map(lambda x: distance_of_cluster(dataset, x), clustering))
+    print(cluster_distances)
 
     if cluster_distances:
         best_cluster = clustering[np.argmin(cluster_distances)]
@@ -21,14 +38,17 @@ def find_central_cluster(dataset, clustering):
 
     return best_cluster
 
+
 def filter_with_cluster(dataset, cluster):
     new_data = []
     for i in cluster:
         new_data.append(dataset['data'][i])
 
-    dataset['data'] = new_data
+    new_dataset = dataset.copy()
+    new_dataset['data'] = new_data
 
-    return dataset
+    return new_dataset
+
 
 def cli():
     parser = argparse.ArgumentParser()
