@@ -19,9 +19,8 @@ def distance_of_cluster(dataset, cluster):
 
     mean, covariance = distribution_of_registrations(registrations)
 
-    perturbation = np.linalg.dot(np.linalg.inv(np.array(dataset['metadata']['ground_truth'])), mean)
-    norm = np.norm(se3_log(perturbation))
-    print(norm)
+    perturbation = np.dot(np.linalg.inv(np.array(dataset['metadata']['ground_truth'])), mean)
+    norm = np.linalg.norm(se3_log(perturbation))
     return norm
 
 def find_central_cluster(dataset, clustering):

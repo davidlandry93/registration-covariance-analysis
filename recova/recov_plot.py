@@ -16,9 +16,13 @@ from recova.util import eprint
 
 
 def covariance_of_central_cluster(dataset, clustering):
+    """
+    :arg dataset: A full registration dataset.
+    :arg clustering: A 2d array describing a clustering.
+    """
     new_dataset = dataset.copy()
-    clustering_data = clustering['data']
-    new_dataset = filter_with_cluster(new_dataset, find_central_cluster(new_dataset, clustering_data))
+    central_cluster = find_central_cluster(new_dataset, clustering)
+    new_dataset = filter_with_cluster(new_dataset, central_cluster)
 
     registrations = registrations_of_dataset(new_dataset)
 
@@ -45,11 +49,11 @@ def plot_cov_against_density(args):
     registrations = registrations_of_dataset(dataset)
 
     covariances = np.empty((len(clusterings), 6, 6))
-    for i, clustering in enumerate(clusterings):
+    for i, clustering in enumerate(clusterings['data']):
         print(i)
-        covariance = covariance_of_central_cluster(dataset, clustering)
+        covariance = covariance_of_central_cluster(dataset, clustering['clustering'])
         covariances[i] = covariance
-        print('{} yield a trace of {}'.format(clustering['metadata']['radius'], np.trace(covariance)))
+        print('{} yield a trace of {}'.format(clustering['radius'], np.trace(covariance)))
         print(covariance)
 
     xs = []
@@ -60,6 +64,7 @@ def plot_cov_against_density(args):
 
     plt.plot(xs, ys, linestyle='-', marker='o')
     plt.show()
+
 
 functions_of_plots = {
     'cov_on_density': plot_cov_against_density

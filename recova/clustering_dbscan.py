@@ -34,7 +34,9 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
         'outliers': clustering.get_noise(),
         'outlier_ratio': len(clustering.get_noise()) / len(dataset),
         'computation_time': computation_time,
-        'density': radius * len(dataset)
+        'density': radius * len(dataset),
+        'radius': radius,
+        'n': n
     }
 
 
