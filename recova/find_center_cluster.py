@@ -24,11 +24,16 @@ def distance_of_cluster(dataset, cluster):
     return norm
 
 def find_central_cluster(dataset, clustering):
+    """
+    :arg dataset: A dataset as a facet.
+    :arg clustering: A list of lists reprensenting the points indices
+    :returns: The cluster itself (as a list of indices).
+    """
     lie_vectors = lie_vectors_of_registrations(dataset)
     norms = np.linalg.norm(lie_vectors, axis=1)
 
     cluster_distances = list(map(lambda x: distance_of_cluster(dataset, x), clustering))
-    print(cluster_distances)
+    eprint('Clustering distances: {}'.format(cluster_distances))
 
     if cluster_distances:
         best_cluster = clustering[np.argmin(cluster_distances)]

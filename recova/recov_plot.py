@@ -1,5 +1,6 @@
 
 
+
 #!/usr/bin/env python3
 
 import argparse
@@ -38,31 +39,33 @@ def plot_cov_against_density(args):
     """
     Plot the evolution of the covariance when we change the clustering radius.
     """
-    parser = argparse.ArgumentParser(prog='cov_on_density')
-    parser.add_argument('dataset', type=str, help='The dataset that was clustered')
-    args = parser.parse_args(args)
-
     clusterings = json.load(sys.stdin)
-    with open(args.dataset) as dataset_file:
-        dataset = json.load(dataset_file)
-
-    registrations = registrations_of_dataset(dataset)
-
-    covariances = np.empty((len(clusterings), 6, 6))
-    for i, clustering in enumerate(clusterings['data']):
-        print(i)
-        covariance = covariance_of_central_cluster(dataset, clustering['clustering'])
-        covariances[i] = covariance
-        print('{} yield a trace of {}'.format(clustering['radius'], np.trace(covariance)))
-        print(covariance)
 
     xs = []
     ys = []
-    for i, covariance in enumerate(covariances):
-        xs.append(clusterings[i]['metadata']['radius'])
+    sizes = []
+    for i, clustering in enumerate(clusterings['data']):
+        xs.append(clustering['radius'])
+        sizes.append(len(clustering['central_cluster']))
+
+        covariance = np.array(clustering['covariance_of_central'])
         ys.append(np.trace(covariance))
 
-    plt.plot(xs, ys, linestyle='-', marker='o')
+    fig, ax1 = plt.subplots()
+    plot1 = ax1.plot(xs, ys, linestyle='-', marker='o', label='Trace of covariance matrix', color='black')
+    ax1.set_xlabel('DBSCAN Radius')
+    ax1.set_ylabel('Trace of covariance matrix')
+
+    ax2 = ax1.twinx()
+    plot2 = ax2.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s', color='0.5')
+    ax2.set_xlabel('DBSCAN Radius')
+    ax2.set_ylabel('N of points in cluster')
+
+    plots = plot1 + plot2
+    labels = [x.get_label() for x in plots]
+    ax1.legend(plots, labels, loc=0)
+
+
     plt.show()
 
 
