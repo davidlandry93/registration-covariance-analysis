@@ -27,8 +27,6 @@ def raw_centered_clustering(dataset, radius, n=12):
     json.dump(dataset.tolist(), stream)
     response = subprocess.run(command, input=json.dumps(dataset.tolist()), stdout=subprocess.PIPE, shell=True, universal_newlines=True)
 
-    print(response)
-
     return json.loads(response.stdout)
 
 
@@ -41,7 +39,9 @@ def centered_clustering(dataset, radius, n=12):
 
     return {
         'clustering': [center_cluster],
-        'n_clusters': 1
+        'n_clusters': 1,
+        'radius': radius,
+        'n': n
     }
 
 

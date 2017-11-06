@@ -10,6 +10,7 @@ import sys
 import time
 import threading
 
+from recova.clustering import clustering_algorithm_factory
 from recova.clustering_dbscan import dbscan_clustering
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint
@@ -24,7 +25,7 @@ def rescale_hypersphere(points, radius):
     return points
 
 
-def run_one_clustering_thread(i, registration_data, density, n=12, scaling_of_translation=False):
+def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling_of_translation=False):
     eprint('Clustering with density {}'.format(density))
 
     lie_vectors = lie_vectors_of_registrations(registration_data)
@@ -33,7 +34,7 @@ def run_one_clustering_thread(i, registration_data, density, n=12, scaling_of_tr
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
 
-    clustering = dbscan_clustering(lie_vectors, radius)
+    clustering = algo(lie_vectors, radius)
 
     eprint('Done clustering with radius {} (density {})'.format(radius, density))
 
@@ -42,6 +43,7 @@ def run_one_clustering_thread(i, registration_data, density, n=12, scaling_of_tr
 
 def cli():
     parser = argparse.ArgumentParser()
+    parser.add_argument('algo', type=str, help='Clustering algorithm to use')
     parser.add_argument('begin', type=float)
     parser.add_argument('end', type=float)
     parser.add_argument('n_samples', type=float)
@@ -57,9 +59,11 @@ def cli():
     else:
         translation_scaling = False
 
+    clustering_algorithm = clustering_algorithm_factory(args.algo)
+
     with multiprocessing.Pool() as pool:
         clusterings = pool.starmap(run_one_clustering_thread,
-                                   [(x, json_dataset, densities[x], translation_scaling) for x in range(len(densities))],
+                                   [(clustering_algorithm, x, json_dataset, densities[x], translation_scaling) for x in range(len(densities))],
                                    chunksize=1)
 
     facet = {
