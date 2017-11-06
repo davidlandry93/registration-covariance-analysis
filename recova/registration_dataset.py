@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+import json
 import numpy as np
+import sys
 
 from pyevtk.hl import pointsToVTK
 from pylie import se3_log
@@ -24,6 +26,27 @@ def registrations_of_dataset(dataset, key='result'):
         registrations[i] = registration['result']
 
     return registrations
+
+
+def index_of_closest_to_ground_truth(dataset):
+    """
+    Find the index of the point in the dataset that is the closest to ground truth.
+    :arg dataset: The registration dataset as a facet.
+    """
+    gt = np.array(dataset['metadata']['ground_truth'])
+    inv_of_gt = np.linalg.inv(gt)
+
+    id_of_min = None
+    min_distance = np.inf
+    for i, registration in enumerate(dataset['data']):
+        reg = np.array(registration['result'])
+        distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
+
+        if distance_to_gt < min_distance:
+            id_of_min = i
+            min_distance = distance_to_gt
+
+    return id_of_min
 
 
 def lie_vectors_of_registrations(json_data, key='result'):
@@ -104,3 +127,7 @@ def points_to_vtk(points, filename, data=None):
                 np.ascontiguousarray(points[:,1]),
                 np.ascontiguousarray(points[:,2]),
                 data = data)
+
+def registration2lie_cli():
+    dataset = json.load(sys.stdin)
+    json.dump(lie_vectors_of_registrations(dataset).tolist(), sys.stdout)

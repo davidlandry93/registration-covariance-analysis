@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import subprocess
 import sys
 
 POSITIVE_STRINGS = ('yes', 'y', 't', 'true', '1')
@@ -19,3 +20,10 @@ def parse_dims(dim_string):
         raise RuntimeError('Can only generate an ellipsoid with 3 dimensions.')
 
     return dims
+
+def run_subprocess(command_string):
+    return subprocess.check_output(
+        command_string,
+        universal_newlines=True,
+        shell=True
+    )

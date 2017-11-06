@@ -15,7 +15,7 @@ setup(
     scripts = ['bin/all_registration_to_vtk_ellipsoid'],
     entry_points = {
         'console_scripts': [
-            'clustering = recova.clustering_dbscan:cli',
+            'clustering = recova.clustering:cli',
             'clustering_batch = recova.clustering_batch:cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',
@@ -28,6 +28,7 @@ setup(
             'registration_2d_plot = recova.single_experiment_plot:cli',
             'registration2covariance = recova.covariance_of_registrations:cli',
             'registration2vtk = recova.results_to_vtk:cli',
+            'registration2lie = recova.registration_dataset:registration2lie_cli',
             'trails2vtk = recova.trails_to_vtk:cli'
         ]
     }

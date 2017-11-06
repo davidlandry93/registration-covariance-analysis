@@ -7,7 +7,7 @@ import sys
 
 from pylie import se3_log
 from recova.covariance_of_registrations import distribution_of_registrations
-from recova.registration_dataset import lie_vectors_of_registrations
+from recova.registration_dataset import lie_vectors_of_registrations, index_of_closest_to_ground_truth
 from recova.util import eprint
 
 
@@ -17,11 +17,16 @@ def distance_of_cluster(dataset, cluster):
     registrations = [x['result'] for x in dataset['data']]
     registrations = np.array(registrations)
 
-    mean, covariance = distribution_of_registrations(registrations)
+    inv_of_gt = np.linalg.inv(np.array(dataset['metadata']['ground_truth']))
 
-    perturbation = np.dot(np.linalg.inv(np.array(dataset['metadata']['ground_truth'])), mean)
-    norm = np.linalg.norm(se3_log(perturbation))
-    return norm
+    min_distance = np.inf
+    for point in cluster:
+        reg = np.array(dataset['data'][point]['result'])
+        distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
+        if distance_to_gt < min_distance:
+            min_distance = distance_to_gt
+
+    return distance_to_gt
 
 def find_central_cluster(dataset, clustering):
     """
@@ -29,8 +34,12 @@ def find_central_cluster(dataset, clustering):
     :arg clustering: A list of lists reprensenting the points indices
     :returns: The cluster itself (as a list of indices).
     """
+
+    closest_point = index_of_closest_to_ground_truth(dataset)
+
     lie_vectors = lie_vectors_of_registrations(dataset)
     norms = np.linalg.norm(lie_vectors, axis=1)
+
 
     cluster_distances = list(map(lambda x: distance_of_cluster(dataset, x), clustering))
     eprint('Clustering distances: {}'.format(cluster_distances))

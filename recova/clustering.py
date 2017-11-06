@@ -1,14 +1,56 @@
 #!/usr/bin/python3
 
 import argparse
+import io
 import json
 import multiprocessing
 import numpy as np
+import subprocess
 import sys
 
 from recova.covariance_of_registrations import distribution_of_registrations
-from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset
+from recova.clustering_dbscan import dbscan_clustering
+from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations
 from recova.find_center_cluster import find_central_cluster, filter_with_cluster
+from recova.util import eprint
+
+def raw_centered_clustering(dataset, radius, n=12):
+    """
+    :arg dataset: The dataset to cluster (as a numpy matrix).
+    :arg radius: The radius in which we have to have enough neighbours to be a core point.
+    :arg n: The number of points that have to be within the radius to be a core point.
+    :returns: The indices of the points that are inside the central cluster as a list.
+    """
+    command = 'centered_clustering -radius {} -n {}'.format(radius, n)
+    eprint(command)
+    stream = io.StringIO()
+    json.dump(dataset.tolist(), stream)
+    response = subprocess.run(command, input=json.dumps(dataset.tolist()), stdout=subprocess.PIPE, shell=True, universal_newlines=True)
+
+    print(response)
+
+    return json.loads(response.stdout)
+
+
+def centered_clustering(dataset, radius, n=12):
+    """
+    :returns: The result of the centered clustering algorithm, as a facet.
+    """
+
+    center_cluster = raw_centered_clustering(dataset, radius, n)
+
+    return {
+        'clustering': [center_cluster],
+        'n_clusters': 1
+    }
+
+
+def clustering_algorithm_factory(algo_name):
+    algo_dict = {
+        'centered': centered_clustering,
+        'dbscan':  dbscan_clustering
+    }
+    return algo_dict[algo_name]
 
 
 def clusters_of_points(clustering, n_points):
@@ -121,3 +163,25 @@ def batch_to_vtk_cli():
 
     batch_to_vtk(points, clusterings, args.output)
 
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('algo', type=str, default='centered', help='The name of the clustering algorithm to use. {centered,dbscan}')
+    parser.add_argument('--radius', type=float, default=0.005,
+                        help='Radius that must contain enough neighbors for a point to be a core point.')
+    parser.add_argument('--n', type=float, default=12,
+                        help='Number of neighbours that must be contained within the radius for a point to be a core point.')
+    args = parser.parse_args()
+
+    json_dataset = json.load(sys.stdin)
+    lie_vectors = lie_vectors_of_registrations(json_dataset)
+
+    algo = clustering_algorithm_factory(args.algo)
+
+    clustering = algo(lie_vectors, args.radius, args.n)
+
+    json.dump(clustering, sys.stdout)
+
+    cluster_sizes = sorted(list(map(len, clustering['clustering'])), reverse=True)
+
+    eprint(cluster_sizes)
