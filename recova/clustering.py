@@ -7,6 +7,7 @@ import multiprocessing
 import numpy as np
 import subprocess
 import sys
+import time
 
 import pyclustering.cluster.dbscan as dbscan
 
@@ -14,6 +15,45 @@ from recova.covariance_of_registrations import distribution_of_registrations
 from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations
 from recova.find_center_cluster import find_central_cluster, filter_with_cluster
 from recova.util import eprint
+
+
+
+def inverse_of_cluster(cluster, size_of_dataset):
+    """Returns a list of points not in cluster."""
+    sorted_cluster = sorted(cluster)
+    inverse = []
+    for i in range(size_of_dataset-1, -1, -1):
+        if sorted_cluster and sorted_cluster[-1] != i:
+            inverse.append(i)
+        elif sorted_cluster:
+            sorted_cluster.pop()
+        else:
+            inverse.append(i)
+
+    return inverse
+
+
+def centered_clustering(dataset, radius, n=12):
+    """
+    :arg dataset: A nd array containing the points to cluster.
+    :returns: The result of the centered clustering algorithm, as a facet.
+    """
+    center_cluster = raw_centered_clustering(dataset, radius, n)
+
+    clustering_row = {
+        'clustering': [center_cluster],
+        'n_clusters': 1,
+        'radius': radius,
+        'n': n,
+        'outliers': inverse_of_cluster(center_cluster, len(dataset)),
+        'outlier_ratio': len(center_cluster) / len(dataset),
+    }
+
+    eprint('{} outliers'.format(len(clustering_row['outliers'])))
+    eprint('{} inliers'.format(len(center_cluster)))
+
+    return clustering_row
+
 
 def raw_centered_clustering(dataset, radius, n=12):
     """
@@ -35,53 +75,12 @@ def raw_centered_clustering(dataset, radius, n=12):
     return json.loads(response.stdout)
 
 
-def inverse_of_cluster(cluster, size_of_dataset):
-    """Returns a list of points not in cluster."""
-    sorted_cluster = sorted(cluster)
-    inverse = []
-    for i in range(size_of_dataset-1, -1, -1):
-        if sorted_cluster and sorted_cluster[-1] != i:
-            inverse.append(i)
-        elif sorted_cluster:
-            sorted_cluster.pop()
-        else:
-            inverse.append(i)
-
-    return inverse
-
-
-def centered_clustering(dataset, radius, n=12):
-    """
-    :arg dataset: The dataset to cluster (as a facet).
-    :returns: The result of the centered clustering algorithm, as a facet.
-    """
-    lie_vectors = lie_vectors_of_registrations(dataset)
-
-    center_cluster = raw_centered_clustering(lie_vectors, radius, n)
-
-    clustering_row = {
-        'clustering': [center_cluster],
-        'n_clusters': 1,
-        'radius': radius,
-        'n': n,
-        'outliers': inverse_of_cluster(center_cluster, len(lie_vectors)),
-        'outlier_ratio': len(center_cluster) / len(lie_vectors),
-        'density': radius * len(lie_vectors)
-    }
-
-    eprint('{} outliers'.format(len(clustering_row['outliers'])))
-    eprint('{} inliers'.format(len(center_cluster)))
-
-    return clustering_row
-
 def dbscan_clustering(dataset, radius=0.005, n=12):
     """
-    :arg dataset: A facet describing the dataset to to cluster.
+    :arg dataset: A np array describing the points to cluster.
     :returns: A datarow representing the clustering.
     """
-    lie_vectors = lie_vectors_of_registrations(dataset)
-
-    clustering = dbscan.dbscan(lie_vectors.tolist(), radius, n, True)
+    clustering = dbscan.dbscan(dataset.tolist(), radius, n, True)
 
     start = time.clock()
     clustering.process()
@@ -93,7 +92,6 @@ def dbscan_clustering(dataset, radius=0.005, n=12):
         'outliers': clustering.get_noise(),
         'outlier_ratio': len(clustering.get_noise()) / len(dataset),
         'computation_time': computation_time,
-        'density': radius * len(lie_vectors),
         'radius': radius,
         'n': n
     }

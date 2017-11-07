@@ -27,12 +27,16 @@ def rescale_hypersphere(points, radius):
 def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling_of_translation=False):
     eprint('Clustering with density {}'.format(density))
 
-    radius = density / len(registration_data['data'])
+    var_translation = float(registration_data['metadata']['var_translation'])
+
+    lie_vectors = lie_vectors_of_registrations(registration_data)
+    radius = (n * density * var_translation**3.0 / len(lie_vectors))**(1. / 3.)
 
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
 
-    clustering = algo(registration_data, radius)
+    clustering = algo(lie_vectors, radius)
+    clustering['density'] = density
 
     clustering_with_distribution = compute_distribution(registration_data, clustering)
 
@@ -48,6 +52,7 @@ def cli():
     parser.add_argument('end', type=float)
     parser.add_argument('n_samples', type=float)
     parser.add_argument('--scale_translations', action='store_true')
+    parser.add_argument('--n_neighbours', type=int, default=12)
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
@@ -63,7 +68,7 @@ def cli():
 
     with multiprocessing.Pool() as pool:
         clusterings = pool.starmap(run_one_clustering_thread,
-                                   [(clustering_algorithm, x, json_dataset, densities[x], translation_scaling) for x in range(len(densities))],
+                                   [(clustering_algorithm, x, json_dataset, densities[x], args.n_neighbours, translation_scaling) for x in range(len(densities))],
                                    chunksize=1)
 
     facet = {
