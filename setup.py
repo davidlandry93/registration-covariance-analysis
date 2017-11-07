@@ -15,6 +15,7 @@ setup(
     scripts = ['bin/all_registration_to_vtk_ellipsoid'],
     entry_points = {
         'console_scripts': [
+            'center_registrations = recova.registration_dataset:center_around_gt_cli',
             'clustering = recova.clustering:cli',
             'clustering_batch = recova.clustering_batch:cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',

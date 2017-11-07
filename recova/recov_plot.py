@@ -45,7 +45,7 @@ def plot_cov_against_density(args):
     ys = []
     sizes = []
     for i, clustering in enumerate(clusterings['data']):
-        xs.append(clustering['radius'])
+        xs.append(clustering['density'])
         sizes.append(len(clustering['central_cluster']))
 
         covariance = np.array(clustering['covariance_of_central'])
@@ -53,12 +53,12 @@ def plot_cov_against_density(args):
 
     fig, ax1 = plt.subplots()
     plot1 = ax1.plot(xs, ys, linestyle='-', marker='o', label='Trace of covariance matrix', color='black')
-    ax1.set_xlabel('DBSCAN Radius')
+    ax1.set_xlabel('Density Gain')
     ax1.set_ylabel('Trace of covariance matrix')
 
     ax2 = ax1.twinx()
     plot2 = ax2.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s', color='0.5')
-    ax2.set_xlabel('DBSCAN Radius')
+    ax2.set_xlabel('Density Gain')
     ax2.set_ylabel('N of points in cluster')
 
     plots = plot1 + plot2

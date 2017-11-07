@@ -131,3 +131,22 @@ def points_to_vtk(points, filename, data=None):
 def registration2lie_cli():
     dataset = json.load(sys.stdin)
     json.dump(lie_vectors_of_registrations(dataset).tolist(), sys.stdout)
+
+
+def center_around_gt_cli():
+    dataset = json.load(sys.stdin)
+    ground_truth_inv = np.matrix(dataset['metadata']['ground_truth']).I
+
+    for i, result in enumerate(dataset['data']):
+        result_matrix = np.matrix(result['result'])
+        estimate_matrix = np.matrix(result['initial_estimate'])
+
+        centered_result = ground_truth_inv * result_matrix
+        centered_estimate = ground_truth_inv * estimate_matrix
+
+        dataset['data'][i]['result'] = centered_result.tolist()
+        dataset['data'][i]['initial_estimate'] = centered_estimate.tolist()
+
+    dataset['metadata']['ground_truth'] = np.identity(4).tolist()
+
+    json.dump(dataset, sys.stdout)

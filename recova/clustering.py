@@ -33,12 +33,12 @@ def inverse_of_cluster(cluster, size_of_dataset):
     return inverse
 
 
-def centered_clustering(dataset, radius, n=12):
+def centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     """
     :arg dataset: A nd array containing the points to cluster.
     :returns: The result of the centered clustering algorithm, as a facet.
     """
-    center_cluster = raw_centered_clustering(dataset, radius, n)
+    center_cluster = raw_centered_clustering(dataset, radius, n, seed=seed)
 
     clustering_row = {
         'clustering': [center_cluster],
@@ -55,14 +55,15 @@ def centered_clustering(dataset, radius, n=12):
     return clustering_row
 
 
-def raw_centered_clustering(dataset, radius, n=12):
+def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     """
     :arg dataset: The dataset to cluster (as a numpy matrix).
     :arg radius: The radius in which we have to have enough neighbours to be a core point.
     :arg n: The number of points that have to be within the radius to be a core point.
     :returns: The indices of the points that are inside the central cluster as a list.
     """
-    command = 'centered_clustering -radius {} -n {}'.format(radius, n)
+    strings_of_seed = list(map(str, seed.tolist()))
+    command = 'centered_clustering -radius {} -n {} -seed {}'.format(radius, n, ','.join(strings_of_seed))
     eprint(command)
     stream = io.StringIO()
     json.dump(dataset.tolist(), stream)
@@ -75,7 +76,7 @@ def raw_centered_clustering(dataset, radius, n=12):
     return json.loads(response.stdout)
 
 
-def dbscan_clustering(dataset, radius=0.005, n=12):
+def dbscan_clustering(dataset, radius=0.005, n=12, seed=None):
     """
     :arg dataset: A np array describing the points to cluster.
     :returns: A datarow representing the clustering.

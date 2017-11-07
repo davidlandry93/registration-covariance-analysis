@@ -10,9 +10,12 @@ import sys
 import time
 import threading
 
+from pylie import se3_log
+
 from recova.clustering import clustering_algorithm_factory, compute_distribution
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint
+
 
 
 def rescale_hypersphere(points, radius):
@@ -35,7 +38,8 @@ def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
 
-    clustering = algo(lie_vectors, radius)
+    ground_truth = np.array(registration_data['metadata']['ground_truth'])
+    clustering = algo(lie_vectors, radius, seed=se3_log(ground_truth))
     clustering['density'] = density
 
     clustering_with_distribution = compute_distribution(registration_data, clustering)
