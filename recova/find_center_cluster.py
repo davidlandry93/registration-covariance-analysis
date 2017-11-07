@@ -21,12 +21,14 @@ def distance_of_cluster(dataset, cluster):
 
     min_distance = np.inf
     for point in cluster:
-        reg = np.array(dataset['data'][point]['result'])
+        reg = registrations[point]
         distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
         if distance_to_gt < min_distance:
             min_distance = distance_to_gt
 
-    return distance_to_gt
+    eprint(min_distance)
+
+    return min_distance
 
 def find_central_cluster(dataset, clustering):
     """

@@ -10,8 +10,7 @@ import sys
 import time
 import threading
 
-from recova.clustering import clustering_algorithm_factory
-from recova.clustering_dbscan import dbscan_clustering
+from recova.clustering import clustering_algorithm_factory, compute_distribution
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint
 
@@ -20,7 +19,7 @@ def rescale_hypersphere(points, radius):
     norms = np.linalg.norm(points, axis=1)
     max_distance = np.max(norms)
 
-    points = points * np.pi / max_distance
+    points = points * radius / max_distance
 
     return points
 
@@ -35,9 +34,11 @@ def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling
 
     clustering = algo(registration_data, radius)
 
+    clustering_with_distribution = compute_distribution(registration_data, clustering)
+
     eprint('Done clustering with radius {} (density {})'.format(radius, density))
 
-    return clustering
+    return clustering_with_distribution
 
 
 def cli():
