@@ -28,13 +28,12 @@ def rescale_hypersphere(points, radius):
 def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling_of_translation=False):
     eprint('Clustering with density {}'.format(density))
 
-    lie_vectors = lie_vectors_of_registrations(registration_data)
-    radius = density / len(lie_vectors)
+    radius = density / len(registration_data['data'])
 
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
 
-    clustering = algo(lie_vectors, radius)
+    clustering = algo(registration_data, radius)
 
     eprint('Done clustering with radius {} (density {})'.format(radius, density))
 

@@ -8,6 +8,8 @@ import numpy as np
 import subprocess
 import sys
 
+import pyclustering.cluster.dbscan as dbscan
+
 from recova.covariance_of_registrations import distribution_of_registrations
 from recova.clustering_dbscan import dbscan_clustering
 from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations
@@ -25,21 +27,57 @@ def raw_centered_clustering(dataset, radius, n=12):
     eprint(command)
     stream = io.StringIO()
     json.dump(dataset.tolist(), stream)
-    response = subprocess.run(command, input=json.dumps(dataset.tolist()), stdout=subprocess.PIPE, shell=True, universal_newlines=True)
+    response = subprocess.run(command,
+                              input=json.dumps(dataset.tolist()),
+                              stdout=subprocess.PIPE,
+                              shell=True,
+                              universal_newlines=True)
 
     return json.loads(response.stdout)
 
 
+
+
 def centered_clustering(dataset, radius, n=12):
     """
+    :arg dataset: The dataset to cluster (as a facet).
     :returns: The result of the centered clustering algorithm, as a facet.
     """
+    lie_vectors = lie_vectors_of_registrations(dataset)
 
-    center_cluster = raw_centered_clustering(dataset, radius, n)
+    center_cluster = raw_centered_clustering(lie_vectors, radius, n)
 
-    return {
+    clustering_row = {
         'clustering': [center_cluster],
         'n_clusters': 1,
+        'radius': radius,
+        'n': n
+    }
+
+    row_with_distribution = compute_distribution(dataset, clustering_row)
+
+    return row_with_distribution
+
+def dbscan_clustering(dataset, radius=0.005, n=12):
+    """
+    :arg dataset: A facet describing the dataset to to cluster.
+    :returns: A datarow representing the clustering.
+    """
+    lie_vectors = lie_vectors_of_registrations(dataset)
+
+    clustering = dbscan.dbscan(lie_vectors.tolist(), radius, n, True)
+
+    start = time.clock()
+    clustering.process()
+    computation_time = time.clock() - start
+
+    return {
+        'clustering': clustering.get_clusters(),
+        'n_clusters': len(clustering.get_clusters()),
+        'outliers': clustering.get_noise(),
+        'outlier_ratio': len(clustering.get_noise()) / len(dataset),
+        'computation_time': computation_time,
+        'density': radius * len(dataset),
         'radius': radius,
         'n': n
     }
@@ -174,14 +212,10 @@ def cli():
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
-    lie_vectors = lie_vectors_of_registrations(json_dataset)
-
     algo = clustering_algorithm_factory(args.algo)
 
-    clustering = algo(lie_vectors, args.radius, args.n)
-
+    clustering = algo(json_dataset, args.radius, args.n)
     json.dump(clustering, sys.stdout)
 
     cluster_sizes = sorted(list(map(len, clustering['clustering'])), reverse=True)
-
     eprint(cluster_sizes)
