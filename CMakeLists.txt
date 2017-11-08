@@ -14,7 +14,7 @@ target_link_libraries(nabo_adapter nabo ${OpenMP_CXX_FLAGS})
 target_compile_options(nabo_adapter PRIVATE ${OpenMP_CXX_FLAGS})
 set_property(TARGET nabo_adapter PROPERTY CXX_STANDARD 11)
 
-add_executable(centered_clustering src/centered_clustering_main.cpp)
+add_executable(centered_clustering src/centered_clustering_main.cpp src/centered_clustering.cpp)
 target_include_directories(centered_clustering PRIVATE include)
 target_link_libraries(centered_clustering nabo_adapter gflags)
 set_property(TARGET centered_clustering PROPERTY CXX_STANDARD 11)

@@ -1,3 +1,5 @@
+#ifndef RECOVA_NABO_ADAPTER_H
+#define RECOVA_NABO_ADAPTER_H
 
 #include <deque>
 #include <memory>
@@ -18,3 +20,5 @@ namespace recova {
     std::unique_ptr<Nabo::NNSearchD> nns;
   };
 }
+
+#endif
