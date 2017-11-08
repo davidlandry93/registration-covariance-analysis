@@ -10,7 +10,7 @@
 
 namespace recova {
 
-  std::set<int> cluster_around(const NaboAdapter& knn_algorithm, const Eigen::VectorXd& center, const int& n, const double& radius);
+  std::set<int> cluster_with_seed(const NaboAdapter& knn_algorithm, const Eigen::VectorXd& seed, const int& n, const double& radius);
 
   std::set<int> find_viable_cluster(const NaboAdapter& knn_algorithm, const Eigen::VectorXd& center);
   int point_closest_to_center(const NaboAdapter& knn_algorithm, const Eigen::VectorXd& center);

@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  auto cluster = cluster_around(knn_algorithm, center, FLAGS_n, FLAGS_radius);
+  auto cluster = cluster_with_seed(knn_algorithm, center, FLAGS_n, FLAGS_radius);
 
   json output_document;
   for(auto elt : cluster) {
