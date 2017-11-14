@@ -7,6 +7,7 @@
 
 #include "centered_clustering.h"
 #include "nabo_adapter.h"
+#include "util.h"
 
 
 using namespace recova;
@@ -18,22 +19,6 @@ template <class OutIt> void explode(std::string &input, char sep, OutIt out) {
 
   while (std::getline(buffer, temp, sep))
     *(out++) = temp;
-}
-
-
-Eigen::MatrixXd json_array_to_matrix(const json& array) {
-  int rows = array[0].size();
-  int columns = array.size();
-  Eigen::MatrixXd eigen_matrix(rows, columns);
-
-  // We transpose the matrix during the copy because libnabo has the points on columns.
-  for(int i = 0; i < rows; i++) {
-    for(int j = 0; j < columns; j++) {
-      eigen_matrix(i,j) = array[j][i];
-    }
-  }
-
-  return eigen_matrix;
 }
 
 DEFINE_int32(n, 12, "Number of elements within radius a point needs to have to be a core point.");
@@ -62,7 +47,9 @@ int main(int argc, char** argv) {
     }
   }
 
-  auto cluster = cluster_with_seed(knn_algorithm, center, FLAGS_n, FLAGS_radius);
+  auto best_seed = find_best_seed(knn_algorithm, center, 100, FLAGS_n);
+
+  auto cluster = cluster_with_seed(knn_algorithm, best_seed, FLAGS_n, FLAGS_radius);
 
   json output_document;
   for(auto elt : cluster) {

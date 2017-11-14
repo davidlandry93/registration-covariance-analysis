@@ -46,11 +46,13 @@ def centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
         'radius': radius,
         'n': n,
         'outliers': inverse_of_cluster(center_cluster, len(dataset)),
-        'outlier_ratio': len(center_cluster) / len(dataset),
+        'outlier_ratio': 1.0 - (len(center_cluster) / len(dataset)),
     }
 
+    eprint('{} radius'.format(radius))
     eprint('{} outliers'.format(len(clustering_row['outliers'])))
     eprint('{} inliers'.format(len(center_cluster)))
+
 
     return clustering_row
 

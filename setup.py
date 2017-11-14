@@ -23,6 +23,7 @@ setup(
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
             'find_central_cluster = recova.find_center_cluster:cli',
             'generate_cube = recova.pointcloud_gen.cube:cli',
+            'json_cat = recova.json_util:json_cat_cli',
             'merge_json_result = recova.merge_json_result:cli',
             'recov_plot = recova.recov_plot:cli',
             'registration_heatmap = recova.single_experiment_heatmap:cli',
@@ -32,5 +33,5 @@ setup(
             'registration2lie = recova.registration_dataset:registration2lie_cli',
             'trails2vtk = recova.trails_to_vtk:cli'
         ]
-    }
+    },
 )

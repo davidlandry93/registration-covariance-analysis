@@ -6,6 +6,8 @@ import sys
 
 from pyevtk.hl import pointsToVTK
 from pylie import se3_log
+
+from recova.density import density_of_points
 from recova.util import empty_to_none, eprint
 
 
@@ -104,6 +106,9 @@ def data_dict_of_registration_data(registration_data):
                 outlier_mask[index] = 1
 
             data_dict['outlier'] = np.ascontiguousarray(outlier_mask)
+
+    density = density_of_points(lie_vectors)
+    data_dict['density'] = np.ascontiguousarray(density)
 
     return data_dict
 

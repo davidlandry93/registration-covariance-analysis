@@ -8,6 +8,10 @@ using namespace Eigen;
 
 namespace recova {
 
+  Eigen::VectorXd NaboAdapter::get_id_from_dataset(const int& index) const {
+    return dataset->col(index);
+  }
+
   void NaboAdapter::set_dataset(std::unique_ptr<Eigen::MatrixXd>&& p_dataset) {
     dataset = std::move(p_dataset);
     nns = std::unique_ptr<NNSearchD>(NNSearchD::createKDTreeLinearHeap(*dataset));

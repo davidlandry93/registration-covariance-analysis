@@ -35,36 +35,38 @@ def covariance_of_central_cluster(dataset, clustering):
     return covariance
 
 
+def plot_clustering_series(covariance_trace_ax, n_points_ax, clusterings):
+    xs = []
+    ys = []
+    sizes = []
+    for i, clustering in enumerate(clusterings['data']):
+        xs.append(clustering['density'])
+        sizes.append(1.0 - float(clustering['outlier_ratio']))
+
+        covariance = np.array(clustering['covariance_of_central'])
+        ys.append(np.trace(covariance))
+
+    print(clusterings['metadata'])
+    plot1 = covariance_trace_ax.plot(xs, ys, linestyle='-', marker='o', label=clusterings['metadata']['dataset'])
+    plot2 = n_points_ax.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s')
+
+
 def plot_cov_against_density(args):
     """
     Plot the evolution of the covariance when we change the clustering radius.
     """
     clusterings = json.load(sys.stdin)
 
-    xs = []
-    ys = []
-    sizes = []
-    for i, clustering in enumerate(clusterings['data']):
-        xs.append(clustering['density'])
-        sizes.append(len(clustering['central_cluster']))
+    fig, ax = plt.subplots()
+    n_points_ax = ax.twinx()
 
-        covariance = np.array(clustering['covariance_of_central'])
-        ys.append(np.trace(covariance))
+    if isinstance(clusterings, dict):
+        plot_clustering_series(ax, n_points_ax, clusterings)
+    elif isinstance(clusterings, list):
+        for series in clusterings:
+            plot_clustering_series(ax, n_points_ax, series)
 
-    fig, ax1 = plt.subplots()
-    plot1 = ax1.plot(xs, ys, linestyle='-', marker='o', label='Trace of covariance matrix', color='black')
-    ax1.set_xlabel('Density Gain')
-    ax1.set_ylabel('Trace of covariance matrix')
-
-    ax2 = ax1.twinx()
-    plot2 = ax2.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s', color='0.5')
-    ax2.set_xlabel('Density Gain')
-    ax2.set_ylabel('N of points in cluster')
-
-    plots = plot1 + plot2
-    labels = [x.get_label() for x in plots]
-    ax1.legend(plots, labels, loc=0)
-
+    ax.legend()
 
     plt.show()
 

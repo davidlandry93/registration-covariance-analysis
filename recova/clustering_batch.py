@@ -22,6 +22,8 @@ def rescale_hypersphere(points, radius):
     norms = np.linalg.norm(points, axis=1)
     max_distance = np.max(norms)
 
+    eprint('Max distance: {}'.format(max_distance))
+
     points = points * radius / max_distance
 
     return points
@@ -33,7 +35,8 @@ def run_one_clustering_thread(algo, i, registration_data, density, n=12, scaling
     var_translation = float(registration_data['metadata']['var_translation'])
 
     lie_vectors = lie_vectors_of_registrations(registration_data)
-    radius = (n * density * var_translation**3.0 / len(lie_vectors))**(1. / 3.)
+    # radius = (n * density * var_translation**3.0 / len(lie_vectors))**(1. / 3.)
+    radius = density
 
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
@@ -75,11 +78,13 @@ def cli():
                                    [(clustering_algorithm, x, json_dataset, densities[x], args.n_neighbours, translation_scaling) for x in range(len(densities))],
                                    chunksize=1)
 
+    metadata_dict = json_dataset['metadata']
+    metadata_dict['translations_scaling'] = translation_scaling
+
+
     facet = {
         'what': 'clusterings',
-        'metadata': {
-            'translations_scaling': translation_scaling,
-        },
+        'metadata': metadata_dict,
         'statistics': {},
         'data': clusterings,
         'facets': []

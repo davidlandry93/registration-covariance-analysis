@@ -14,6 +14,7 @@ namespace recova {
   public:
     void set_dataset(std::unique_ptr<Eigen::MatrixXd>&& dataset);
     std::pair<Eigen::MatrixXi, Eigen::MatrixXd> query(const Eigen::MatrixXd& query_points, const int& n_neighbors) const;
+    Eigen::VectorXd get_id_from_dataset(const int& index) const;
     Eigen::MatrixXd get_ids_from_dataset(const std::deque<int>& ids) const;
 
     template<typename Iterator>
@@ -21,7 +22,7 @@ namespace recova {
       Eigen::MatrixXd points(dataset->rows(), std::distance(begin, end));
 
       int n_points = std::distance(begin, end);
-      for(auto it = begin; it < end; std::next(it)) {
+      for(auto it = begin; it != end; it = std::next(it)) {
         points.col(std::distance(begin, it)) = dataset->col(*it);
       }
 

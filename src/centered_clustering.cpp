@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <iostream>
 #include <memory>
 #include <tuple>
 
@@ -22,9 +23,10 @@ int point_closest_to_center(const NaboAdapter &knn_algorithm,
   return indices(0);
 }
 
-  int find_best_seed(const NaboAdapter& knn_algorithm,
+  Eigen::VectorXd find_best_seed(const NaboAdapter& knn_algorithm,
                      const Eigen::VectorXd& location_of_search,
-                     const int& n_seeds_to_consider) {
+                     const int& n_seeds_to_consider,
+                     const int& n) {
     Eigen::MatrixXi indices(n_seeds_to_consider, 1);
     Eigen::MatrixXd distances(n_seeds_to_consider, 1);
     std::tie(indices, distances) = knn_algorithm.query(location_of_search, n_seeds_to_consider);
@@ -32,8 +34,23 @@ int point_closest_to_center(const NaboAdapter &knn_algorithm,
     std::vector<int> vec_of_indices(indices.data(), indices.data() + indices.size());
 
     Eigen::MatrixXd search_result = knn_algorithm.get_ids_from_dataset(vec_of_indices.begin(), vec_of_indices.end());
+    indices.resize(n, search_result.cols());
+    distances.resize(n, search_result.cols());
 
-    return 0;
+    std::tie(indices, distances) = knn_algorithm.query(search_result, n);
+
+    int min_index = 0;
+    auto min_distance = std::numeric_limits<double>::infinity();
+    for(auto i = 0; i < n_seeds_to_consider; i++) {
+      double dist_of_current = distances(n - 1, i);
+      if(dist_of_current < min_distance) {
+        min_index = i;
+        min_distance = distances(n - 1, i);
+      }
+    }
+
+    Eigen::VectorXd best_seed = knn_algorithm.get_id_from_dataset(min_index);
+    return best_seed;
   }
 
 
