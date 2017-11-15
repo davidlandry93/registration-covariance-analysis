@@ -116,4 +116,15 @@ std::vector<int> potential_seeds(const NaboAdapter &knn_algorithm,
 
   return potential_seeds_vector;
 }
+
+  std::set<int> run_centered_clustering(std::unique_ptr<Eigen::MatrixXd>&& dataset, const Eigen::VectorXd& center, int k, double radius) {
+    NaboAdapter knn_algorithm;
+    knn_algorithm.set_dataset(std::move(dataset));
+
+    auto best_seed = find_best_seed(knn_algorithm, center, 100, k);
+
+    return cluster_with_seed(knn_algorithm, best_seed, k, radius);
+  }
+
+
 }

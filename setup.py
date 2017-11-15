@@ -11,6 +11,9 @@ setup(
     author_email='davidlandry93@gmail.com',
     url='https://github.com/davidlandry93/registration-covariance-analysis',
     packages=find_packages(exclude='tests'),
+    package_data={
+        'recova': ['core.so']
+    },
     install_requires=['numpy', 'pyevtk'],
     scripts = ['bin/all_registration_to_vtk_ellipsoid'],
     entry_points = {

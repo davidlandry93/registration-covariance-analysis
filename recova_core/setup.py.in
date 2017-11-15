@@ -1,0 +1,13 @@
+from setuptools import setup
+
+setup(name='recova_core',
+      version='${recova_VERSION}',
+      description='Core C++ modules for recova.',
+      author='David Landry',
+      author_email='davidlandry93@gmail.com',
+      install_requires=[],
+      python_requires='>=3.0',
+      url='https://github.com/davidlandry93/registration-covariance-analysis',
+      packages=['recova_core'],
+      package_data={'recova_core': ['recova_core.so']},
+      zip_safe = False)

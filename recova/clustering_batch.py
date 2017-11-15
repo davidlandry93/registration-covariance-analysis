@@ -20,11 +20,11 @@ from recova.util import eprint
 
 def rescale_hypersphere(points, radius):
     norms = np.linalg.norm(points, axis=1)
-    max_distance = np.max(norms)
+    percentile = np.percentile(norms, 90.0)
 
-    eprint('Max distance: {}'.format(max_distance))
+    eprint('90th pertencile used for rescaling: {}'.format(max_distance))
 
-    points = points * radius / max_distance
+    points = points * radius / percentile
 
     return points
 
