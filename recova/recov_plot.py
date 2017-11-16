@@ -47,7 +47,7 @@ def plot_clustering_series(covariance_trace_ax, n_points_ax, clusterings):
         ys.append(np.trace(covariance))
 
     print(clusterings['metadata'])
-    plot1 = covariance_trace_ax.plot(xs, ys, linestyle='-', marker='o', label=clusterings['metadata']['dataset'])
+    plot1 = covariance_trace_ax.plot(xs, ys, linestyle='-', marker='o', label='{} ({})'.format(clusterings['metadata']['dataset'], clusterings['metadata']['reference']))
     plot2 = n_points_ax.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s')
 
 

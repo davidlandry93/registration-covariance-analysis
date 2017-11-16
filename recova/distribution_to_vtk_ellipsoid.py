@@ -79,7 +79,16 @@ def distribution_to_vtk_ellipsoid(mean, covariance, filename):
     T[0:3,0:3] = eig_vecs
     T[0:3,3] = mean
 
+    print('T of ellipsoid: {}'.format(T))
+    print('Eigvals: {}'.format(eig_vals))
+
+    # Replace negative eigenvalues by a very small number.
+    for i in range(len(eig_vals)):
+        if eig_vals[i] < 0.0:
+            eig_vals[i] = 1e-6
+
     points, connectivity, offsets = make_ellipsoid_mesh(*np.sqrt(eig_vals))
+    print(filename)
 
     points_transformed = apply_t_to_points(points, T)
 

@@ -52,6 +52,11 @@ np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
   return np::array(matrix);
 }
 
+p::list cylindrical_descriptor(const np::ndarray& points, const p::list& azimuths, const p::list& inclinations, const p::list& depths) {
+
+  return p::list();
+}
+
 
 p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
   auto eigen_matrix = std::unique_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
@@ -67,4 +72,5 @@ BOOST_PYTHON_MODULE(recova_core) {
   np::initialize();
 
   p::def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
+  p::def("cylindrical_descriptor", cylindrical_descriptor, "Compute a cylindrical occupancy grid of a point cloud.");
 }

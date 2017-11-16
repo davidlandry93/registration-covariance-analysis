@@ -12,9 +12,12 @@ import time
 import pyclustering.cluster.dbscan as dbscan
 
 from recova.covariance_of_registrations import distribution_of_registrations
-from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations
+from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
+from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster, filter_with_cluster
 from recova.util import eprint
+
+from pylie import se3_log
 
 import recova_core
 
@@ -69,7 +72,7 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     :returns: The indices of the points that are inside the central cluster as a list.
     """
     strings_of_seed = list(map(str, seed.tolist()))
-    command = 'centered_clustering -radius {} -n {} -seed {}'.format(radius, n, ','.join(strings_of_seed))
+    command = 'centered_clustering -radius {} -k {} -seed {}'.format(radius, n, ','.join(strings_of_seed))
     eprint(command)
     stream = io.StringIO()
     json.dump(dataset.tolist(), stream)
@@ -128,11 +131,23 @@ def to_vtk(dataset, clustering, output):
     :arg dataset: The full dataset to which the clustering is applied.
     :arg clustering: The clustering data row.
     """
-    density = float(clustering['density'])
-    clustering_data = clusters_of_points(clustering['clustering'], len(dataset))
+    points = positions_of_registration_data(dataset)
 
-    points_to_vtk(dataset[:,0:3], '{}_translation'.format(output, density), data={'clustering': np.ascontiguousarray(clustering_data)})
-    points_to_vtk(dataset[:,3:6], '{}_rotation'.format(output, density), data={'clustering': np.ascontiguousarray(clustering_data)})
+    density = float(clustering['density'])
+    clustering_data = clusters_of_points(clustering['clustering'], len(points))
+
+    data_dict = data_dict_of_registration_data(dataset)
+    data_dict['clustering'] = np.ascontiguousarray(clustering_data)
+
+    points_to_vtk(points[:,0:3], '{}_translation'.format(output, density), data=data_dict)
+    points_to_vtk(points[:,3:6], '{}_rotation'.format(output, density), data=data_dict)
+
+    mean = np.array(clustering['mean_of_central'])
+    mean = se3_log(mean)
+    covariance = np.array(clustering['covariance_of_central'])
+
+    distribution_to_vtk_ellipsoid(mean[0:3], covariance[0:3, 0:3], '{}_translation_ellipsoid'.format(output))
+    distribution_to_vtk_ellipsoid(mean[3:6], covariance[3:6, 3:6], '{}_rotation_ellipsoid'.format(output))
 
 
 def batch_to_vtk(dataset, clustering_batch, output):
@@ -214,13 +229,14 @@ def batch_to_vtk_cli():
     parser.add_argument('output', help='Prefix of the output vtk files.', type=str)
     args = parser.parse_args()
 
+    print('Loading from stdin')
     clusterings = json.load(sys.stdin)
+
+    print('Loading from file')
     with open(args.dataset) as dataset_file:
         dataset = json.load(dataset_file)
 
-    points = positions_of_registration_data(dataset)
-
-    batch_to_vtk(points, clusterings, args.output)
+    batch_to_vtk(dataset, clusterings, args.output)
 
 
 def cli():
