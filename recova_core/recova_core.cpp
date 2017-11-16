@@ -13,6 +13,17 @@ namespace np = boost::python::numpy;
 
 using namespace recova;
 
+template<typename It>
+p::list to_list(const It begin, const It end) {
+  p::list output;
+  for(auto it = begin; it != end; std::next(it)) {
+    output.append(*it);
+  }
+
+  return output;
+}
+
+
 Eigen::MatrixXd ndarray_to_eigen_matrix(const np::ndarray& np_matrix) {
   auto eigen_matrix = Eigen::MatrixXd(np_matrix.shape(0), np_matrix.shape(1));
 
@@ -41,13 +52,14 @@ np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
   return np::array(matrix);
 }
 
-np::ndarray centered_clustering(const np::ndarray& m) {
+
+p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
   auto eigen_matrix = std::unique_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
   *eigen_matrix = ndarray_to_eigen_matrix(m);
 
-  std::set<int> clustering = run_centered_clustering(std::move(eigen_matrix), Eigen::VectorXd(3), 12, 1.0);
+  std::set<int> clustering = run_centered_clustering(std::move(eigen_matrix), Eigen::VectorXd(3), k, radius);
 
-  return np::array(p::list());
+  return to_list(clustering.begin(), clustering.end());
 }
 
 

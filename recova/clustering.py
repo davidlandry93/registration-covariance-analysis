@@ -16,6 +16,8 @@ from recova.registration_dataset import points_to_vtk, positions_of_registration
 from recova.find_center_cluster import find_central_cluster, filter_with_cluster
 from recova.util import eprint
 
+import recova_core
+
 
 
 def inverse_of_cluster(cluster, size_of_dataset):
@@ -38,7 +40,9 @@ def centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     :arg dataset: A nd array containing the points to cluster.
     :returns: The result of the centered clustering algorithm, as a facet.
     """
-    center_cluster = raw_centered_clustering(dataset, radius, n, seed=seed)
+
+    # TODO Replace the call to raw_centered_clustering with a call to the cpp library recova_core
+    center_cluster = raw_centered_clustering(dataset, radius, n, seed)
 
     clustering_row = {
         'clustering': [center_cluster],
