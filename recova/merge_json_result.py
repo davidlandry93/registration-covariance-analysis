@@ -4,6 +4,8 @@ import argparse
 import json
 import sys
 
+from recova.util import eprint
+
 def merge_statistics(dict1, dict2):
     return {}
 
@@ -18,7 +20,11 @@ def cli():
     what = None
     for entry in args.inputs:
         with open(entry) as jsonfile:
-            data = json.load(jsonfile)
+            try:
+                data = json.load(jsonfile)
+            except JSONDecodeError:
+                eprint('File {} was not json parsable'.format(entry))
+                continue
 
         if 'what' in data:
             if not what:

@@ -15,7 +15,8 @@ setup(
         'recova': ['core.so']
     },
     install_requires=['numpy', 'pyevtk'],
-    scripts = ['bin/all_registration_to_vtk_ellipsoid'],
+    scripts = ['bin/all_registration_to_vtk_ellipsoid',
+               'bin/meta_of_json'],
     entry_points = {
         'console_scripts': [
             'center_registrations = recova.registration_dataset:center_around_gt_cli',
