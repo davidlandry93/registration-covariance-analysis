@@ -8,6 +8,8 @@
 #include "centered_clustering.h"
 #include "nabo_adapter.h"
 
+#include "recov/pointcloud.h"
+
 namespace p = boost::python;
 namespace np = boost::python::numpy;
 
@@ -52,12 +54,6 @@ np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
   return np::array(matrix);
 }
 
-p::list cylindrical_descriptor(const np::ndarray& points, const p::list& azimuths, const p::list& inclinations, const p::list& depths) {
-
-  return p::list();
-}
-
-
 p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
   auto eigen_matrix = std::unique_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
   *eigen_matrix = ndarray_to_eigen_matrix(m);
@@ -67,10 +63,15 @@ p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, do
   return to_list(clustering.begin(), clustering.end());
 }
 
+p::list bin_points(const np::ndarray& m) {
+
+  return p::list();
+}
+
 
 BOOST_PYTHON_MODULE(recova_core) {
   np::initialize();
 
   p::def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
-  p::def("cylindrical_descriptor", cylindrical_descriptor, "Compute a cylindrical occupancy grid of a point cloud.");
+  p::def("bin_points", bin_points, "Separate a ndarray of points in a grid.");
 }

@@ -8,6 +8,8 @@ find_package(gflags REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
 
+find_package(recov REQUIRED)
+
 add_library(nabo_adapter src/nabo_adapter.cpp)
 target_include_directories(nabo_adapter
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})
