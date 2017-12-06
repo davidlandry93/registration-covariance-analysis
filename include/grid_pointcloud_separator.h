@@ -9,7 +9,7 @@ namespace recova {
   class GridPointcloudSeparator : public PointcloudSeparator {
   public:
     GridPointcloudSeparator(double spanx, double spany, double spanz, int nx, int ny, int nz);
-    SparseBins<Eigen::MatrixXd, 3> separate() const override;
+    SparseBins<Eigen::Vector3d, 3> separate() const override;
 
   private:
     double spanx, spany, spanz;

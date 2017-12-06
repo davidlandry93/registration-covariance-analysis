@@ -19,6 +19,7 @@ set_property(TARGET nabo_adapter PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(recova
   src/util.cpp
   src/centered_clustering.cpp
+  src/pointcloud_separator.cpp
   src/grid_pointcloud_separator.cpp)
 target_include_directories(recova
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})

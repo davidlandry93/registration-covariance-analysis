@@ -24,6 +24,8 @@ setup(
             'clustering_batch = recova.clustering_batch:cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',
+            'csv2xyz = recova.io:csv2xyz_cli',
+            'xyz2descriptor = recova.descriptor:cli',
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
             'find_central_cluster = recova.find_center_cluster:cli',
             'generate_cube = recova.pointcloud_gen.cube:cli',

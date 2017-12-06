@@ -11,9 +11,9 @@ namespace recova {
 
   class PointcloudSeparator {
   public:
-    virtual ~PointcloudSeparator();
-    void setPointcloud(const std::unique_ptr<Eigen::MatrixXd>&& pointcloud);
-    virtual SparseBins<Eigen::MatrixXd, 3> separate() const=0;
+    virtual ~PointcloudSeparator()=default;
+    void set_pointcloud(std::unique_ptr<Eigen::MatrixXd>&& pointcloud);
+    virtual SparseBins<Eigen::Vector3d, 3> separate() const=0;
 
     static Eigen::Vector3d compute_centroid(const Eigen::MatrixXd& pointcloud);
 

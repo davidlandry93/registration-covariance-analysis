@@ -5,22 +5,13 @@
 
 namespace recova {
   template<typename T, int N>
-  SparseBins<T, N>::SparseBins(const T& default_value) : default_value(default_value) {}
-
-  template<typename T, int N>
-  T SparseBins<T,N>::get(const std::array<int, N>& coordinates) {
-    auto it = bins.find(coordinates);
-
-    if(it == bins.end()) {
-      return default_value;
-    } else {
-      return it->second;
-    }
+  std::vector<T> SparseBins<T,N>::get(const std::array<int, N>& coordinates) {
+    return bins[coordinates];
   }
 
   template<typename T, int N>
-  void SparseBins<T,N>::set(const std::array<int, N>& coordinates, const T& value) {
-    bins[coordinates] = value;
+  void SparseBins<T,N>::add_to_bin(const std::array<int, N>& coordinates, const T& value) {
+    bins[coordinates].push_back(value);
   }
 }
 

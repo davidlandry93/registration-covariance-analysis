@@ -1,11 +1,13 @@
 
 #include <memory>
+#include <iostream>
 
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <Eigen/Core>
 
 #include "centered_clustering.h"
+#include "grid_pointcloud_separator.h"
 #include "nabo_adapter.h"
 
 namespace p = boost::python;
@@ -23,7 +25,6 @@ p::list to_list(const It begin, const It end) {
   return output;
 }
 
-
 Eigen::MatrixXd ndarray_to_eigen_matrix(const np::ndarray& np_matrix) {
   auto eigen_matrix = Eigen::MatrixXd(np_matrix.shape(0), np_matrix.shape(1));
 
@@ -36,7 +37,7 @@ Eigen::MatrixXd ndarray_to_eigen_matrix(const np::ndarray& np_matrix) {
   return eigen_matrix;
 }
 
-np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
+p::list eigen_matrix_to_list(const Eigen::MatrixXd& eigen_m) {
   p::list matrix;
 
   for(auto i = 0; i < eigen_m.rows(); ++i) {
@@ -49,7 +50,11 @@ np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
     matrix.append(row);
   }
 
-  return np::array(matrix);
+  return matrix;
+}
+
+np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
+  return np::array(eigen_matrix_to_list(eigen_m));
 }
 
 p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
@@ -61,9 +66,39 @@ p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, do
   return to_list(clustering.begin(), clustering.end());
 }
 
-p::list bin_points(const np::ndarray& m) {
+p::list grid_pointcloud_separator(const np::ndarray& m,
+                                  double spanx, double spany, double spanz,
+                                  int nx, int ny, int nz) {
+  GridPointcloudSeparator separator(spanx, spany, spanz, nx, ny, nz);
+  auto pointcloud = std::unique_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd(ndarray_to_eigen_matrix(m)));
+  pointcloud->transposeInPlace();
 
-  return p::list();
+  separator.set_pointcloud(std::move(pointcloud));
+  auto bins = separator.separate();
+
+  p::list list_of_bins;
+  for(auto i = 0; i < nx; i++) {
+    for(auto j = 0; j < ny; j++) {
+      for(auto k = 0; k < nz; k++) {
+        auto bin = bins.get({i,j,k});
+
+        p::list list_of_points;
+        for(auto point : bin) {
+          p::list python_point;
+
+          python_point.append(point[0]);
+          python_point.append(point[1]);
+          python_point.append(point[2]);
+
+          list_of_points.append(python_point);
+        }
+
+        list_of_bins.append(np::array(list_of_points));
+      }
+    }
+  }
+
+  return list_of_bins;
 }
 
 
@@ -71,5 +106,5 @@ BOOST_PYTHON_MODULE(recova_core) {
   np::initialize();
 
   p::def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
-  p::def("bin_points", bin_points, "Separate a ndarray of points in a grid.");
+  p::def("grid_pointcloud_separator", grid_pointcloud_separator, "Separate a ndarray of points in a grid.");
 }
