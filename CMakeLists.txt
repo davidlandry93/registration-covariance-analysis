@@ -8,8 +8,6 @@ find_package(gflags REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
 
-find_package(recov REQUIRED)
-
 add_library(nabo_adapter src/nabo_adapter.cpp)
 target_include_directories(nabo_adapter
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})
@@ -18,7 +16,10 @@ target_compile_options(nabo_adapter PRIVATE ${OpenMP_CXX_FLAGS})
 set_property(TARGET nabo_adapter PROPERTY CXX_STANDARD 11)
 set_property(TARGET nabo_adapter PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-add_library(recova src/util.cpp src/centered_clustering.cpp)
+add_library(recova
+  src/util.cpp
+  src/centered_clustering.cpp
+  src/grid_pointcloud_separator.cpp)
 target_include_directories(recova
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})
 set_property(TARGET recova PROPERTY CXX_STANDARD 11)

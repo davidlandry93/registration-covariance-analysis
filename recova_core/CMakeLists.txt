@@ -15,7 +15,7 @@ endif(USE_PYTHON3)
 find_package(PythonLibs)
 
 add_library(recova_bindings SHARED recova_core.cpp)
-target_link_libraries(recova_bindings recova nabo_adapter recov::recov ${Boost_LIBRARIES})
+target_link_libraries(recova_bindings recova nabo_adapter ${Boost_LIBRARIES})
 target_include_directories(recova_bindings PRIVATE ${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 set_target_properties(recova_bindings PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY recova_core

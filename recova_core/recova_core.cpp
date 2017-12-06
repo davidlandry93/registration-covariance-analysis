@@ -8,8 +8,6 @@
 #include "centered_clustering.h"
 #include "nabo_adapter.h"
 
-#include "recov/pointcloud.h"
-
 namespace p = boost::python;
 namespace np = boost::python::numpy;
 
