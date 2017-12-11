@@ -23,6 +23,7 @@ setup(
             'clustering = recova.clustering:cli',
             'clustering_batch = recova.clustering_batch:cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
+            'clusterings2examples = recova.learning_dataset:generate_examples_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',
             'csv2xyz = recova.io:csv2xyz_cli',
             'dataset2descriptors = recova.descriptor:generate_descriptors_cli',
