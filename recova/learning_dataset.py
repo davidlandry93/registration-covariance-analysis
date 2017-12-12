@@ -7,7 +7,7 @@ import pathlib
 
 from recov.datasets import create_registration_dataset
 from recova.clustering import CenteredClusteringAlgorithm
-from recova.descriptor import generate_descriptor
+from recova.descriptor import generate_descriptor, OccupancyGridDescriptor
 from recova.registration_result_database import RegistrationResultDatabase
 
 
@@ -75,12 +75,9 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(pointcloud_root, registration_pair, clustering_algorithm):
-    cloud_dataset = create_registration_dataset('ethz', pointcloud_root / registration_pair.dataset)
-    cloud = cloud_dataset.points_of_cloud(registration_pair.reading)
-    descriptor = generate_descriptor(cloud)
-
-    covariance = registration_pair.covariance(clustering_algorithm, radius=0.2)
+def generate_one_example(registration_pair, descriptor_algorithm, clustering_algorithm):
+    descriptor = registration_pair.descriptor(descriptor_algorithm)
+    covariance = registration_pair.covariance(clustering_algorithm)
     vectorized_covariance = vectorize_covariance(covariance)
 
     return (descriptor, vectorized_covariance)
@@ -102,9 +99,10 @@ def generate_examples_cli():
     pairs = db.registration_pairs()
 
     clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    descriptor_algorithm = OccupancyGridDescriptor()
 
     with multiprocessing.Pool() as pool:
-        examples = pool.starmap(generate_one_example, [(pointcloud_root, x, clustering_algorithm) for x in db.registration_pairs()])
+        examples = pool.starmap(generate_one_example, [(x, descriptor_algorithm, clustering_algorithm) for x in db.registration_pairs()])
 
     print(examples)
 

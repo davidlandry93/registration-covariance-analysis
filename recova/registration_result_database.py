@@ -79,32 +79,61 @@ class RegistrationResult:
         return registration_dict
 
 
-    def covariance(self, clustering_algorithm, radius=0.2):
+    def descriptor(self, descriptor_algorithm):
+        descriptor_directory = self.directory_of_pair / 'descriptor'
+
+        if not descriptor_directory.exists():
+            descriptor_directory.mkdir()
+
+        descriptor_file = descriptor_directory / (str(descriptor_algorithm) + '.json')
+        descriptor = None
+        if descriptor_file.exists():
+            try:
+                with descriptor_file.open() as jsonfile:
+                    descriptor = json.load(jsonfile)
+                    eprint('Using cached descriptor for {}'.format(self))
+            except ValueError:
+                eprint('Error decoding cached descriptor {} for {}'.format(descriptor_algorithm, self))
+
+        if not descriptor:
+            descriptor = self.compute_descriptor(descriptor_algorithm)
+
+            with descriptor_file.open('w') as jsonfile:
+                json.dump(descriptor, jsonfile)
+
+        return descriptor
+
+
+    def covariance(self, clustering_algorithm):
         clustering_directory = self.directory_of_pair / 'clustering'
 
+        # Create clustering directory if it doesn't exist
         if not clustering_directory.exists():
             clustering_directory.mkdir()
 
+        # If we can recover a cache file for this clustering, do it.
         clustering_file = clustering_directory / (str(clustering_algorithm) + '.json')
-        if not clustering_file.exists():
-            clustering = self.compute_clustering(clustering_algorithm, radius=radius)
-            clustering = compute_distribution(self.registration_dict(), clustering)
-
-            with clustering_file.open('w') as jsonfile:
-                json.dump(clustering, jsonfile)
-        else:
+        clustering = None
+        if clustering_file.exists():
             try:
                 with clustering_file.open() as jsonfile:
                     clustering = json.load(jsonfile)
                     eprint('Using cached clustering for {}'.format(self))
             except ValueError:
-                print('Error decoding clustering {} for {}'.format(clustering_algorithm, self))
+                eprint('Error decoding clustering {} for {}'.format(clustering_algorithm, self))
 
+        # If we still don't have a clustering at this point, we need to compute it.
+        if not clustering:
+            clustering = self.compute_clustering(clustering_algorithm)
+            clustering = compute_distribution(self.registration_dict(), clustering)
+
+            with clustering_file.open('w') as jsonfile:
+                json.dump(clustering, jsonfile)
 
         return np.array(clustering['covariance_of_central'])
 
 
-    def compute_clustering(self, clustering_algorithm, radius=0.2):
+    def compute_clustering(self, clustering_algorithm):
         ground_truth = self.registration_dict()['metadata']['ground_truth']
 
         lie = self.lie_matrix_of_results()

@@ -10,6 +10,14 @@ from recova.util import eprint
 from recova_core import grid_pointcloud_separator
 
 
+class DescriptorAlgorithm:
+    def __init__(self):
+        pass
+
+    def compute(self, points_of_reading, points_of_reference):
+        raise NotImplementedError('DescriptorAlgorithms must implement method compute')
+
+
 def occupancy_descriptor(bin, total_n_points):
     return len(bin) / total_n_points
 
