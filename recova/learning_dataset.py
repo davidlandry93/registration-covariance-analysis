@@ -4,6 +4,11 @@ import json
 import numpy as np
 import pathlib
 
+from recov.datasets import create_registration_dataset
+from recova.clustering import centered_clustering
+from recova.descriptor import generate_descriptor
+from recova.registration_result_database import RegistrationResultDatabase
+
 
 def nearestPD(A):
     """Find the nearest positive-definite matrix to input
@@ -70,24 +75,37 @@ def vectorize_covariance(cov_matrix):
 
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
-    parser.add_argument('dataset_name', type=str, help='The name to give to the output files')
-    parser.add_argument('n_examples', type=int, help='Number of examples to generate')
     parser.add_argument('--output', type=str, help='Where to store the examples', default='.')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.')
+    parser.add_argument('--pointcloud_root', type=str, help='Where to find the pointclouds')
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
 
+    pointcloud_root = pathlib.Path(args.pointcloud_root)
+    db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
-    for i in range(args.n_examples):
-        with open('{}_{}/clusterings.json'.format(i+1, i)) as clusterings_file:
-            clusterings = json.load(clusterings_file)
-            cov_matrix = np.array(clusterings['data'][5]['covariance_of_central'])
+    pairs = db.registration_pairs()
 
-            vector_of_cov = vectorize_covariance(cov_matrix)
+    for pair in pairs:
+        cloud_dataset = create_registration_dataset('ethz', pointcloud_root / pair.dataset)
+        cloud = cloud_dataset.points_of_cloud(pair.reading)
+        descriptor = generate_descriptor(cloud)
 
-            filename = 'example_{}_{}.json'.format(args.dataset_name, i)
-            with (output_path / filename).open('w') as output_file:
-                print(filename)
-                json.dump(vector_of_cov, output_file)
+        covariance = pair.covariance(centered_clustering, radius=0.2)
+        print(covariance)
+
+
+
+    # for i in range(args.n_examples):
+    #     with open('{}_{}/clusterings.json'.format(i+1, i)) as clusterings_file:
+    #         clusterings = json.load(clusterings_file)
+    #         cov_matrix = np.array(clusterings['data'][5]['covariance_of_central'])
+
+    #         vector_of_cov = vectorize_covariance(cov_matrix)
+
+    #         filename = 'example_{}_{}.json'.format(args.dataset_name, i)
+    #         with (output_path / filename).open('w') as output_file:
+    #             print(filename)
+    #             json.dump(vector_of_cov, output_file)

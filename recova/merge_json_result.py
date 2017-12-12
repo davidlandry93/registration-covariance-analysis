@@ -9,16 +9,14 @@ from recova.util import eprint
 def merge_statistics(dict1, dict2):
     return {}
 
-def cli():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('inputs', type=str, nargs='+', help='The files containing the parts of the dataset')
-    args = parser.parse_args()
 
+def merge_result_files(result_files, output):
     metadata = {}
     merged_data = []
     statistics = {}
     what = None
-    for entry in args.inputs:
+
+    for entry in result_files:
         with open(entry) as jsonfile:
             try:
                 data = json.load(jsonfile)
@@ -47,7 +45,17 @@ def cli():
     if what:
         output_dict['what'] = what
 
-    json.dump(output_dict, sys.stdout)
+    json.dump(output_dict, output)
+
+
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('inputs', type=str, nargs='+', help='The files containing the parts of the dataset')
+    args = parser.parse_args()
+
+    merge_result_files(args.inputs, sys.stdout)
+
 
 
 if __name__ == '__main__':
