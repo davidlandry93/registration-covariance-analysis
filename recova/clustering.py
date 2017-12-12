@@ -22,6 +22,69 @@ from pylie import se3_log
 import recova_core
 
 
+class ClusteringAlgorithm:
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        raise NotImplementedError('Clustering Algorithms must implement __repr__')
+
+    def cluster(dataset):
+        raise NotImplementedError('Clustering Algorithms must implement the cluster method')
+
+
+class CenteredClusteringAlgorithm(ClusteringAlgorithm):
+    def __init__(self, radius, k=12):
+        self.radius = radius
+        self.k = k
+
+    def __repr__(self):
+        return 'centered_{:.5f}_{}'.format(self.radius, self.k)
+
+    def cluster(self, dataset, seed=np.array([0., 0., 0., 0., 0., 0.])):
+        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed)
+
+        clustering_row = {
+            'clustering': [center_cluster],
+            'n_clusters': 1,
+            'radius': self.radius,
+            'n': self.k,
+            'outliers': inverse_of_cluster(center_cluster, len(dataset)),
+            'outlier_ratio': 1.0 - (len(center_cluster) / len(dataset)),
+        }
+
+        eprint('{} radius'.format(self.radius))
+        eprint('{} outliers'.format(len(clustering_row['outliers'])))
+        eprint('{} inliers'.format(len(center_cluster)))
+
+
+        return clustering_row
+
+class DBSCANClusteringAlgorithm(ClusteringAlgorithm):
+    def __init__(self, radius, k=12):
+        self.radius = radius
+        self.k = k
+
+    def __repr__(self):
+        return 'dbscan_{:.5f}_{}'.format(self.radius, self.k)
+
+    def cluster(self, dataset):
+        clustering = dbscan.dbscan(dataset.tolist(), self.radius, self.k, True)
+
+        start = time.clock()
+        clustering.process()
+        computation_time = time.clock() - start
+
+        return {
+            'clustering': clustering.get_clusters(),
+            'n_clusters': len(clustering.get_clusters()),
+            'outliers': clustering.get_noise(),
+            'outlier_ratio': len(clustering.get_noise()) / len(dataset),
+            'computation_time': computation_time,
+            'radius': self.radius,
+            'n': self.k
+        }
+
 
 def inverse_of_cluster(cluster, size_of_dataset):
     """Returns a list of points not in cluster."""
@@ -90,29 +153,14 @@ def dbscan_clustering(dataset, radius=0.005, n=12, seed=None):
     :arg dataset: A np array describing the points to cluster.
     :returns: A datarow representing the clustering.
     """
-    clustering = dbscan.dbscan(dataset.tolist(), radius, n, True)
-
-    start = time.clock()
-    clustering.process()
-    computation_time = time.clock() - start
-
-    return {
-        'clustering': clustering.get_clusters(),
-        'n_clusters': len(clustering.get_clusters()),
-        'outliers': clustering.get_noise(),
-        'outlier_ratio': len(clustering.get_noise()) / len(dataset),
-        'computation_time': computation_time,
-        'radius': radius,
-        'n': n
-    }
 
 
 def clustering_algorithm_factory(algo_name):
     algo_dict = {
-        'centered': centered_clustering,
-        'dbscan':  dbscan_clustering
+        'centered': CenteredClusteringAlgorithm,
+        'dbscan':  DBSCANClusteringAlgorithm
     }
-    return algo_dict[algo_name]
+    return algo_dict[algo_name]()
 
 
 def clusters_of_points(clustering, n_points):

@@ -1,11 +1,12 @@
 
 import argparse
 import json
+import multiprocessing
 import numpy as np
 import pathlib
 
 from recov.datasets import create_registration_dataset
-from recova.clustering import centered_clustering
+from recova.clustering import CenteredClusteringAlgorithm
 from recova.descriptor import generate_descriptor
 from recova.registration_result_database import RegistrationResultDatabase
 
@@ -73,6 +74,18 @@ def vectorize_covariance(cov_matrix):
 
     return vector_of_cov
 
+
+def generate_one_example(pointcloud_root, registration_pair, clustering_algorithm):
+    cloud_dataset = create_registration_dataset('ethz', pointcloud_root / registration_pair.dataset)
+    cloud = cloud_dataset.points_of_cloud(registration_pair.reading)
+    descriptor = generate_descriptor(cloud)
+
+    covariance = registration_pair.covariance(clustering_algorithm, radius=0.2)
+    vectorized_covariance = vectorize_covariance(covariance)
+
+    return (descriptor, vectorized_covariance)
+
+
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='.')
@@ -88,13 +101,13 @@ def generate_examples_cli():
 
     pairs = db.registration_pairs()
 
-    for pair in pairs:
-        cloud_dataset = create_registration_dataset('ethz', pointcloud_root / pair.dataset)
-        cloud = cloud_dataset.points_of_cloud(pair.reading)
-        descriptor = generate_descriptor(cloud)
+    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
 
-        covariance = pair.covariance(centered_clustering, radius=0.2)
-        print(covariance)
+    with multiprocessing.Pool() as pool:
+        examples = pool.starmap(generate_one_example, [(pointcloud_root, x, clustering_algorithm) for x in db.registration_pairs()])
+
+    print(examples)
+
 
 
 

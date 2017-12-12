@@ -105,6 +105,6 @@ p::list grid_pointcloud_separator(const np::ndarray& m,
 BOOST_PYTHON_MODULE(recova_core) {
   np::initialize();
 
-  p::def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
+  p:def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
   p::def("grid_pointcloud_separator", grid_pointcloud_separator, "Separate a ndarray of points in a grid.");
 }

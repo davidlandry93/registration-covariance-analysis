@@ -4,6 +4,7 @@ import numpy as np
 import os
 import pathlib
 
+from recov.util import ln_se3
 
 from recova.clustering import compute_distribution
 from recova.util import eprint
@@ -79,12 +80,40 @@ class RegistrationResult:
 
 
     def covariance(self, clustering_algorithm, radius=0.2):
+        clustering_directory = self.directory_of_pair / 'clustering'
+
+        if not clustering_directory.exists():
+            clustering_directory.mkdir()
+
+        clustering_file = clustering_directory / (str(clustering_algorithm) + '.json')
+        if not clustering_file.exists():
+            clustering = self.compute_clustering(clustering_algorithm, radius=radius)
+            clustering = compute_distribution(self.registration_dict(), clustering)
+
+            with clustering_file.open('w') as jsonfile:
+                json.dump(clustering, jsonfile)
+        else:
+            try:
+                with clustering_file.open() as jsonfile:
+                    clustering = json.load(jsonfile)
+                    eprint('Using cached clustering for {}'.format(self))
+            except ValueError:
+                print('Error decoding clustering {} for {}'.format(clustering_algorithm, self))
+
+
+        return np.array(clustering['covariance_of_central'])
+
+
+    def compute_clustering(self, clustering_algorithm, radius=0.2):
+        ground_truth = self.registration_dict()['metadata']['ground_truth']
+
         lie = self.lie_matrix_of_results()
 
-        clustering_row = clustering_algorithm(lie, radius=radius)
+        clustering_row = clustering_algorithm.cluster(lie, seed=ln_se3(np.array(ground_truth)))
         distribution = compute_distribution(self.registration_dict(), clustering_row)
 
-        return np.array(distribution['covariance_of_central'])
+        return distribution
+
 
 
 
