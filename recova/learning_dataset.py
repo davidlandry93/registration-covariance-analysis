@@ -86,13 +86,11 @@ def generate_one_example(registration_pair, combining_algorithm, binning_algorit
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='.')
-    parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.')
-    parser.add_argument('--pointcloud_root', type=str, help='Where to find the pointclouds')
+    parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
 
-    pointcloud_root = pathlib.Path(args.pointcloud_root)
     db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 

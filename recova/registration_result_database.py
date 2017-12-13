@@ -105,10 +105,30 @@ class RegistrationResult:
 
         return descriptor
 
-    def compute_descriptor(self, combiner, binner, descriptor_algorithm):
 
+    def compute_descriptor(self, combiner, binner, descriptor_algorithm):
+        reading = self.points_of_reading()
+        reference = self.points_of_reference()
+
+        combined = combiner.compute(reading, reference)
+        binned = binner.compute(combined)
+        descriptor = descriptor_algorithm.compute(combined, binned)
+
+        print(descriptor)
 
         return descriptor
+
+
+    def points_of_reading(self):
+        reading_file = self.directory_of_pair / 'reading.json'
+        with reading_file.open() as f:
+            return json.load(f)
+
+
+    def points_of_reference(self):
+        reading_file = self.directory_of_pair / 'reference.json'
+        with reading_file.open() as f:
+            return json.load(f)
 
 
     def covariance(self, clustering_algorithm):
@@ -211,5 +231,5 @@ def import_files_cli():
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.ThreadPool() as pool:
         pool.starmap(import_pointclouds_of_one_pair, [(x, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])

@@ -2,6 +2,7 @@ import argparse
 import json
 import multiprocessing
 import pathlib
+import subprocess
 import sys
 
 from recov.datasets import create_registration_dataset
@@ -26,6 +27,7 @@ class DescriptorAlgorithm:
 class OccupancyGridDescriptor(DescriptorAlgorithm):
     def compute(self, pointcloud, bins):
         descriptor = [len(x) / len(pointcloud) for x in bins]
+        return descriptor
 
     def __repr__(self):
         return 'occupancy_grid'
@@ -55,8 +57,28 @@ class GridBinningAlgorithm(BinningAlgorithm):
         self.ny = ny
         self.nz = nz
 
+    # def compute(self, pointcloud):
+    #     return grid_pointcloud_separator(pointcloud, self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
+
     def compute(self, pointcloud):
-        return grid_pointcloud_separator(pointcloud, self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
+        command_string = 'grid_pointcloud_separator -spanx {} -spany {} -spanz {} -nx {} -ny {} -nz {}'.format(
+            self.spanx,
+            self.spany,
+            self.spanz,
+            self.nx,
+            self.ny,
+            self.nz
+        )
+        eprint(command_string)
+
+        response = subprocess.check_output(
+            command_string,
+            universal_newlines=True,
+            shell=True,
+            input=json.dumps(pointcloud)
+        )
+
+        return json.loads(response)
 
     def __repr__(self):
         return 'grid-{:.4f}-{:.4f}-{:.4f}-{}-{}-{}'.format(self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
@@ -73,7 +95,7 @@ class PointcloudCombiner:
 
 
 
-class ReferenceOnlyCombiner(PointcloudCobiner):
+class ReferenceOnlyCombiner(PointcloudCombiner):
     def compute(self, reading, reference):
         return reference
 
