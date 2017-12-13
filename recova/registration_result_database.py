@@ -1,12 +1,15 @@
 import argparse
 import json
+import multiprocessing
 import numpy as np
 import os
 import pathlib
 
+from recov.datasets import create_registration_dataset
 from recov.util import ln_se3
 
 from recova.clustering import compute_distribution
+from recova.file_cache import FileCache
 from recova.util import eprint
 from recova.merge_json_result import merge_result_files
 from recova.registration_dataset import lie_vectors_of_registrations
@@ -18,6 +21,7 @@ class RegistrationResult:
         self.dataset = dataset
         self.reading = reading
         self.reference = reference
+        self.cache = FileCache(self.directory_of_pair / 'cache')
 
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
@@ -42,6 +46,18 @@ class RegistrationResult:
         dest = str(self.directory_of_pair / 'raw' / p.name)
         eprint('{} to {}'.format(p, dest))
         os.rename(str(p), dest)
+
+
+    def import_pointclouds(self, pointcloud_dataset):
+        """Import the reading and the reference that were used to generate the results from a pointcloud_dataset."""
+        reading_file = self.directory_of_pair / 'reading.json'
+        reference_file = self.directory_of_pair / 'reference.json'
+
+        with reading_file.open('w') as f:
+            json.dump(pointcloud_dataset.points_of_cloud(self.reading).tolist(), f)
+
+        with reference_file.open('w') as f:
+            json.dump(pointcloud_dataset.points_of_cloud(self.reference).tolist(), f)
 
 
     def pair_exists(self):
@@ -79,27 +95,18 @@ class RegistrationResult:
         return registration_dict
 
 
-    def descriptor(self, descriptor_algorithm):
-        descriptor_directory = self.directory_of_pair / 'descriptor'
+    def descriptor(self, combiner, binner, descriptor_algorithm):
+        descriptor_name = '{}_{}_{}'.format(combiner, binner, descriptor_algorithm)
 
-        if not descriptor_directory.exists():
-            descriptor_directory.mkdir()
-
-        descriptor_file = descriptor_directory / (str(descriptor_algorithm) + '.json')
-        descriptor = None
-        if descriptor_file.exists():
-            try:
-                with descriptor_file.open() as jsonfile:
-                    descriptor = json.load(jsonfile)
-                    eprint('Using cached descriptor for {}'.format(self))
-            except ValueError:
-                eprint('Error decoding cached descriptor {} for {}'.format(descriptor_algorithm, self))
-
+        descriptor = self.cache[descriptor_name]
         if not descriptor:
-            descriptor = self.compute_descriptor(descriptor_algorithm)
+            descriptor = self.compute_descriptor(combiner, binner, descriptor_algorithm)
+            self.cache[descriptor_name] = descriptor
 
-            with descriptor_file.open('w') as jsonfile:
-                json.dump(descriptor, jsonfile)
+        return descriptor
+
+    def compute_descriptor(self, combiner, binner, descriptor_algorithm):
+
 
         return descriptor
 
@@ -172,6 +179,7 @@ class RegistrationResultDatabase:
     def registration_pairs(self):
         pairs = []
         for d in self.root.iterdir():
+            print(d)
             if d.is_dir():
                 components = d.stem.split('-')
 
@@ -182,14 +190,26 @@ class RegistrationResultDatabase:
 
         return pairs
 
+def import_pointclouds_of_one_pair(registration_pair, dataset_type, pointcloud_root):
+    print(registration_pair)
+    dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
+    registration_pair.import_pointclouds(dataset)
+
 
 def import_files_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('files', nargs='*', type=str, help='The files to import')
     parser.add_argument('--root', help='Location of the registration result database', type=str)
+    parser.add_argument('--pointcloud_root', help='Location of the point clouds designated by the pairs', type=str)
+    parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str)
     args = parser.parse_args()
 
     db = RegistrationResultDatabase(args.root)
 
     for registration_file in args.files:
         db.import_file(registration_file)
+
+    pointcloud_root = pathlib.Path(args.pointcloud_root)
+
+    with multiprocessing.Pool() as pool:
+        pool.starmap(import_pointclouds_of_one_pair, [(x, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])

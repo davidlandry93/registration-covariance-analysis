@@ -7,7 +7,7 @@ import pathlib
 
 from recov.datasets import create_registration_dataset
 from recova.clustering import CenteredClusteringAlgorithm
-from recova.descriptor import generate_descriptor, OccupancyGridDescriptor
+from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, ReferenceOnlyCombiner, GridBinningAlgorithm
 from recova.registration_result_database import RegistrationResultDatabase
 
 
@@ -75,8 +75,8 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, descriptor_algorithm, clustering_algorithm):
-    descriptor = registration_pair.descriptor(descriptor_algorithm)
+def generate_one_example(registration_pair, combining_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
+    descriptor = registration_pair.descriptor(combining_algorithm, binning_algorithm, descriptor_algorithm)
     covariance = registration_pair.covariance(clustering_algorithm)
     vectorized_covariance = vectorize_covariance(covariance)
 
@@ -98,25 +98,13 @@ def generate_examples_cli():
 
     pairs = db.registration_pairs()
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    combiner = ReferenceOnlyCombiner()
+    binning_algorithm = GridBinningAlgorithm(10., 10., 10., 5, 5, 5)
     descriptor_algorithm = OccupancyGridDescriptor()
 
+    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+
     with multiprocessing.Pool() as pool:
-        examples = pool.starmap(generate_one_example, [(x, descriptor_algorithm, clustering_algorithm) for x in db.registration_pairs()])
+        examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in db.registration_pairs()])
 
     print(examples)
-
-
-
-
-    # for i in range(args.n_examples):
-    #     with open('{}_{}/clusterings.json'.format(i+1, i)) as clusterings_file:
-    #         clusterings = json.load(clusterings_file)
-    #         cov_matrix = np.array(clusterings['data'][5]['covariance_of_central'])
-
-    #         vector_of_cov = vectorize_covariance(cov_matrix)
-
-    #         filename = 'example_{}_{}.json'.format(args.dataset_name, i)
-    #         with (output_path / filename).open('w') as output_file:
-    #             print(filename)
-    #             json.dump(vector_of_cov, output_file)

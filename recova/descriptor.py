@@ -10,12 +10,76 @@ from recova.util import eprint
 from recova_core import grid_pointcloud_separator
 
 
+
 class DescriptorAlgorithm:
+    """A descriptor algorithm takes a bin of points and outputs a description of the contents of the bin."""
     def __init__(self):
         pass
 
-    def compute(self, points_of_reading, points_of_reference):
+    def compute(self, pointcloud, bins):
         raise NotImplementedError('DescriptorAlgorithms must implement method compute')
+
+    def __repr__(self):
+        raise NotImplementedError('DescriptorAlgorithms must implement __repr__')
+
+
+class OccupancyGridDescriptor(DescriptorAlgorithm):
+    def compute(self, pointcloud, bins):
+        descriptor = [len(x) / len(pointcloud) for x in bins]
+
+    def __repr__(self):
+        return 'occupancy_grid'
+
+
+
+
+class BinningAlgorithm:
+    """A binning alogrithm takes a pointcloud and puts it into bins we can compute a descriptor."""
+    def __init__(self):
+        pass
+
+    def compute(self, reading, reference):
+        raise NotImplementedError('Binning algorithms must implement method compute')
+
+    def __repr__(self):
+        raise NotImplementedError('BinningAlgorithms must implement __repr__')
+
+
+
+class GridBinningAlgorithm(BinningAlgorithm):
+    def __init__(self, spanx, spany, spanz, nx, ny, nz):
+        self.spanx = spanx
+        self.spany = spany
+        self.spanz = spanz
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+
+    def compute(self, pointcloud):
+        return grid_pointcloud_separator(pointcloud, self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
+
+    def __repr__(self):
+        return 'grid-{:.4f}-{:.4f}-{:.4f}-{}-{}-{}'.format(self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
+
+
+
+class PointcloudCombiner:
+    """A pointcloud combiner takes the reading and outputs a single pointcloud which we use for learning."""
+    def compute(self, reading, reference):
+        raise NotImplementedError('PointcloudCombiners must implement compute')
+
+    def __repr__(self):
+        raise NotImplementedError('PoincloudCombiners must implement __repr__')
+
+
+
+class ReferenceOnlyCombiner(PointcloudCobiner):
+    def compute(self, reading, reference):
+        return reference
+
+    def __repr__(self):
+        return 'ref-only'
+
 
 
 def occupancy_descriptor(bin, total_n_points):
