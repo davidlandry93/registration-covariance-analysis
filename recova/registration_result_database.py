@@ -83,10 +83,13 @@ class RegistrationResult:
 
         return lie_vectors_of_registrations(reg_dict)
 
+    @property
+    def registration_file(self):
+        return self.directory_of_pair / 'registrations.json'
+
 
     def registration_dict(self):
-        registration_file = self.directory_of_pair / 'registrations.json'
-        if not registration_file.exists():
+        if not self.registration_file.exists():
             self.merge_raw_results()
 
         with registration_file.open() as f:
@@ -106,11 +109,27 @@ class RegistrationResult:
         return descriptor
 
 
+    def initial_estimate(self):
+        with self.registration_file.open() as f:
+            results = json.load(f)
+            initial_estimate = results['metadata']['initial_estimate_mean']
+
+        return np.array(initial_estimate)
+
+    def ground_truth(self):
+        with self.registration_file.open() as f:
+            results = json.load(f)
+            ground_truth = results['metadata']['ground_truth']
+
+        return np.array(ground_truth)
+
+
     def compute_descriptor(self, combiner, binner, descriptor_algorithm):
         reading = self.points_of_reading()
         reference = self.points_of_reference()
+        initial_estimate = self.initial_estimate()
 
-        combined = combiner.compute(reading, reference)
+        combined = combiner.compute(reading, reference, initial_estimate)
         binned = binner.compute(combined)
         descriptor = descriptor_algorithm.compute(combined, binned)
 
@@ -231,5 +250,5 @@ def import_files_cli():
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 
-    with multiprocessing.ThreadPool() as pool:
+    with multiprocessing.Pool() as pool:
         pool.starmap(import_pointclouds_of_one_pair, [(x, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])

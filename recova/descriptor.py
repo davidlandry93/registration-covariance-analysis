@@ -5,6 +5,7 @@ import pathlib
 import subprocess
 import sys
 
+from recov.registration_algorithm import IcpAlgorithm
 from recov.datasets import create_registration_dataset
 from recova.io import read_xyz
 from recova.util import eprint
@@ -57,8 +58,6 @@ class GridBinningAlgorithm(BinningAlgorithm):
         self.ny = ny
         self.nz = nz
 
-    # def compute(self, pointcloud):
-    #     return grid_pointcloud_separator(pointcloud, self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
 
     def compute(self, pointcloud):
         command_string = 'grid_pointcloud_separator -spanx {} -spany {} -spanz {} -nx {} -ny {} -nz {}'.format(
@@ -87,7 +86,7 @@ class GridBinningAlgorithm(BinningAlgorithm):
 
 class PointcloudCombiner:
     """A pointcloud combiner takes the reading and outputs a single pointcloud which we use for learning."""
-    def compute(self, reading, reference):
+    def compute(self, reading, reference, t):
         raise NotImplementedError('PointcloudCombiners must implement compute')
 
     def __repr__(self):
@@ -96,11 +95,21 @@ class PointcloudCombiner:
 
 
 class ReferenceOnlyCombiner(PointcloudCombiner):
-    def compute(self, reading, reference):
+    def compute(self, reading, reference, t):
         return reference
 
     def __repr__(self):
         return 'ref-only'
+
+
+class OverlappingRegionCombiner(PointcloudCombiner):
+    """A pointcloud combiner that registers the point clouds and returns the overlapping region."""
+    def compute(self, reading, reference, initial_estimate):
+        icp = IcpAlgorithm()
+        t = icp.register(reading, reference, initial_estimate)
+
+    def __repr__(self):
+        return 'ref-only_icp'
 
 
 

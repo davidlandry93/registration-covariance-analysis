@@ -1,13 +1,16 @@
 
 import argparse
+import copy
+import datetime
 import json
 import multiprocessing
 import numpy as np
 import pathlib
+import time
 
 from recov.datasets import create_registration_dataset
 from recova.clustering import CenteredClusteringAlgorithm
-from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, ReferenceOnlyCombiner, GridBinningAlgorithm
+from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, OverlappingRegionCombiner, GridBinningAlgorithm
 from recova.registration_result_database import RegistrationResultDatabase
 
 
@@ -85,7 +88,7 @@ def generate_one_example(registration_pair, combining_algorithm, binning_algorit
 
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output', type=str, help='Where to store the examples', default='.')
+    parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
     args = parser.parse_args()
 
@@ -94,15 +97,38 @@ def generate_examples_cli():
     db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
-    pairs = db.registration_pairs()
-
-    combiner = ReferenceOnlyCombiner()
+    combiner = OverlappingRegionCombiner()
     binning_algorithm = GridBinningAlgorithm(10., 10., 10., 5, 5, 5)
     descriptor_algorithm = OccupancyGridDescriptor()
 
     clustering_algorithm = CenteredClusteringAlgorithm(0.2)
 
-    with multiprocessing.Pool() as pool:
-        examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in db.registration_pairs()])
+    registration_pairs = db.registration_pairs()
 
-    print(examples)
+    with multiprocessing.Pool() as pool:
+        examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
+
+    xs, ys = zip(*examples)
+
+    with open(args.output, 'w') as dataset_file:
+        json.dump({
+            'metadata': {
+                'what': 'learning_dataset',
+                'date': str(datetime.datetime.today()),
+                'combiner': str(combiner),
+                'binner': str(binning_algorithm),
+                'descriptor': str(descriptor_algorithm),
+                'clustering': str(clustering_algorithm)
+            },
+            'statistics': {
+                'n_examples': len(xs)
+            },
+            'data': {
+                'pairs': [{
+                    'dataset': x.dataset,
+                    'reading': x.reading,
+                    'reference': x.reference} for x in registration_pairs],
+                'xs': xs,
+                'ys': ys,
+            }
+        }, dataset_file)
