@@ -92,7 +92,7 @@ class RegistrationResult:
         if not self.registration_file.exists():
             self.merge_raw_results()
 
-        with registration_file.open() as f:
+        with self.registration_file.open() as f:
             registration_dict = json.load(f)
 
         return registration_dict
@@ -110,6 +110,9 @@ class RegistrationResult:
 
 
     def initial_estimate(self):
+        if not self.registration_file.exists():
+            self.merge_raw_results()
+
         with self.registration_file.open() as f:
             results = json.load(f)
             initial_estimate = results['metadata']['initial_estimate_mean']

@@ -8,7 +8,7 @@ find_package(gflags REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(nabo_adapter src/nabo_adapter.cpp)
@@ -38,8 +38,21 @@ add_executable(point_density src/point_density_main.cpp src/point_density.cpp)
 target_include_directories(point_density PRIVATE include)
 target_link_libraries(point_density recova nabo_adapter gflags)
 
+add_executable(overlapping_region src/overlapping_region_main.cpp)
+target_link_libraries(overlapping_region gflags nabo_adapter recova)
+target_include_directories(overlapping_region PRIVATE include)
+
+add_executable(json2xyz src/json2xyz_main.cpp)
+target_include_directories(json2xyz PRIVATE include)
+
+
 # Installation
-install(TARGETS centered_clustering point_density grid_pointcloud_separator
+install(TARGETS
+  centered_clustering
+  grid_pointcloud_separator
+  json2xyz
+  overlapping_region
+  point_density
   RUNTIME DESTINATION bin)
 
 if(PYTHON_BINDINGS)

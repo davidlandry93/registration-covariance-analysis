@@ -10,7 +10,7 @@ import time
 
 from recov.datasets import create_registration_dataset
 from recova.clustering import CenteredClusteringAlgorithm
-from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, OverlappingRegionCombiner, GridBinningAlgorithm
+from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, OverlappingRegionCombiner, GridBinningAlgorithm, ReferenceOnlyCombiner
 from recova.registration_result_database import RegistrationResultDatabase
 
 
@@ -97,7 +97,7 @@ def generate_examples_cli():
     db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
-    combiner = OverlappingRegionCombiner()
+    combiner = ReferenceOnlyCombiner()
     binning_algorithm = GridBinningAlgorithm(10., 10., 10., 5, 5, 5)
     descriptor_algorithm = OccupancyGridDescriptor()
 
@@ -105,7 +105,7 @@ def generate_examples_cli():
 
     registration_pairs = db.registration_pairs()
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(8) as pool:
         examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
 
     xs, ys = zip(*examples)
