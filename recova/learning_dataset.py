@@ -97,7 +97,7 @@ def generate_examples_cli():
     db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
-    combiner = ReferenceOnlyCombiner()
+    combiner = OverlappingRegionCombiner()
     binning_algorithm = GridBinningAlgorithm(10., 10., 10., 5, 5, 5)
     descriptor_algorithm = OccupancyGridDescriptor()
 
@@ -105,7 +105,7 @@ def generate_examples_cli():
 
     registration_pairs = db.registration_pairs()
 
-    with multiprocessing.Pool(8) as pool:
+    with multiprocessing.Pool(1) as pool:
         examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
 
     xs, ys = zip(*examples)

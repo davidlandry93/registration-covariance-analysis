@@ -2,13 +2,15 @@ import argparse
 import json
 import multiprocessing
 import pathlib
+import shlex
 import subprocess
 import sys
+import tempfile
 
 from recov.registration_algorithm import IcpAlgorithm
 from recov.datasets import create_registration_dataset
 from recova.io import read_xyz
-from recova.util import eprint
+from recova.util import eprint, run_subprocess
 from recova_core import grid_pointcloud_separator
 
 
@@ -104,12 +106,20 @@ class ReferenceOnlyCombiner(PointcloudCombiner):
 
 class OverlappingRegionCombiner(PointcloudCombiner):
     """A pointcloud combiner that registers the point clouds and returns the overlapping region."""
-    def compute(self, reading, reference, initial_estimate):
-        icp = IcpAlgorithm()
-        t = icp.register(reading, reference, initial_estimate)
+    def compute(self, reading, reference, ground_truth):
+        cmd_template = 'overlapping_region'
+
+        input_dict = {
+            'reading': reading,
+            'reference': reference,
+            't': ground_truth.tolist()
+        }
+
+        response = run_subprocess(cmd_template, json.dumps(input_dict))
+        return json.loads(response)
 
     def __repr__(self):
-        return 'ref-only_icp'
+        return 'ref-only_gt'
 
 
 

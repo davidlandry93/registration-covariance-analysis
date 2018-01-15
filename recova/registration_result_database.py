@@ -110,6 +110,7 @@ class RegistrationResult:
 
 
     def initial_estimate(self):
+        eprint('Loading initial estimate for {}'.format(self))
         if not self.registration_file.exists():
             self.merge_raw_results()
 

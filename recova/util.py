@@ -21,9 +21,10 @@ def parse_dims(dim_string):
 
     return dims
 
-def run_subprocess(command_string):
+def run_subprocess(command_string, input=None):
     return subprocess.check_output(
         command_string,
+        input=input,
         universal_newlines=True,
         shell=True
     )
