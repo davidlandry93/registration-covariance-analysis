@@ -99,7 +99,7 @@ def generate_examples_cli():
     db = RegistrationResultDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
-    combiner = OverlappingRegionCombiner()
+    combiner = ReferenceOnlyCombiner()
     binning_algorithm = GridBinningAlgorithm(10., 10., 10., 5, 5, 5)
     descriptor_algorithm = OccupancyGridDescriptor()
 
