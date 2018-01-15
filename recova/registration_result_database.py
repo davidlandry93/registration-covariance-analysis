@@ -133,7 +133,12 @@ class RegistrationResult:
         reference = self.points_of_reference()
         initial_estimate = self.initial_estimate()
 
-        combined = combiner.compute(reading, reference, initial_estimate)
+        if not self.cache[combiner.__repr__()]:
+            combined = combiner.compute(reading, reference, initial_estimate)
+            self.cache[combiner.__repr__()] = combined
+        else:
+            combined = self.cache[combiner.__repr__()]
+
         binned = binner.compute(combined)
         descriptor = descriptor_algorithm.compute(combined, binned)
 

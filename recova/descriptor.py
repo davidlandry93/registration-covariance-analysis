@@ -115,11 +115,14 @@ class OverlappingRegionCombiner(PointcloudCombiner):
             't': ground_truth.tolist()
         }
 
+        with open('tst.json', 'w') as f:
+            json.dump(input_dict, f)
+
         response = run_subprocess(cmd_template, json.dumps(input_dict))
         return json.loads(response)
 
     def __repr__(self):
-        return 'ref-only_gt'
+        return 'overlapping-region_gt'
 
 
 

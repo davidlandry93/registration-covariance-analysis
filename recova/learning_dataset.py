@@ -86,6 +86,8 @@ def generate_one_example(registration_pair, combining_algorithm, binning_algorit
     return (descriptor, vectorized_covariance)
 
 
+
+
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
@@ -105,7 +107,7 @@ def generate_examples_cli():
 
     registration_pairs = db.registration_pairs()
 
-    with multiprocessing.Pool(1) as pool:
+    with multiprocessing.Pool() as pool:
         examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
 
     xs, ys = zip(*examples)
