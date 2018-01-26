@@ -34,7 +34,7 @@ class ClusteringAlgorithm:
 
 
 class CenteredClusteringAlgorithm(ClusteringAlgorithm):
-    def __init__(self, radius, k=12):
+    def __init__(self, radius=0.2, k=12):
         self.radius = radius
         self.k = k
 
@@ -61,7 +61,7 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         return clustering_row
 
 class DBSCANClusteringAlgorithm(ClusteringAlgorithm):
-    def __init__(self, radius, k=12):
+    def __init__(self, radius=0.2, k=12):
         self.radius = radius
         self.k = k
 
@@ -299,9 +299,14 @@ def cli():
     json_dataset = json.load(sys.stdin)
     algo = clustering_algorithm_factory(args.algo)
 
-    clustering = algo(json_dataset, args.radius, args.n)
+    data = lie_vectors_of_registrations(json_dataset)
 
-    clustering_with_distribution = compute_distribution(json_dataset, clustering)
+    algo.radius = args.radius
+    algo.k = args.n
+    clustering = algo.cluster(data)
+
+
+    clustering_with_distribution = compute_distribution(data, clustering)
 
     json.dump(clustering_with_distribution, sys.stdout)
 

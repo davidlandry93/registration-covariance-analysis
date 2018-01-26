@@ -1,6 +1,7 @@
 import argparse
 import json
 import multiprocessing
+import numpy as np
 import pathlib
 import shlex
 import subprocess
@@ -36,94 +37,27 @@ class OccupancyGridDescriptor(DescriptorAlgorithm):
         return 'occupancy_grid'
 
 
+class MomentGridDescriptor(DescriptorAlgorithm):
+    def compute(self, pointcloud, bins):
+        bin_descriptors = np.empty((len(bins), 12))
+        for i, b in enumerate(bins):
+            if len(b) == 0:
+                bin_descriptors[i] = np.zeros(12)
+            else:
+                points = np.array(b)
+                first_moment = points.mean(axis=0)
 
+                centered_points = points - first_moment
+                second_moment = np.dot(centered_points.T, centered_points) / len(centered_points)
 
-class BinningAlgorithm:
-    """A binning alogrithm takes a pointcloud and puts it into bins we can compute a descriptor."""
-    def __init__(self):
-        pass
+                bin_descriptors[i, 0:3] = first_moment
+                bin_descriptors[i, 3:12] = second_moment.flatten()
 
-    def compute(self, reading, reference):
-        raise NotImplementedError('Binning algorithms must implement method compute')
+        return bin_descriptors.flatten().tolist()
+
 
     def __repr__(self):
-        raise NotImplementedError('BinningAlgorithms must implement __repr__')
-
-
-
-class GridBinningAlgorithm(BinningAlgorithm):
-    def __init__(self, spanx, spany, spanz, nx, ny, nz):
-        self.spanx = spanx
-        self.spany = spany
-        self.spanz = spanz
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-
-
-    def compute(self, pointcloud):
-        command_string = 'grid_pointcloud_separator -spanx {} -spany {} -spanz {} -nx {} -ny {} -nz {}'.format(
-            self.spanx,
-            self.spany,
-            self.spanz,
-            self.nx,
-            self.ny,
-            self.nz
-        )
-        eprint(command_string)
-
-        response = subprocess.check_output(
-            command_string,
-            universal_newlines=True,
-            shell=True,
-            input=json.dumps(pointcloud)
-        )
-
-        return json.loads(response)
-
-    def __repr__(self):
-        return 'grid-{:.4f}-{:.4f}-{:.4f}-{}-{}-{}'.format(self.spanx, self.spany, self.spanz, self.nx, self.ny, self.nz)
-
-
-
-class PointcloudCombiner:
-    """A pointcloud combiner takes the reading and outputs a single pointcloud which we use for learning."""
-    def compute(self, reading, reference, t):
-        raise NotImplementedError('PointcloudCombiners must implement compute')
-
-    def __repr__(self):
-        raise NotImplementedError('PoincloudCombiners must implement __repr__')
-
-
-
-class ReferenceOnlyCombiner(PointcloudCombiner):
-    def compute(self, reading, reference, t):
-        return reference
-
-    def __repr__(self):
-        return 'ref-only'
-
-
-class OverlappingRegionCombiner(PointcloudCombiner):
-    """A pointcloud combiner that registers the point clouds and returns the overlapping region."""
-    def compute(self, reading, reference, ground_truth):
-        cmd_template = 'overlapping_region'
-
-        input_dict = {
-            'reading': reading,
-            'reference': reference,
-            't': ground_truth.tolist()
-        }
-
-        with open('tst.json', 'w') as f:
-            json.dump(input_dict, f)
-
-        response = run_subprocess(cmd_template, json.dumps(input_dict))
-        return json.loads(response)
-
-    def __repr__(self):
-        return 'overlapping-region_gt'
-
+        return 'moment-grid'
 
 
 def occupancy_descriptor(bin, total_n_points):

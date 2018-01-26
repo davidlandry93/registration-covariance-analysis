@@ -19,6 +19,7 @@ setup(
                'bin/meta_of_json'],
     entry_points = {
         'console_scripts': [
+            'pca_align = recova.alignment:pca_alignment_cli',
             'center_registrations = recova.registration_dataset:center_around_gt_cli',
             'clustering = recova.clustering:cli',
             'clustering_batch = recova.clustering_batch:cli',

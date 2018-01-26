@@ -8,9 +8,14 @@ import numpy as np
 import pathlib
 import time
 
+from lie import se3
+
 from recov.datasets import create_registration_dataset
+from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm
-from recova.descriptor import generate_descriptor, OccupancyGridDescriptor, OverlappingRegionCombiner, GridBinningAlgorithm, ReferenceOnlyCombiner
+from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
+from recova.binning import GridBinningAlgorithm
+from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
 from recova.registration_result_database import RegistrationResultDatabase
 
 
@@ -78,10 +83,15 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, combining_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
-    descriptor = registration_pair.descriptor(combining_algorithm, binning_algorithm, descriptor_algorithm)
+def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
+
+    descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
     covariance = registration_pair.covariance(clustering_algorithm)
-    vectorized_covariance = vectorize_covariance(covariance)
+
+
+    adj_of_t = se3.adjoint(alignment_algorithm.transform)
+    rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T))
+    vectorized_covariance = vectorize_covariance(rotated_covariance)
 
     return (descriptor, vectorized_covariance)
 
@@ -100,15 +110,16 @@ def generate_examples_cli():
     output_path = pathlib.Path(args.output)
 
     combiner = OverlappingRegionCombiner()
-    binning_algorithm = GridBinningAlgorithm(10., 10., 10., 3, 3, 3)
-    descriptor_algorithm = OccupancyGridDescriptor()
+    aligner = PCAlignmentAlgorithm()
+    binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
+    descriptor_algorithm = MomentGridDescriptor()
 
     clustering_algorithm = CenteredClusteringAlgorithm(0.2)
 
     registration_pairs = db.registration_pairs()
 
     with multiprocessing.Pool() as pool:
-        examples = pool.starmap(generate_one_example, [(x, combiner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
+        examples = pool.starmap(generate_one_example, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
 
     xs, ys = zip(*examples)
 

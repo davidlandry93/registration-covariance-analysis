@@ -8,10 +8,12 @@ import pathlib
 from recov.datasets import create_registration_dataset
 from recov.util import ln_se3
 
+from recova.alignment import IdentityAlignmentAlgorithm
 from recova.clustering import compute_distribution
 from recova.file_cache import FileCache
 from recova.util import eprint
 from recova.merge_json_result import merge_result_files
+from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations
 
 
@@ -98,13 +100,37 @@ class RegistrationResult:
         return registration_dict
 
 
-    def descriptor(self, combiner, binner, descriptor_algorithm):
-        descriptor_name = '{}_{}_{}'.format(combiner, binner, descriptor_algorithm)
+    def descriptor(self, combiner, aligner, binner, descriptor_algorithm):
+        descriptor_name = '{}_{}_{}_{}'.format(combiner, aligner, binner, descriptor_algorithm)
 
         descriptor = self.cache[descriptor_name]
         if not descriptor:
-            descriptor = self.compute_descriptor(combiner, binner, descriptor_algorithm)
+            descriptor = self.compute_descriptor(combiner, aligner, binner, descriptor_algorithm)
             self.cache[descriptor_name] = descriptor
+
+        return descriptor
+
+
+    def compute_descriptor(self, combiner, aligner, binner, descriptor_algorithm):
+        reading = self.points_of_reading()
+        reference = self.points_of_reference()
+        initial_estimate = self.initial_estimate()
+
+        if not self.cache[combiner.__repr__()]:
+            combined = combiner.compute(reading, reference, initial_estimate)
+            self.cache[combiner.__repr__()] = combined
+        else:
+            combined = self.cache[combiner.__repr__()]
+
+        T = aligner.align(combined)
+        np_combined = np.array(combined)
+
+        homo_combined = to_homogeneous(np_combined)
+
+        aligned = np.dot(T, homo_combined).T
+
+        binned = binner.compute(aligned.tolist())
+        descriptor = descriptor_algorithm.compute(aligned, binned)
 
         return descriptor
 
@@ -126,25 +152,6 @@ class RegistrationResult:
             ground_truth = results['metadata']['ground_truth']
 
         return np.array(ground_truth)
-
-
-    def compute_descriptor(self, combiner, binner, descriptor_algorithm):
-        reading = self.points_of_reading()
-        reference = self.points_of_reference()
-        initial_estimate = self.initial_estimate()
-
-        if not self.cache[combiner.__repr__()]:
-            combined = combiner.compute(reading, reference, initial_estimate)
-            self.cache[combiner.__repr__()] = combined
-        else:
-            combined = self.cache[combiner.__repr__()]
-
-        binned = binner.compute(combined)
-        descriptor = descriptor_algorithm.compute(combined, binned)
-
-        print(descriptor)
-
-        return descriptor
 
 
     def points_of_reading(self):
@@ -184,6 +191,8 @@ class RegistrationResult:
 
             with clustering_file.open('w') as jsonfile:
                 json.dump(clustering, jsonfile)
+
+        
 
         return np.array(clustering['covariance_of_central'])
 
@@ -255,6 +264,7 @@ def import_files_cli():
     db = RegistrationResultDatabase(args.root)
 
     for registration_file in args.files:
+        print(registration_file)
         db.import_file(registration_file)
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
