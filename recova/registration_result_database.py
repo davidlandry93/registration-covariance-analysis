@@ -136,7 +136,6 @@ class RegistrationResult:
 
 
     def initial_estimate(self):
-        eprint('Loading initial estimate for {}'.format(self))
         if not self.registration_file.exists():
             self.merge_raw_results()
 
@@ -166,33 +165,23 @@ class RegistrationResult:
             return json.load(f)
 
 
-    def covariance(self, clustering_algorithm):
-        clustering_directory = self.directory_of_pair / 'clustering'
+    def clustering_of_results(self, clustering_algorithm):
+        cached_clustering = self.cache[clustering_algorithm.__repr__()]
 
-        # Create clustering directory if it doesn't exist
-        if not clustering_directory.exists():
-            clustering_directory.mkdir()
-
-        # If we can recover a cache file for this clustering, do it.
-        clustering_file = clustering_directory / (str(clustering_algorithm) + '.json')
-        clustering = None
-        if clustering_file.exists():
-            try:
-                with clustering_file.open() as jsonfile:
-                    clustering = json.load(jsonfile)
-                    eprint('Using cached clustering for {}'.format(self))
-            except ValueError:
-                eprint('Error decoding clustering {} for {}'.format(clustering_algorithm, self))
-
-        # If we still don't have a clustering at this point, we need to compute it.
-        if not clustering:
+        if not cached_clustering:
             clustering = self.compute_clustering(clustering_algorithm)
-            clustering = compute_distribution(self.registration_dict(), clustering)
+            self.cache[clustering_algorithm.__repr__()] = clustering
+            return clustering
+        else:
+            return cached_clustering
 
-            with clustering_file.open('w') as jsonfile:
-                json.dump(clustering, jsonfile)
 
-        
+    def covariance(self, clustering_algorithm):
+        clustering = self.clustering_of_results(clustering_algorithm)
+        clustering = compute_distribution(self.registration_dict(), clustering)
+
+        with clustering_file.open('w') as jsonfile:
+            json.dump(clustering, jsonfile)
 
         return np.array(clustering['covariance_of_central'])
 
