@@ -9,6 +9,8 @@ from sklearn.neighbors import DistanceMetric, BallTree
 
 
 class CelloModel:
+    BALL_SIZE = 100.
+
     def __init__(self, predictors, errors, parameters):
         up = vector_to_upper_triangular(parameters)
         metric_matrix = np.dot(up.T, up)
@@ -17,12 +19,39 @@ class CelloModel:
         self.errors = errors
         self.tree = BallTree(predictors, metric=metric)
 
+    def metric_damping_function(self, metric_value):
+        return max(200. - metric_value, 0.)
+
     def query(self, point):
-        indices, distances = self.tree.query([point], k=10)
+        indices, distances = self.tree.query_radius([point], r=self.BALL_SIZE, return_distance=True)
+
         print(indices)
         print(distances)
 
-        return np.identity(6)
+        sum_of_damped_distances = 0.
+        covariance = np.zeros((6,6))
+
+        for i in range(len(indices)):
+            # Disallow self matches.
+            if distances[i] == 0.:
+                continue
+
+            # Compute the weight of one error vector associated with this descriptor.
+            weight = self.metric_damping_function(distances[i])
+            sum_of_damped_distances += weight * len(self.errors[i])
+
+            for matched_predictor in indices[i]:
+                errors_of_predictor = self.errors[matched_predictor]
+
+                for e in errors_of_predictor:
+                    e = e[np.newaxis]
+                    print(np.dot(e.T, e))
+                    covariance += weight * np.dot(e.T, e)
+
+        covariance /= sum_of_damped_distances
+
+        return covariance
+
 
 def size_of_vector(n):
     """The size of a vector representing an nxn upper triangular matrix."""
@@ -54,6 +83,9 @@ def compute_loss(model, predictors, errors):
         print(i)
         predicted_cov = model.query(predictors[i])
 
+        print('Predicted covariance: ')
+        print(predicted_cov)
+
         # First term of the loss. See Cello eq. 29.
         loss += len(errors[i]) * np.linalg.norm(predicted_cov)
 
@@ -65,8 +97,10 @@ def compute_loss(model, predictors, errors):
     return loss
 
 
-def censi_learning_cli():
+def cello_learning_cli():
+    print('Loading document')
     input_document = json.load(sys.stdin)
+    print('Done loading document')
 
     predictors = np.array(input_document['data']['predictors'])
 
