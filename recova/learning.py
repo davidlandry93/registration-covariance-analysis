@@ -3,13 +3,81 @@ import argparse
 import json
 import os
 from math import sqrt, ceil
+import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
+import sklearn
+import sklearn.model_selection
 import torch
+import torch.optim as optim
 from torch.autograd import Variable
 
-from sklearn.neighbors import DistanceMetric, BallTree
+from sklearn.neighbors import DistanceMetric, BallTree, KDTree
+
+from recova.util import nearestPD
+
+
+def kullback_leibler(cov1, cov2):
+    """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
+    cov1 and cov2 must be numpy matrices.
+    See http://bit.ly/2FAYCgu."""
+
+    corrected_cov1, corrected_cov2 = nearestPD(cov1), nearestPD(cov2)
+    det1, det2 = np.linalg.det(corrected_cov1), np.linalg.det(corrected_cov2)
+
+    A = np.trace(np.dot(np.linalg.inv(corrected_cov1), corrected_cov2))
+    B = 6.
+    C = float(np.log(det1) - np.log(det2))
+
+    kll = 0.5 * (A - B + C)
+
+    return kll
+
+
+class CovarianceEstimationModel:
+    def fit(self, xs, ys):
+        raise NotImplementedError('CovarianceEstimationModels must implement fit method')
+
+    def predict(self, xs):
+        raise NotImplementedError('CovarianceEstimationModels must implement predict method')
+
+    def validate(self, xs, ys):
+        """Given a validation set, outputs a loss."""
+        predictions = self.predict(xs)
+
+        total_loss = 0.
+        for i in range(len(predictions)):
+            total_loss += kullback_leibler(ys[i], predictions[i])
+
+        return total_loss / len(xs)
+
+
+class KnnModel(CovarianceEstimationModel):
+    def __init__(self, k=12):
+        self.default_k = k
+
+    def fit(self, xs, ys):
+        self.kdtree = KDTree(xs)
+        self.examples = ys
+
+    def predict(self, xs, p_k=None):
+        k = self.default_k if p_k is None else p_k
+
+        distances, indices = self.kdtree.query(xs, k=k)
+        predictions = np.zeros((len(xs), 6, 6))
+
+        for i in range(len(xs)):
+            exp_dists = np.exp(-distances[i])
+            sum_dists = np.sum(exp_dists)
+            ratios = exp_dists / sum_dists
+
+            for j in range(len(indices)):
+                predicted = np.sum(self.examples[indices[i]] * ratios.reshape(k,1,1), axis=0)
+                predictions[i] = predicted
+
+        return predictions
+
 
 def to_upper_triangular(v):
     # Infer the size of the matrix from the size of the vector.
@@ -229,23 +297,6 @@ def predict(predictors, covariances, distances, predictor):
     return predicted_cov
 
 
-def kullback_leibler(cov1, cov2):
-    """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
-    See http://bit.ly/2FAYCgu."""
-    det1, det2 = np.linalg.det(cov1.data), np.linalg.det(cov2.data)
-
-    print('KLL')
-    print(cov1.data)
-    print(det1)
-    print(cov2.data)
-    print(det2)
-
-    A = torch.trace(torch.mm(torch.inverse(cov1), cov2))
-    B = 6.
-    C = float(np.log(det1 / det2))
-    return 0.5 * (A - B + C)
-
-
 def loss_of_covariance(lhs, rhs):
     return torch.log(torch.norm(torch.mm(torch.inverse(lhs), rhs) - Variable(torch.eye(6))))
 
@@ -255,7 +306,9 @@ def loss_of_set(xs, ys, metric, test_xs, test_ys):
     for i, x in enumerate(test_xs):
         distances = compute_distances(xs, metric, x)
         predicted_cov = predict(xs, ys, distances, x)
-        sum_of_losses += kullback_leibler(test_ys[i], predicted_cov)
+
+        kll = kullback_leibler(predicted_cov.data.numpy(), test_ys[i].data.numpy())
+        sum_of_losses += kll
 
     return sum_of_losses / len(test_xs)
 
@@ -285,8 +338,11 @@ def cello_torch(predictors, covariances):
 
     theta = Variable(torch.randn(sz_of_vector) / 1000., requires_grad=True)
 
+    optimizer = optim.SGD([theta], lr=1e-5)
+
     for epoch in range(500):
         for i, predictor in enumerate(predictors_training):
+            optimizer.zero_grad()
             metric_matrix = theta_to_metric_matrix(theta)
 
             distances = compute_distances(predictors_training, metric_matrix, predictor)
@@ -300,16 +356,33 @@ def cello_torch(predictors, covariances):
             regularization_term = torch.sum(torch.log(nonzero_distances))
             loss = (1 - alpha) * (loss_lhs + loss_rhs ) +  alpha * regularization_term
 
-            # print('Norm: {}, Cov: {}, Reg: {}'.format(loss_lhs.data[0], loss_rhs.data[0], regularization_term.data[0]))
-
             loss.backward(retain_graph=True)
+            optimizer.step()
 
-            theta.data -= 1e-5 * theta.grad.data
-            theta.grad.data.zero_()
 
         print('VALIDATION')
-        print(theta)
         print(loss_of_set(predictors_training, covariances_training, metric_matrix, predictors_validation, covariances_validation))
+
+
+def covariance_model_performance(model, predictors, covariances, p_selection=None):
+    scores = []
+
+    selection = (sklearn.model_selection.ShuffleSplit(n_splits = 100, test_size=0.25) if
+                 p_selection is None else p_selection)
+
+    for training_set, test_set in selection.split(predictors, covariances):
+        model.fit(predictors[training_set], covariances[training_set])
+        score = model.validate(predictors[test_set], covariances[test_set])
+        scores.append(score)
+
+
+    scores = np.array(scores)
+    return scores.mean(), scores.std()
+
+
+def plot_learning(ax, x, y, cov):
+    ax.fill_between(x, y - cov, y + cov)
+    ax.plot(x, y)
 
 
 def cello_learning_cli():
@@ -333,5 +406,15 @@ def cello_learning_cli():
         cello_learninig(predictors, np_examples)
     elif args.algorithm == 'cellotorch':
         cello_torch(predictors, covariances)
+    elif args.algorithm == 'knn':
+        scores = []
+        ks = list(range(1,20))
+        for k in ks:
+            model = KnnModel(k)
+            scores.append(covariance_model_performance(model, predictors, covariances))
+            print('%.5e var %.5e' % scores[-1])
 
-
+        scores = np.array(scores)
+        fig, ax = plt.subplots()
+        plot_learning(ax, ks, scores[:,0], scores[:,1])
+        plt.show()
