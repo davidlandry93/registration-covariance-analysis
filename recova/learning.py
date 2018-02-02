@@ -15,7 +15,7 @@ from torch.autograd import Variable
 
 from sklearn.neighbors import DistanceMetric, BallTree, KDTree
 
-from recova.util import nearestPD
+from recova.util import nearestPD, eprint
 
 
 def kullback_leibler(cov1, cov2):
@@ -97,6 +97,7 @@ def to_upper_triangular(v):
 
     return gathered.view(n,n) * Variable(upper_triangular_mask(n).float())
 
+
 def upper_triangular_to_vector(up):
     return up[upper_triangular_mask(up.size(-1))]
 
@@ -136,186 +137,109 @@ class NearestNeighbor(torch.autograd.Function):
         return (torch.sum(self.predictors * sum_of_predictor, 1), torch.sum(torch.dot(self.predictors, metric_matrix), 1))
 
 
-class CelloFunction(torch.autograd.Function):
-    BALL_SIZE = 500.
-
-    def __init__(self, predictors, errors):
-        self.predictors = predictors
-        self.errors = errors
-
-        for error_collection in self.errors:
-            self.covariance_of_predictors.append(np.dot(error_collection.T, error_collection))
-
-    @staticmethod
-    def forward(ctx, parameters, predictor):
-
-        up = vector_to_upper_triangular(parameters)
-        metric_matrix = np.dot(up.T, up)
-        metric = DistanceMetric.get_metrix('mahalanobis', VI=metric_matrix)
-
-        tree = BallTree(self.predictors, metric=metric)
-        indices, distances = tree.query_radius([predictor], r=self.BALL_SIZE, return_distance=True)
-
-        if len(indices) == 0:
-            raise RuntimeError('No predictor was close enough to the query point.')
-
-        sum_of_damped_distances = 0.
-        if i in range(len(indices)):
-            weight = self.metric_damping_function(distances[i])
-            sum_of_damped_distances += weight * len(self.errors[i])
-
-            covariance += weight * self.covariance_of_predictors[indices[i]]
-
-        ctx.save_for_backward(predictor, distances)
-
-        return covariance / sum_of_damped_distances
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        predictor, distances = ctx.saved_variables
-
-        grad_of_k = [-1. if rho < self.BALL_SIZE else 0. for rho in distances]
-
-
-        return parameters_grad, predictor_grad
-
-
-class CelloModel:
-    BALL_SIZE = 500.
-
-    def __init__(self, predictors, errors, parameters):
-        up = vector_to_upper_triangular(parameters)
-        metric_matrix = np.dot(up.T, up)
-        metric = DistanceMetric.get_metric('mahalanobis', VI=metric_matrix)
-
-        self.errors = errors
-        self.tree = BallTree(predictors, metric=metric)
-
-        self.covariance_of_predictors = []
-
-        print('Precomputing covariances')
-
-
-    def metric_damping_function(self, metric_value):
-        return max(200. - metric_value, 0.)
-
-
-    def query(self, point):
-        indices, distances = self.tree.query_radius([point], r=self.BALL_SIZE, return_distance=True)
-        indices = indices[0]
-        distances = distances[0]
-
-        sum_of_damped_distances = 0.
-        covariance = np.zeros((6,6))
-
-        if len(indices) == 0:
-            raise RuntimeError('No predictor was close enough to the query point.')
-
-        for i in range(len(indices)):
-            # Disallow self matches.
-            if distances[i] == 0.:
-                continue
-
-            # Compute the weight of one error vector associated with this descriptor.
-            weight = self.metric_damping_function(distances[i])
-            sum_of_damped_distances += weight * len(self.errors[i])
-
-            covariance += weight * self.covariance_of_predictors[indices[i]]
-
-        covariance /= sum_of_damped_distances
-
-        return covariance
-
-
 def size_of_vector(n):
     """The size of a vector representing an nxn upper triangular matrix."""
     return int((n * n + n) / 2.)
 
-def upper_triangular_to_vector(up):
-    pass
-
-def vector_to_upper_triangular(vector):
-    # Infer the shape of the matrix from the size of the vector.
-    y = len(vector)
-    n = int((-1 + np.sqrt(8. * y)) / 2.)
-
-    matrix = np.zeros((n,n))
-    cursor = 0
-
-    for i in range(n):
-        for j in range(i, n):
-            matrix[i,j] = vector[cursor]
-            cursor = cursor + 1
-
-    return matrix
 
 
-def compute_loss(model, predictors, errors):
-    loss = 0.
-
-    for i in range(len(predictors)):
-        predicted_cov = model.query(predictors[i])
-
-        # First term of the loss. See Cello eq. 29.
-        loss += len(errors[i]) * np.linalg.norm(predicted_cov)
-
-        inv_predicted_cov = np.linalg.inv(predicted_cov)
-
-        # Use matrix operations to compute the second term of the loss for multiple error vectors.
-        err_losses = np.dot(errors[i], inv_predicted_cov)
-        err_losses = err_losses * errors[i] # Term by term multiplication.
-        err_losses = np.sum(err_losses)
-
-        loss += err_losses
-
-    return loss
-
-def cello_learning(predictors, errors):
-    size_of_predictor = predictors.shape[1]
-    sz_of_vector = size_of_vector(size_of_predictor)
-
-    model = CelloModel(predictors[0:300], np_examples[0:300], np.ones(sz_of_vector))
-
-    loss = compute_loss(model, predictors[300:], np_examples[300:])
-    print(loss)
 
 
-def compute_distances(predictors, metric_matrix, predictor):
-    delta = predictors - predictor
-    lhs = torch.mm(delta, metric_matrix)
-    return torch.sum(lhs * delta, 1).squeeze()
 
 
-def predict(predictors, covariances, distances, predictor):
-    zero_distances = distances < 1e-10
-    distances.masked_fill(zero_distances, 1.)
+class CelloCovarianceEstimationModel(CovarianceEstimationModel):
+    def __init__(self, alpha=1e-6):
+        self.alpha = alpha
 
-    weights = torch.clamp(1. - distances, min=0.)
+    def fit(self, predictors, covariances):
+        self.predictors = torch.Tensor(predictors)
+        self.covariances = torch.Tensor(covariances)
 
-    predicted_cov = torch.sum(covariances * weights.view(-1,1,1), 0) / torch.sum(weights)
+        # Initialize a distance metric.
+        sz_of_vector = size_of_vector(predictors.shape[1])
+        self.theta = Variable(torch.randn(sz_of_vector) / 1000., requires_grad=True)
 
-    return predicted_cov
+        selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=100)
+
+        # optimizer = optim.SGD([theta], lr=1e-7)
+        # optimizer = optim.Adam([theta], lr=1e-5)
+        optimizer = optim.RMSprop([self.theta], lr=1e-5)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+
+        for epoch, (train_set, test_set) in enumerate(selector.split(predictors)):
+            optimizer.zero_grad()
+
+            xs_train, xs_validation = Variable(torch.Tensor(predictors[train_set])), Variable(torch.Tensor(predictors[test_set]))
+            ys_train, ys_validation = Variable(torch.Tensor(covariances[train_set])), Variable(torch.Tensor(predictors[test_set]))
+
+            sum_of_losses = Variable(torch.Tensor([0.]))
+
+            for i, x in enumerate(xs_train):
+                metric_matrix = self.theta_to_metric_matrix(self.theta)
+
+                distances = self.compute_distances(xs_train, metric_matrix, x)
+                prediction = self.prediction_from_distances(ys_train, distances, x)
+
+                loss_A = torch.log(torch.norm(prediction))
+                loss_B = torch.log(torch.norm(torch.mm(torch.inverse(prediction), ys_train[i]) - Variable(torch.eye(6))))
+
+                nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
+                regularization_term = torch.sum(torch.log(nonzero_distances))
+
+                optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
+                sum_of_losses += optimization_loss
+                optimization_loss.backward()
+                optimizer.step()
+
+            average_loss = sum_of_losses / len(xs_train)
+
+            print('Avg Optimization Loss: %f' % average_loss)
+            print(epoch)
+            if epoch % 10 == 0:
+                print(self.validate(xs_validation, ys_validation))
 
 
-def loss_of_covariance(lhs, rhs):
-    return torch.log(torch.norm(torch.mm(torch.inverse(lhs), rhs) - Variable(torch.eye(6))))
+    def predict(self, queries):
+        metric_matrix = self.theta_to_metric_matrix(self.theta)
+
+        print(metric_matrix)
+
+        predictions = torch.zeros(len(queries),6,6)
+
+        for i, x in enumerate(queries):
+            print('PREDICTING %d' %i)
+            distances = self.compute_distances(self.predictors, metric_matrix, x)
+            predictions[i] = self.prediction_from_distances(self.covariances, distances, x)
+            print(predictions[i])
 
 
-def loss_of_set(xs, ys, metric, test_xs, test_ys):
-    sum_of_losses = 0.
-    for i, x in enumerate(test_xs):
-        distances = compute_distances(xs, metric, x)
-        predicted_cov = predict(xs, ys, distances, x)
-
-        kll = kullback_leibler(predicted_cov.data.numpy(), test_ys[i].data.numpy())
-        sum_of_losses += kll
-
-    return sum_of_losses / len(test_xs)
+        return predictions
 
 
-def theta_to_metric_matrix(theta):
-    up = to_upper_triangular(theta)
-    return torch.mm(up, up.transpose(0,1))
+    def theta_to_metric_matrix(self, theta):
+        up = to_upper_triangular(theta)
+        return torch.mm(up, up.transpose(0,1))
+
+
+    def compute_distances(self, predictors, metric_matrix, predictor):
+        print(predictors.shape)
+        print(metric_matrix.shape)
+        print(predictor.shape)
+        delta = predictors - predictor
+        lhs = torch.mm(delta, metric_matrix)
+        return torch.sum(lhs * delta, 1).squeeze()
+
+
+    def prediction_from_distances(self, covariances, distances, x):
+        zero_distances = distances < 1e-10
+        distances.masked_fill(zero_distances, 1.)
+
+        weights = torch.clamp(1. - distances, min=0.)
+        predicted_cov = torch.sum(covariances * weights.view(-1,1,1), 0) / torch.sum(weights)
+
+        return predicted_cov
+
+
 
 
 def cello_torch(predictors, covariances):
@@ -403,9 +327,8 @@ def cello_learning_cli():
         covariances[i,:,:] = np.dot(errors.T, errors)
 
     if args.algorithm == 'cello':
-        cello_learninig(predictors, np_examples)
-    elif args.algorithm == 'cellotorch':
-        cello_torch(predictors, covariances)
+        model = CelloCovarianceEstimationModel()
+        model.fit(predictors, covariances)
     elif args.algorithm == 'knn':
         scores = []
         ks = list(range(1,20))
