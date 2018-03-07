@@ -181,14 +181,14 @@ def to_vtk(dataset, clustering, output):
     """
     points = positions_of_registration_data(dataset)
 
-    density = float(clustering['density'])
+    radius = float(clustering['radius'])
     clustering_data = clusters_of_points(clustering['clustering'], len(points))
 
     data_dict = data_dict_of_registration_data(dataset)
     data_dict['clustering'] = np.ascontiguousarray(clustering_data)
 
-    points_to_vtk(points[:,0:3], '{}_translation'.format(output, density), data=data_dict)
-    points_to_vtk(points[:,3:6], '{}_rotation'.format(output, density), data=data_dict)
+    points_to_vtk(points[:,0:3], '{}_translation'.format(output, radius), data=data_dict)
+    points_to_vtk(points[:,3:6], '{}_rotation'.format(output, radius), data=data_dict)
 
     mean = np.array(clustering['mean_of_central'])
     mean = se3_log(mean)

@@ -40,7 +40,7 @@ def plot_clustering_series(covariance_trace_ax, n_points_ax, clusterings):
     ys = []
     sizes = []
     for i, clustering in enumerate(clusterings['data']):
-        xs.append(clustering['density'])
+        xs.append(clustering['radius'])
         sizes.append(1.0 - float(clustering['outlier_ratio']))
 
         covariance = np.array(clustering['covariance_of_central'])
@@ -49,6 +49,7 @@ def plot_clustering_series(covariance_trace_ax, n_points_ax, clusterings):
     print(clusterings['metadata'])
     plot1 = covariance_trace_ax.plot(xs, ys, linestyle='-', marker='o', label='{} ({})'.format(clusterings['metadata']['dataset'], clusterings['metadata']['reference']))
     plot2 = n_points_ax.plot(xs, sizes, label='N of points in cluster', linestyle='--', marker='s')
+    covariance_trace_ax.set_ylabel('Trace of covariance matrix')
 
 
 def plot_cov_against_density(args):
@@ -67,6 +68,9 @@ def plot_cov_against_density(args):
             plot_clustering_series(ax, n_points_ax, series)
 
     ax.legend()
+    ax.set_xlabel('Clustering radius')
+    ax.set_ylabel('Proportion of inliers')
+    ax.set_title('Trace of covariance matrix according to clustering radius')
 
     plt.show()
 
