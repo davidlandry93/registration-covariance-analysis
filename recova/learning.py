@@ -15,24 +15,149 @@ from torch.autograd import Variable
 
 from sklearn.neighbors import DistanceMetric, BallTree, KDTree
 
-from recova.util import nearestPD, eprint
+import recova.util
+from recova.util import eprint
 
+def pytorch_is_pd(A):
+    try:
+        _ = torch.potrf(A)
+        return True
+    except RuntimeError:
+        return False
+
+
+def pytorch_correlation_repair(C):
+    print('Fxing matrix')
+    print(C)
+    eigvals, eigvecs = torch.eig(C, eigenvectors=True)
+
+    print(eigvals)
+    print(eigvecs)
+
+    eigvals = torch.max(torch.zeros(6), eigvals[:,0])
+
+    print(eigvals)
+    reconstructed = torch.mm(eigvecs, torch.mm(torch.diag(eigvals), eigvecs))
+    print('Reconstructed')
+    print(reconstructed)
+
+    T = 1. / torch.sqrt(torch.diag(eigvals))
+    TT = torch.mm(T, torch.t(T))
+
+    repaired = reconstructed * TT
+    print('Repaired')
+    print(repaired)
+
+    print('Forbenius norm: {}'.format(torch.norm(C - repaired)))
+
+    return repaired
+
+
+def pytorch_nearest_pd(A):
+    """Find the nearest positive-definite matrix to input
+
+    A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which
+    credits [2].
+
+    [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
+
+    [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
+    matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
+    """
+
+    print('Computing nearest PD of {}'.format(A.shape))
+    B = (A + torch.t(A)) / 2
+    _, s, V = torch.svd(B)
+
+    H = torch.mm(torch.t(V), torch.mm(torch.diag(s), V))
+
+    A2 = (B + H) / 2
+
+    A3 = (A2 + torch.t(A2)) / 2
+
+    if pytorch_is_pd(A3):
+        return A3
+
+    spacing = np.spacing(torch.norm(A).detach().numpy())
+
+    # The above is different from [1]. It appears that MATLAB's `chol` Cholesky
+    # decomposition will accept matrixes with exactly 0-eigenvalue, whereas
+    # Numpy's will not. So where [1] uses `eps(mineig)` (where `eps` is Matlab
+    # for `np.spacing`), we use the above definition. CAVEAT: our `spacing`
+    # will be much larger than [1]'s `eps(mineig)`, since `mineig` is usually on
+    # the order of 1e-16, and `eps(1e-16)` is on the order of 1e-34, whereas
+    # `spacing` will, for Gaussian random matrixes of small dimension, be on
+    # othe order of 1e-16. In practice, both ways converge, as the unit test
+    # below suggests.
+    I = torch.eye(A.shape[0])
+    k = 1
+    while not pytorch_is_pd(A3):
+        eigvals, _ = torch.eig(A3)
+        mineig = torch.min(eigvals)
+
+        A3 += I * (-mineig * k**2 + spacing)
+        print(A3)
+        print(spacing)
+        k += 1
+
+    error = torch.norm(A - A3)
+    if error > 1e-6:
+        eprint('Warning: high reconstruction error detected when correcting a Positive Definite matrix. {}'.format(error))
+
+    return A3
 
 def kullback_leibler(cov1, cov2):
     """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
     cov1 and cov2 must be numpy matrices.
     See http://bit.ly/2FAYCgu."""
 
-    corrected_cov1, corrected_cov2 = nearestPD(cov1), nearestPD(cov2)
-    det1, det2 = np.linalg.det(corrected_cov1), np.linalg.det(corrected_cov2)
+    corrected_cov1 = recova.util.nearestPD(cov1)
+    corrected_cov2 = recova.util.nearestPD(cov2)
+
+    det1 = np.linalg.det(corrected_cov1)
+    det2 = np.linalg.det(corrected_cov2)
 
     A = np.trace(np.dot(np.linalg.inv(corrected_cov1), corrected_cov2))
     B = 6.
     C = float(np.log(det1) - np.log(det2))
 
+
     kll = 0.5 * (A - B + C)
 
     return kll
+
+def kullback_leibler_pytorch(cov1, cov2):
+    """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
+    cov1 and cov2 must be numpy matrices.
+    See http://bit.ly/2FAYCgu."""
+
+    corrected_cov1 = nearestPD(cov1.data.numpy())
+    corrected_cov2 = nearestPD(cov2.data.numpy())
+
+    det1 = torch.det(corrected_cov1)
+    det2 = torch.det(corrected_cov2)
+
+    print('Inverted matrix')
+    print(torch.inverse(corrected_cov2))
+
+    A = torch.trace(torch.mm(torch.inverse(corrected_cov1), corrected_cov2))
+    B = 6.
+    C = float(torch.log(det1) - torch.log(det2))
+
+    print('{} - {} + {}'.format(A,B,C))
+
+    kll = 0.5 * (A - B + C)
+
+    print()
+
+    return kll
+
+def bat_distance(cov1, cov2):
+    avg_cov = cov1 + cov2 / 2
+    A = torch.det(avg_cov)
+    B = torch.det(cov1)
+    C = torch.det(cov2)
+    return 0.5 * torch.log(A / torch.sqrt(B + C))
 
 
 class CovarianceEstimationModel:
@@ -48,7 +173,13 @@ class CovarianceEstimationModel:
 
         total_loss = 0.
         for i in range(len(predictions)):
-            total_loss += kullback_leibler(ys[i], predictions[i])
+            # loss_of_i = torch.norm(ys[i] - predictions[i])
+            loss_of_i = kullback_leibler(ys[i], predictions[i])
+            print('Loss of {}: {}'.format(i, loss_of_i))
+            total_loss += loss_of_i
+
+        print('Validation score: {:.2E}'.format(total_loss / len(xs)))
+        print('Log Validation score: {:.2E}'.format(np.log(total_loss / len(xs))))
 
         return total_loss / len(xs)
 
@@ -152,8 +283,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.alpha = alpha
 
     def fit(self, predictors, covariances):
-        self.predictors = torch.Tensor(predictors)
-        self.covariances = torch.Tensor(covariances)
+        self.predictors = Variable(torch.Tensor(predictors))
+        self.covariances = Variable(torch.Tensor(covariances))
 
         # Initialize a distance metric.
         sz_of_vector = size_of_vector(predictors.shape[1])
@@ -170,7 +301,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             optimizer.zero_grad()
 
             xs_train, xs_validation = Variable(torch.Tensor(predictors[train_set])), Variable(torch.Tensor(predictors[test_set]))
-            ys_train, ys_validation = Variable(torch.Tensor(covariances[train_set])), Variable(torch.Tensor(predictors[test_set]))
+            ys_train, ys_validation = Variable(torch.Tensor(covariances[train_set])), Variable(torch.Tensor(covariances[test_set]))
 
             sum_of_losses = Variable(torch.Tensor([0.]))
 
@@ -193,13 +324,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
             average_loss = sum_of_losses / len(xs_train)
 
+            print('Validation score: {:.2E}'.format(self.validate(xs_validation.data.numpy(), ys_validation.data.numpy())))
             print('Avg Optimization Loss: %f' % average_loss)
-            print(epoch)
-            if epoch % 10 == 0:
-                print(self.validate(xs_validation, ys_validation))
 
 
     def predict(self, queries):
+        torch_queryes = torch.Tensor(queries)
         metric_matrix = self.theta_to_metric_matrix(self.theta)
 
         print(metric_matrix)
@@ -212,8 +342,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             predictions[i] = self.prediction_from_distances(self.covariances, distances, x)
             print(predictions[i])
 
-
-        return predictions
+        return predictions.data.numpy()
 
 
     def theta_to_metric_matrix(self, theta):
@@ -222,10 +351,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def compute_distances(self, predictors, metric_matrix, predictor):
-        print(predictors.shape)
-        print(metric_matrix.shape)
-        print(predictor.shape)
-        delta = predictors - predictor
+        pytorch_predictors = torch.Tensor(predictors)
+        pytorch_predictor = torch.Tensor(predictor)
+
+        delta = pytorch_predictors - pytorch_predictor.view(1, pytorch_predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
         return torch.sum(lhs * delta, 1).squeeze()
 
