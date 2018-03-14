@@ -100,6 +100,37 @@ class RegistrationResult:
         return registration_dict
 
 
+    def combined_realigned(self, combiner, aligner):
+        combined_realigned_name = 'cb_{}_{}'.format(combiner, aligner)
+        transform_name = 'cbt_{}_{}'.format(combiner, aligner)
+
+        if not self.cache[combined_realigned_name]:
+            combined_realigned, t = self.compute_combined_realigned(combiner, aligner)
+            self.cache[combined_realigned_name] = combined_realigned.tolist()
+            self.cache[transform_name] = t.tolist()
+
+            return combined_realigned, t
+        else:
+            return self.cache[combined_realigned_name], np.array(self.cache[transform_name])
+
+
+    def compute_combined_realigned(self, combiner, aligner):
+        reading = self.points_of_reading()
+        reference = self.points_of_reference()
+        initial_estimate = self.initial_estimate()
+
+        combined = combiner.compute(reading, reference, self.initial_estimate())
+
+        T = aligner.align(combined)
+        np_combined = np.array(combined)
+
+        homo_combined = to_homogeneous(np_combined)
+
+        aligned = np.dot(T, homo_combined).T
+
+        return aligned, T
+
+
     def descriptor(self, combiner, aligner, binner, descriptor_algorithm):
         descriptor_name = '{}_{}_{}_{}'.format(combiner, aligner, binner, descriptor_algorithm)
 
@@ -116,21 +147,10 @@ class RegistrationResult:
         reference = self.points_of_reference()
         initial_estimate = self.initial_estimate()
 
-        if not self.cache[combiner.__repr__()]:
-            combined = combiner.compute(reading, reference, initial_estimate)
-            self.cache[combiner.__repr__()] = combined
-        else:
-            combined = self.cache[combiner.__repr__()]
+        combined_realigned, _ = self.combined_realigned(combiner, aligner)
 
-        T = aligner.align(combined)
-        np_combined = np.array(combined)
-
-        homo_combined = to_homogeneous(np_combined)
-
-        aligned = np.dot(T, homo_combined).T
-
-        binned = binner.compute(aligned.tolist())
-        descriptor = descriptor_algorithm.compute(aligned, binned)
+        binned = binner.compute(combined_realigned.tolist())
+        descriptor = descriptor_algorithm.compute(combined_realigned, binned)
 
         return descriptor
 
@@ -179,9 +199,6 @@ class RegistrationResult:
     def covariance(self, clustering_algorithm):
         clustering = self.clustering_of_results(clustering_algorithm)
         clustering = compute_distribution(self.registration_dict(), clustering)
-
-        with clustering_file.open('w') as jsonfile:
-            json.dump(clustering, jsonfile)
 
         return np.array(clustering['covariance_of_central'])
 

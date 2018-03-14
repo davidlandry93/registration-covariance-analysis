@@ -27,8 +27,10 @@ class AlignmentAlgorithm():
 
 
 class IdentityAlignmentAlgorithm(AlignmentAlgorithm):
+    def init(self):
+        self._transform = np.identity(4)
+
     def align(self, pointcloud):
-        print('Calling Align!!')
         self._transform = np.identity(4)
         return np.identity(4)
 

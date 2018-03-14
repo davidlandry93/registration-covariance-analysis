@@ -21,6 +21,7 @@ def cli():
     parser.add_argument('--dim3', type=int, default=2)
     parser.add_argument('--rotation', action='store_true', help='Print rotation dimensions instead of translation.')
     parser.add_argument('--initial-estimate', action='store_true', help='Print initial estimates instead of results.')
+    parser.add_argument('--center_around_gt', action='store_true', help='Center the results around the ground truth')
     args = parser.parse_args()
 
     json_data = json.load(sys.stdin)
@@ -30,7 +31,12 @@ def cli():
     else:
         dims = (args.dim1, args.dim2, args.dim3)
 
-    points = positions_of_registration_data(json_data, (args.initial_estimate in POSITIVE_STRINGS))
+    if args.center_around_gt:
+        prealignment = np.array(json_data['metadata']['ground_truth'])
+    else:
+        prealignment = np.identity(4)
+
+    points = positions_of_registration_data(json_data, (args.initial_estimate in POSITIVE_STRINGS), prealignment=prealignment)
 
     data_dict = empty_to_none(data_dict_of_registration_data(json_data))
     points_to_vtk(points[:, dims], args.output, data_dict)

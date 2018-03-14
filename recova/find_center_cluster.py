@@ -7,9 +7,30 @@ import sys
 
 from pylie import se3_log
 from recova.covariance_of_registrations import distribution_of_registrations
-from recova.registration_dataset import lie_vectors_of_registrations, index_of_closest_to_ground_truth
+from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint
 
+def index_of_closest_to_ground_truth(dataset):
+    """
+    Find the index of the point in the dataset that is the closest to ground truth.
+    :arg dataset: The registration dataset as a facet.
+    """
+    gt = np.array(dataset['metadata']['ground_truth'])
+    inv_of_gt = np.linalg.inv(gt)
+
+    id_of_min = None
+    min_distance = np.inf
+    for i, registration in enumerate(dataset['data']):
+        reg = np.array(registration['result'])
+        distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
+
+        if distance_to_gt < min_distance:
+            id_of_min = i
+            min_distance = distance_to_gt
+
+    eprint('Min distance to ground truth: {}'.format(min_distance))
+
+    return id_of_min
 
 def distance_of_cluster(dataset, cluster):
     filtered_dataset = filter_with_cluster(dataset, cluster)
@@ -51,7 +72,7 @@ def find_central_cluster(dataset, clustering):
     else:
         best_cluster = []
 
-    return best_cluster
+    return best_cluster, np.min(cluster_distances)
 
 
 def filter_with_cluster(dataset, cluster):

@@ -40,18 +40,16 @@ def vectorize_covariance(cov_matrix):
 
 
 def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
-
     descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
     covariance = registration_pair.covariance(clustering_algorithm)
 
+    _, t = registration_pair.combined_realigned(combining_algorithm, alignment_algorithm)
 
-    adj_of_t = se3.adjoint(alignment_algorithm.transform)
+    adj_of_t = se3.adjoint(t)
     rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T))
     vectorized_covariance = vectorize_covariance(rotated_covariance)
 
     return (descriptor, vectorized_covariance)
-
-
 
 
 def generate_examples_cli():
@@ -70,7 +68,7 @@ def generate_examples_cli():
     binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
     descriptor_algorithm = MomentGridDescriptor()
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    clustering_algorithm = CenteredClusteringAlgorithm(0.05)
 
     registration_pairs = db.registration_pairs()
 

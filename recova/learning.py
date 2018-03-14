@@ -210,6 +210,11 @@ class KnnModel(CovarianceEstimationModel):
         return predictions
 
 
+
+class MLPModel(CovarianceEstimationModel):
+    def __init__(self, configuration=[])
+
+
 def to_upper_triangular(v):
     # Infer the size of the matrix from the size of the vector.
     n = ceil((-1 + sqrt(8. * len(v))) / 2.)
@@ -238,43 +243,9 @@ def upper_triangular_mask(n):
     return v >= v.view(n,1)
 
 
-class NearestNeighbor(torch.autograd.Function):
-    BALL_SIZE = 500.
-
-    def __init__(self, predictors):
-        self.predictors = predictors
-
-    @staticmethod
-    def forward(ctx, metric_matrix, predictor):
-        metric = DistanceMetric.get_metric('mahalanobis', VI=metric_matrix)
-
-        tree = BallTree(self.predictors, metric=metric)
-        indices, distances = tree.query_radius([predictor], r=self.BALL_SIZE, return_distances=True)
-        indices = indices[0]
-        distances = distances[0]
-
-        ctx.save_for_backward(metric_matrix, predictor, indices[0])
-
-        all_distances = self.BALL_SIZE * torch.ones(self.predictors.size(0))
-        all_distances[indices] = distances
-
-        return all_distances
-
-    @staticmethod
-    def backward(ctx, distances_grad):
-        metric_matrix, predictor, neighbors = ctx.saved_variables
-        sum_of_predictor = torch.sum(predictor)
-
-        return (torch.sum(self.predictors * sum_of_predictor, 1), torch.sum(torch.dot(self.predictors, metric_matrix), 1))
-
-
 def size_of_vector(n):
     """The size of a vector representing an nxn upper triangular matrix."""
     return int((n * n + n) / 2.)
-
-
-
-
 
 
 

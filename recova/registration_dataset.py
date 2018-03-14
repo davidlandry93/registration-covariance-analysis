@@ -30,28 +30,9 @@ def registrations_of_dataset(dataset, key='result'):
     return registrations
 
 
-def index_of_closest_to_ground_truth(dataset):
-    """
-    Find the index of the point in the dataset that is the closest to ground truth.
-    :arg dataset: The registration dataset as a facet.
-    """
-    gt = np.array(dataset['metadata']['ground_truth'])
-    inv_of_gt = np.linalg.inv(gt)
-
-    id_of_min = None
-    min_distance = np.inf
-    for i, registration in enumerate(dataset['data']):
-        reg = np.array(registration['result'])
-        distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
-
-        if distance_to_gt < min_distance:
-            id_of_min = i
-            min_distance = distance_to_gt
-
-    return id_of_min
 
 
-def lie_vectors_of_registrations(json_data, key='result'):
+def lie_vectors_of_registrations(json_data, key='result', prealignment=np.identity(4)):
     """
     Outputs the lie vectors of a json registration dataset.
 
@@ -59,12 +40,13 @@ def lie_vectors_of_registrations(json_data, key='result'):
     :param key: The key of the matrix to evaluate, inside the registration result.
     :returns: A Nx6 numpy matrix containing the lie algebra representation of the results.
     """
+    inv_of_prealignment = np.linalg.inv(prealignment)
     lie_results = np.empty((len(json_data['data']), 6))
     for i, registration in enumerate(json_data['data']):
         m = np.array(registration[key])
 
         try:
-            lie_results[i,:] = se3_log(m)
+            lie_results[i,:] = se3_log(np.dot(inv_of_prealignment, m))
         except RuntimeError:
             lie_results[i,:] = np.zeros(6)
             eprint('Warning: failed conversion to lie algebra of matrix {}'.format(m))
@@ -72,7 +54,7 @@ def lie_vectors_of_registrations(json_data, key='result'):
     return lie_results
 
 
-def positions_of_registration_data(reg_data, initial_estimates=False):
+def positions_of_registration_data(reg_data, initial_estimates=False, prealignment=np.identity(4)):
     if ('what' in reg_data and
         'trails' == reg_data['what']):
         lie_vectors = lie_tensor_of_trails(reg_data)[(0 if initial_estimates else -1)]
@@ -81,7 +63,7 @@ def positions_of_registration_data(reg_data, initial_estimates=False):
         if initial_estimates:
             key = 'initial_estimate'
 
-        lie_vectors = lie_vectors_of_registrations(reg_data, key=key)
+        lie_vectors = lie_vectors_of_registrations(reg_data, key=key, prealignment=prealignment)
 
     return lie_vectors
 

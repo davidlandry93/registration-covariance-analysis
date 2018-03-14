@@ -229,7 +229,7 @@ def compute_distribution(dataset, clustering):
     :arg cluster: The data row on which we want to compute the distribution of the central cluster.
     :returns: A new data row, this time with a distribution attached.
     """
-    central_cluster = find_central_cluster(dataset, clustering['clustering'])
+    central_cluster, cluster_distance = find_central_cluster(dataset, clustering['clustering'])
     mean, covariance = distribution_of_cluster(dataset, central_cluster)
 
     new_clustering = clustering.copy()
@@ -237,6 +237,7 @@ def compute_distribution(dataset, clustering):
     new_clustering['covariance_of_central'] = covariance.tolist()
     new_clustering['central_cluster_size'] = len(central_cluster)
     new_clustering['central_cluster'] = central_cluster
+    new_clustering['cluster_distance'] = cluster_distance
 
     return new_clustering
 
