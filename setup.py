@@ -24,6 +24,7 @@ setup(
             'clustering = recova.clustering:cli',
             'clustering_batch = recova.clustering_batch:cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
+            'dataset_summary = recova.learning_dataset:dataset_summary_cli',
             'generate_cello_dataset = recova.learning_dataset:generate_cello_dataset_cli',
             'generate_learning_dataset = recova.learning_dataset:generate_examples_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',

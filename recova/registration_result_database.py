@@ -242,7 +242,6 @@ class RegistrationResultDatabase:
     def registration_pairs(self):
         pairs = []
         for d in self.root.iterdir():
-            print(d)
             if d.is_dir():
                 components = d.stem.split('-')
 

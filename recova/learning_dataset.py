@@ -1,12 +1,14 @@
 
 import argparse
 import copy
+import csv
 import datetime
 import json
 import multiprocessing
 import numpy as np
 import pathlib
 import time
+import sys
 
 from lie import se3
 
@@ -166,3 +168,26 @@ def generate_cello_dataset_cli():
 
     with open(args.output, 'w') as json_file:
         json_file.write(json.dumps(output_document))
+
+def dataset_summary_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=str, help='Path to the managed registration result database')
+    args = parser.parse_args()
+
+    db = RegistrationResultDatabase(args.input)
+    clustering_algorithm = CenteredClusteringAlgorithm(0.05)
+
+    writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio'])
+    writer.writeheader()
+    for registration_pair in db.registration_pairs():
+        clustering = registration_pair.clustering_of_results(clustering_algorithm)
+
+        d = {
+            'dataset': registration_pair.dataset,
+            'reading': registration_pair.reading,
+            'reference': registration_pair.reference,
+            'cluster_distance': clustering['cluster_distance'],
+            'outlier_ratio': clustering['outlier_ratio'],
+        }
+
+        writer.writerow(d)

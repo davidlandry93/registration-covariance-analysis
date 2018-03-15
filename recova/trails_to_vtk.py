@@ -27,8 +27,6 @@ def cli():
 
     dims = parse_dims(parsed_args.dims)
 
-    positions_of_iterations = lie_tensor_of_trails(json_data)
-
     lie_tensor = lie_tensor_of_trails(json_data)
     data_dict = data_dict_of_registration_data(json_data)
 

@@ -96,14 +96,20 @@ def data_dict_of_registration_data(registration_data):
 
 
 def lie_tensor_of_trails(registration_dataset):
-    n_iterations = len(registration_dataset['data'][0]['trail'])
+    """
+    Arguments
+    registration_dataset -- A trails full dataset
+    """
+    max_trail_length = registration_dataset['metadata']['max_trail_length']
     n_particles = len(registration_dataset['data'])
-    positions_of_iterations = np.zeros((n_iterations, n_particles, 6))
+    positions_of_iterations = np.zeros((max_trail_length, n_particles, 6))
 
-    for i in range(n_iterations):
-        positions_of_iterations[i] = np.zeros((n_particles, 6))
-        for j, trail in enumerate(registration_dataset['data']):
-            positions_of_iterations[i,j,:] = np.array(trail['trail'])[i]
+    for i, particle in enumerate(registration_dataset['data']):
+        for j in range(max_trail_length):
+            latest_position = min(len(particle['trail'])-1, j)
+            for k in range(6):
+                positions_of_iterations[j, i, k] = particle['trail'][latest_position][k]
+
 
     return positions_of_iterations
 
