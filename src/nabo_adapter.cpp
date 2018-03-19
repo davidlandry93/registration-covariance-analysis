@@ -8,19 +8,26 @@ using namespace Eigen;
 
 namespace recova {
 
+NaboAdapter::NaboAdapter() : dataset(nullptr) {}
+
+NaboAdapter::NaboAdapter(NaboAdapter& lhs) : dataset(nullptr) {
+    if (lhs.dataset != nullptr) {
+        set_dataset(lhs.dataset);
+    }
+}
+
 Eigen::VectorXd NaboAdapter::get_id_from_dataset(const int& index) const {
     return dataset->col(index);
 }
 
 void NaboAdapter::set_dataset(const Eigen::MatrixXd& p_dataset) {
-    auto dataset = std::make_unique<Eigen::MatrixXd>(p_dataset);
-    set_dataset(std::move(dataset));
+    auto dataset = std::make_shared<Eigen::MatrixXd>(p_dataset);
+    set_dataset(dataset);
 }
 
-void NaboAdapter::set_dataset(std::unique_ptr<Eigen::MatrixXd>&& p_dataset) {
-    dataset = std::move(p_dataset);
-    nns =
-        std::unique_ptr<NNSearchD>(NNSearchD::createKDTreeLinearHeap(*dataset));
+void NaboAdapter::set_dataset(std::shared_ptr<Eigen::MatrixXd>& p_dataset) {
+    dataset = p_dataset;
+    nns = std::unique_ptr<NNSearchD>(NNSearchD::createKDTreeLinearHeap(*dataset));
 }
 
 std::pair<MatrixXi, MatrixXd> NaboAdapter::query(const MatrixXd& query_points,
@@ -44,4 +51,5 @@ Eigen::MatrixXd NaboAdapter::get_ids_from_dataset(
 
     return points;
 }
+
 }

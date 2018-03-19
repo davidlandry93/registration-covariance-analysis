@@ -13,7 +13,7 @@ import threading
 from pylie import se3_log
 
 from recova.clustering import CenteredClusteringAlgorithm, compute_distribution
-from recova.registration_dataset import lie_vectors_of_registrations
+from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
 from recova.util import eprint
 
 
@@ -29,19 +29,20 @@ def rescale_hypersphere(points, radius):
     return points
 
 
-def run_one_clustering_thread(radius, k, registration_data, scaling_of_translation=False):
+def run_one_clustering_thread(radius, k, registration_data, scaling_of_translation=False, n_seed_init=100):
     eprint('Clustering with radius {}'.format(radius))
 
     var_translation = float(registration_data['metadata']['var_translation'])
 
-    lie_vectors = lie_vectors_of_registrations(registration_data)
+    lie_vectors = positions_of_registration_data(registration_data)
 
     if scaling_of_translation:
         lie_vectors[:,0:3] = rescale_hypersphere(lie_vectors[:,0:3], scaling_of_translation)
 
     ground_truth = np.array(registration_data['metadata']['ground_truth'])
 
-    algo = CenteredClusteringAlgorithm(radius, k)
+    algo = CenteredClusteringAlgorithm(radius, k, n_seed_init)
+    algo.n_seed_init = n_seed_init
     clustering = algo.cluster(lie_vectors, seed=se3_log(ground_truth))
 
     clustering_with_distribution = compute_distribution(registration_data, clustering)
@@ -58,6 +59,7 @@ def cli():
     parser.add_argument('n_samples', type=float)
     parser.add_argument('--scale_translations', action='store_true')
     parser.add_argument('--n_neighbors', type=int, default=12)
+    parser.add_argument('--n_seed_init', type=int, default=100, help='Number of seed points to consider during the initialization.')
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
@@ -71,7 +73,7 @@ def cli():
 
     with multiprocessing.Pool() as pool:
         clusterings = pool.starmap(run_one_clustering_thread,
-                                   [(x, args.n_neighbors, json_dataset, translation_scaling) for x in radii],
+                                   [(x, args.n_neighbors, json_dataset, translation_scaling, args.n_seed_init) for x in radii],
                                    chunksize=1)
 
     metadata_dict = json_dataset['metadata']

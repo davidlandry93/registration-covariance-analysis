@@ -8,7 +8,7 @@ from pyevtk.hl import pointsToVTK
 from pylie import se3_log
 
 from recova.density import density_of_points
-from recova.util import empty_to_none, eprint
+from recova.util import empty_to_none, eprint, dataset_to_registrations
 
 
 def dataset_to_vtk(dataset, filename, dims=(0,1,2)):
@@ -23,13 +23,9 @@ def registrations_of_dataset(dataset, key='result'):
     A numpy array containing all the registration results contained in a dataset.
     The registration results are in matrix form.
     """
-    registrations = np.empty((len(dataset['data']), 4, 4))
-    for i, registration in enumerate(dataset['data']):
-        registrations[i] = registration['result']
+    registrations = dataset_to_registrations(dataset)
 
     return registrations
-
-
 
 
 def lie_vectors_of_registrations(json_data, key='result', prealignment=np.identity(4)):

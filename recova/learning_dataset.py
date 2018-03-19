@@ -27,9 +27,6 @@ def vectorize_covariance(cov_matrix):
 
     error = np.linalg.norm(cov_matrix - pd_matrix)
 
-    if error > 1.0:
-        eprint('DROPPED IT for {}'.format(cov_matrix))
-
     lower_triangular = np.linalg.cholesky(pd_matrix)
 
     vector_of_cov = []

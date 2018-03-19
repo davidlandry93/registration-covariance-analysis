@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 
 #include "nabo_adapter.h"
+#include "seed_selection_algorithm.h"
 
 namespace recova {
 
@@ -26,10 +27,9 @@ Eigen::VectorXd find_best_seed(const NaboAdapter &knn_algorithm,
                                const Eigen::VectorXd &location_of_search,
                                const int &n_seeds_to_consider, const int &n);
 
-std::set<int> run_centered_clustering(std::unique_ptr<Eigen::MatrixXd>&& dataset,
-                                      const Eigen::VectorXd& center,
-                                      int k,
-                                      double radius);
+std::set<int> run_centered_clustering(
+    std::shared_ptr<Eigen::MatrixXd>& dataset, std::unique_ptr<SeedSelectionAlgorithm>&& seed_selector, const int& k, const double& radius);
+
 }
 
 #endif

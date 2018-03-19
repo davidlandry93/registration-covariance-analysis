@@ -5,10 +5,11 @@ import json
 import numpy as np
 import sys
 
+from lieroy.parallel import FunctionWrapper
 from pylie import se3_log
 from recova.covariance_of_registrations import distribution_of_registrations
 from recova.registration_dataset import lie_vectors_of_registrations
-from recova.util import eprint
+from recova.util import eprint, dataset_to_registrations
 
 def index_of_closest_to_ground_truth(dataset):
     """
@@ -21,6 +22,7 @@ def index_of_closest_to_ground_truth(dataset):
     id_of_min = None
     min_distance = np.inf
     for i, registration in enumerate(dataset['data']):
+        print(registration)
         reg = np.array(registration['result'])
         distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
 
@@ -35,8 +37,7 @@ def index_of_closest_to_ground_truth(dataset):
 def distance_of_cluster(dataset, cluster):
     filtered_dataset = filter_with_cluster(dataset, cluster)
 
-    registrations = [x['result'] for x in dataset['data']]
-    registrations = np.array(registrations)
+    registrations = dataset_to_registrations(dataset)
 
     inv_of_gt = np.linalg.inv(np.array(dataset['metadata']['ground_truth']))
 
@@ -47,7 +48,7 @@ def distance_of_cluster(dataset, cluster):
         if distance_to_gt < min_distance:
             min_distance = distance_to_gt
 
-    eprint(min_distance)
+    eprint('Cluster has {} distance to GT.'.format(min_distance))
 
     return min_distance
 
@@ -57,6 +58,9 @@ def find_central_cluster(dataset, clustering):
     :arg clustering: A list of lists reprensenting the points indices
     :returns: The cluster itself (as a list of indices).
     """
+
+    if len(clustering) == 1:
+        return clustering[0], distance_of_cluster(dataset, clustering[0])
 
     closest_point = index_of_closest_to_ground_truth(dataset)
 

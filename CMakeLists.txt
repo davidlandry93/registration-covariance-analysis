@@ -27,7 +27,7 @@ target_include_directories(recova
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})
 set_property(TARGET recova PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-add_executable(centered_clustering src/centered_clustering_main.cpp src/centered_clustering.cpp)
+add_executable(centered_clustering src/centered_clustering_main.cpp src/centered_clustering.cpp src/greedy_seed_selection_algorithm.cpp src/localized_seed_selection_algorithm.cpp)
 target_include_directories(centered_clustering PRIVATE include)
 target_link_libraries(centered_clustering recova nabo_adapter gflags)
 

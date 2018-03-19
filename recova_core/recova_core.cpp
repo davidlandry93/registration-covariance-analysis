@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 
 #include "centered_clustering.h"
+#include "greedy_seed_selection_algorithm.h"
 #include "grid_pointcloud_separator.h"
 #include "nabo_adapter.h"
 
@@ -58,10 +59,13 @@ np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
 }
 
 p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
-  auto eigen_matrix = std::unique_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
+  auto eigen_matrix = std::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
   *eigen_matrix = ndarray_to_eigen_matrix(m);
 
-  std::set<int> clustering = run_centered_clustering(std::move(eigen_matrix), Eigen::VectorXd(3), k, radius);
+  NaboAdapter knn_algorithm;
+  auto seed_selector = std::unique_ptr<SeedSelectionAlgorithm>(new GreedySeedSelectionAlgorithm(knn_algorithm, 12));
+
+  std::set<int> clustering = run_centered_clustering(eigen_matrix, std::move(seed_selector),  k, radius);
 
   return to_list(clustering.begin(), clustering.end());
 }

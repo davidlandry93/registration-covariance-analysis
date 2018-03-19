@@ -4,6 +4,8 @@ import numpy as np
 import subprocess
 import sys
 
+from lieroy.parallel import FunctionWrapper
+
 POSITIVE_STRINGS = ('yes', 'y', 't', 'true', '1')
 
 def eprint(*args, **kwargs):
@@ -100,3 +102,21 @@ def kullback_leibler(cov1, cov2):
     kll = 0.5 * (A - B + C)
 
     return kll
+
+def dataset_to_registrations(dataset):
+    """
+    Turn a json dataset into a series of numpy 4x4 registrations.
+    """
+
+    se3exp = FunctionWrapper('exp', 'lieroy.se3')
+
+    if dataset['what'] == 'trails':
+        registrations = np.empty((len(dataset['data']), 4, 4))
+
+        for i, registration in enumerate(dataset['data']):
+            registrations[i] = se3exp(np.array(registration['trail'][-1]))
+    else:
+        registrations = [x['result'] for x in dataset['data']]
+        registrations = np.array(registrations)
+
+    return registrations

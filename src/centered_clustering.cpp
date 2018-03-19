@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 
 #include "centered_clustering.h"
+#include "localized_seed_selection_algorithm.h"
 #include "nabo_adapter.h"
 
 namespace recova {
@@ -23,36 +24,15 @@ int point_closest_to_center(const NaboAdapter &knn_algorithm,
     return indices(0);
 }
 
-Eigen::VectorXd find_best_seed(const NaboAdapter &knn_algorithm,
+Eigen::VectorXd find_best_seed(std::shared_ptr<Eigen::MatrixXd>& dataset,
+                               NaboAdapter &knn_algorithm,
                                const Eigen::VectorXd &location_of_search,
                                const int &n_seeds_to_consider, const int &n) {
-    Eigen::MatrixXi indices(n_seeds_to_consider, 1);
-    Eigen::MatrixXd distances(n_seeds_to_consider, 1);
-    std::tie(indices, distances) =
-        knn_algorithm.query(location_of_search, n_seeds_to_consider);
+    LocalizedSeedSelectionAlgorithm seed_selector(knn_algorithm, location_of_search, n_seeds_to_consider, n);
 
-    std::vector<int> vec_of_indices(indices.data(),
-                                    indices.data() + indices.size());
+    int seed_id = seed_selector.select(dataset);
 
-    Eigen::MatrixXd search_result = knn_algorithm.get_ids_from_dataset(
-        vec_of_indices.begin(), vec_of_indices.end());
-    indices.resize(n, search_result.cols());
-    distances.resize(n, search_result.cols());
-
-    std::tie(indices, distances) = knn_algorithm.query(search_result, n);
-
-    int min_index = 0;
-    auto min_distance = std::numeric_limits<double>::infinity();
-    for (auto i = 0; i < n_seeds_to_consider; i++) {
-        double dist_of_current = distances(n - 1, i);
-        if (dist_of_current < min_distance) {
-            min_index = i;
-            min_distance = distances(n - 1, i);
-        }
-    }
-
-    Eigen::VectorXd best_seed = knn_algorithm.get_id_from_dataset(min_index);
-    return best_seed;
+    return dataset->col(seed_id);
 }
 
 std::set<int> cluster_with_seed(const NaboAdapter &knn_algorithm,
@@ -120,14 +100,15 @@ std::vector<int> potential_seeds(const NaboAdapter &knn_algorithm,
     return potential_seeds_vector;
 }
 
-std::set<int> run_centered_clustering(
-    std::unique_ptr<Eigen::MatrixXd> &&dataset, const Eigen::VectorXd &center,
-    int k, double radius) {
+std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
+                                      std::unique_ptr<SeedSelectionAlgorithm>&& seed_selector,
+                                      const int& k,
+                                      const double& radius) {
     NaboAdapter knn_algorithm;
-    knn_algorithm.set_dataset(std::move(dataset));
+    knn_algorithm.set_dataset(dataset);
 
-    auto best_seed = find_best_seed(knn_algorithm, center, 100, k);
+    int seed_index = seed_selector->select(dataset);
 
-    return cluster_with_seed(knn_algorithm, best_seed, k, radius);
+    return cluster_with_seed(knn_algorithm, dataset->col(seed_index), k, radius);
 }
 }

@@ -19,6 +19,8 @@ from recova.util import eprint
 
 from pylie import se3_log
 
+from lieroy.parallel import FunctionWrapper
+
 import recova_core
 
 
@@ -34,15 +36,16 @@ class ClusteringAlgorithm:
 
 
 class CenteredClusteringAlgorithm(ClusteringAlgorithm):
-    def __init__(self, radius=0.2, k=12):
+    def __init__(self, radius=0.2, k=12, n_seed_init=100):
         self.radius = radius
         self.k = k
+        self.n_seed_init = n_seed_init
 
     def __repr__(self):
         return 'centered_{:.5f}_{}'.format(self.radius, self.k)
 
     def cluster(self, dataset, seed=np.array([0., 0., 0., 0., 0., 0.])):
-        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed)
+        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init)
 
         clustering_row = {
             'clustering': [center_cluster],
@@ -127,7 +130,7 @@ def centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     return clustering_row
 
 
-def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
+def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100):
     """
     :arg dataset: The dataset to cluster (as a numpy matrix).
     :arg radius: The radius in which we have to have enough neighbours to be a core point.
@@ -135,7 +138,9 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
     :returns: The indices of the points that are inside the central cluster as a list.
     """
     strings_of_seed = list(map(str, seed.tolist()))
-    command = 'centered_clustering -radius {} -k {} -seed {}'.format(radius, n, ','.join(strings_of_seed))
+
+    command = 'centered_clustering -seed_selector {} -k {} -radius {}'.format('greedy', n, radius)
+
     eprint(command)
     stream = io.StringIO()
     json.dump(dataset.tolist(), stream)
@@ -173,13 +178,16 @@ def clusters_of_points(clustering, n_points):
     return clusters
 
 
-def to_vtk(dataset, clustering, output):
+def to_vtk(dataset, clustering, output, center_around_gt=False):
     """
     Make a vtk file showing a clustering on a certain dataset.
     :arg dataset: The full dataset to which the clustering is applied.
     :arg clustering: The clustering data row.
     """
     points = positions_of_registration_data(dataset)
+
+    if center_around_gt:
+        points = center_lie_around_t(points, np.array(dataset['metadata']['ground_truth']))
 
     radius = float(clustering['radius'])
     clustering_data = clusters_of_points(clustering['clustering'], len(points))
@@ -198,7 +206,21 @@ def to_vtk(dataset, clustering, output):
     distribution_to_vtk_ellipsoid(mean[3:6], covariance[3:6, 3:6], '{}_rotation_ellipsoid'.format(output))
 
 
-def batch_to_vtk(dataset, clustering_batch, output):
+def center_lie_around_t(points, T):
+    """
+    Recenter a collection of lie algebra vectors around a new 4x4 T.
+    """
+    se3log = FunctionWrapper('log', 'lieroy.se3')
+    se3exp = FunctionWrapper('exp', 'lieroy.se3')
+    inv_of_T = np.linalg.inv(T)
+
+    for i in range(len(points)):
+        points[i] = se3log(np.dot(se3exp(points[i]), inv_of_T))
+
+    return points
+
+
+def batch_to_vtk(dataset, clustering_batch, output, center_around_gt=False):
     """
     Make vtk files showing the evolution of clustering depending on a parameter.
     :arg dataset: The matrix of points on which the clustering was applied.
@@ -206,7 +228,7 @@ def batch_to_vtk(dataset, clustering_batch, output):
     """
 
     with multiprocessing.Pool() as pool:
-        pool.starmap(to_vtk, [(dataset, x, '{}_{}'.format(output, i)) for i, x in enumerate(clustering_batch['data'])])
+        pool.starmap(to_vtk, [(dataset, x, '{}_{}'.format(output, i), center_around_gt) for i, x in enumerate(clustering_batch['data'])])
 
 
 def distribution_of_cluster(dataset, cluster):
@@ -276,6 +298,7 @@ def batch_to_vtk_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='The dataset on which the clustering is applied.', type=str)
     parser.add_argument('output', help='Prefix of the output vtk files.', type=str)
+    parser.add_argument('--center_around_gt', help='Center the results around the ground truth', action='store_true')
     args = parser.parse_args()
 
     print('Loading from stdin')
@@ -285,7 +308,7 @@ def batch_to_vtk_cli():
     with open(args.dataset) as dataset_file:
         dataset = json.load(dataset_file)
 
-    batch_to_vtk(dataset, clusterings, args.output)
+    batch_to_vtk(dataset, clusterings, args.output, args.center_around_gt)
 
 
 def cli():

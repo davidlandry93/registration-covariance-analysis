@@ -11,7 +11,10 @@
 namespace recova {
 class NaboAdapter {
   public:
-    void set_dataset(std::unique_ptr<Eigen::MatrixXd>&& dataset);
+    NaboAdapter();
+    NaboAdapter(NaboAdapter& lhs);
+
+    void set_dataset(std::shared_ptr<Eigen::MatrixXd>& dataset);
 
     void set_dataset(const Eigen::MatrixXd& p_dataset);
     std::pair<Eigen::MatrixXi, Eigen::MatrixXd> query(
@@ -33,7 +36,7 @@ class NaboAdapter {
     }
 
   private:
-    std::unique_ptr<Eigen::MatrixXd> dataset;
+    std::shared_ptr<Eigen::MatrixXd> dataset;
     std::unique_ptr<Nabo::NNSearchD> nns;
 };
 }
