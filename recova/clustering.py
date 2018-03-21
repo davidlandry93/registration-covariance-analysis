@@ -14,7 +14,7 @@ import pyclustering.cluster.dbscan as dbscan
 from recova.covariance_of_registrations import distribution_of_registrations
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
-from recova.find_center_cluster import find_central_cluster, filter_with_cluster
+from recova.find_center_cluster import find_central_cluster
 from recova.util import eprint
 
 from pylie import se3_log
@@ -232,10 +232,9 @@ def batch_to_vtk(dataset, clustering_batch, output, center_around_gt=False):
 
 
 def distribution_of_cluster(dataset, cluster):
-    new_dataset = dataset.copy()
-    new_dataset = filter_with_cluster(new_dataset, cluster)
+    registrations = registrations_of_dataset(dataset)
+    registrations = registrations[cluster]
 
-    registrations = registrations_of_dataset(new_dataset)
 
     if len(registrations) != 0:
         mean, covariance = distribution_of_registrations(registrations)

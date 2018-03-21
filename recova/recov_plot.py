@@ -11,7 +11,7 @@ import numpy as np
 import sys
 
 from recova.covariance_of_registrations import distribution_of_registrations
-from recova.find_center_cluster import find_central_cluster, filter_with_cluster
+from recova.find_center_cluster import find_central_cluster 
 from recova.registration_dataset import registrations_of_dataset
 from recova.util import eprint
 
@@ -21,11 +21,10 @@ def covariance_of_central_cluster(dataset, clustering):
     :arg dataset: A full registration dataset.
     :arg clustering: A 2d array describing a clustering.
     """
-    new_dataset = dataset.copy()
-    central_cluster = find_central_cluster(new_dataset, clustering)
-    new_dataset = filter_with_cluster(new_dataset, central_cluster)
+    central_cluster = find_central_cluster(dataset, clustering)
 
     registrations = registrations_of_dataset(new_dataset)
+    registrations = registration[central_cluster]
 
     if len(registrations) != 0:
         mean, covariance = distribution_of_registrations(registrations)

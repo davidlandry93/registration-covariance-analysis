@@ -35,9 +35,8 @@ def index_of_closest_to_ground_truth(dataset):
     return id_of_min
 
 def distance_of_cluster(dataset, cluster):
-    filtered_dataset = filter_with_cluster(dataset, cluster)
-
     registrations = dataset_to_registrations(dataset)
+    registrations = registrations[cluster]
 
     inv_of_gt = np.linalg.inv(np.array(dataset['metadata']['ground_truth']))
 
@@ -78,39 +77,3 @@ def find_central_cluster(dataset, clustering):
 
     return best_cluster, np.min(cluster_distances)
 
-
-def filter_with_cluster(dataset, cluster):
-    new_data = []
-    for i in cluster:
-        new_data.append(dataset['data'][i])
-
-    new_dataset = dataset.copy()
-    new_dataset['data'] = new_data
-
-    return new_dataset
-
-
-def cli():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--clustering', type=str, help='Name of clustering file to use', default='')
-    args = parser.parse_args()
-
-    dataset = json.load(sys.stdin)
-
-    if args.clustering:
-        with open(args.clustering) as clustering_file:
-            clustering = json.load(clustering_file)['data']
-    else:
-        clustering = dataset['statistics']['clustering']
-
-    central_cluster_ids = find_central_cluster(dataset, clustering)
-
-    size_before = len(dataset['data'])
-    central_cluster_points = filter_with_cluster(dataset, central_cluster_ids)
-    eprint('{}% of the data was part of the central cluster.'.format((len(dataset['data']) / size_before)*100.))
-
-    json.dump(dataset, sys.stdout)
-
-
-if __name__ == '__main__':
-    cli()
