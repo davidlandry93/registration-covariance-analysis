@@ -24,6 +24,7 @@ add_library(recova
   src/centered_clustering.cpp
   src/pointcloud_separator.cpp
   src/grid_pointcloud_separator.cpp
+  src/pointcloud_logger_locator.cpp
   src/xyz_pointcloud_logger.cpp)
 target_include_directories(recova
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})

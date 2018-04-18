@@ -6,7 +6,7 @@
 
 namespace recova {
 
-XyzPointcloudLogger::XyzPointcloudLogger(std::string& output_dir) : output_dir(output_dir) {}
+XyzPointcloudLogger::XyzPointcloudLogger(std::string&& output_dir) : output_dir(output_dir) {}
 
 void XyzPointcloudLogger::log(const std::string& label, const Eigen::Matrix<float, Eigen::Dynamic, 3>& cloud) {
     log<float>(label, cloud);

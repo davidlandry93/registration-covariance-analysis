@@ -9,7 +9,7 @@ namespace recova {
 
 class XyzPointcloudLogger : public PointcloudLogger {
   public:
-    XyzPointcloudLogger(std::string& output_dir);
+    XyzPointcloudLogger(std::string&& output_dir);
 
     void log(const std::string& label, const Eigen::Matrix<float, Eigen::Dynamic, 3>& cloud);
     void log(const std::string& label, const Eigen::Matrix<double, Eigen::Dynamic, 3>& cloud);

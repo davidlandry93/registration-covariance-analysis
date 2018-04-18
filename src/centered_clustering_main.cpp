@@ -12,8 +12,10 @@
 #include "localized_seed_selection_algorithm.h"
 #include "nabo_adapter.h"
 #include "pointcloud_io.hpp"
+#include "pointcloud_logger_locator.h"
 #include "seed_selection_algorithm.h"
 #include "util.h"
+#include "xyz_pointcloud_logger.h"
 
 
 using namespace lieroy;
@@ -59,6 +61,10 @@ int main(int argc, char** argv) {
   *eigen_dataset = json_array_to_matrix(json_dataset);
 
   std::cerr << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
+
+  PointcloudLoggerLocator locator;
+  std::unique_ptr<PointcloudLogger> logger(new XyzPointcloudLogger("."));
+  locator.set(std::move(logger));
 
   if(FLAGS_vtk_log) {
       std::ofstream output_stream;

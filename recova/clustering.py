@@ -319,7 +319,7 @@ def cli():
     parser.add_argument('--n', type=int, default=12,
                         help='Number of neighbours that must be contained within the radius for a point to be a core point.')
     parser.add_argument('--rescale_data', action='store_true', help='Scale rotations and translations so that the rotations live within a 1.0 radius sphere and the translations live within a 1.0 radius sphere.')
-    parser.add_argument('--seed_selector', type=str, help='The seed selection strategy to use. <greedy|centered>')
+    parser.add_argument('--seed_selector', type=str, help='The seed selection strategy to use. <greedy|centered>', default='greedy')
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
