@@ -120,3 +120,16 @@ def dataset_to_registrations(dataset):
         registrations = np.array(registrations)
 
     return registrations
+
+def rescale_hypersphere(points, radius):
+    """
+    Rescale points so that they live within an hypersphere of size radius.
+    """
+    norms = np.linalg.norm(points, axis=1)
+    percentile = np.percentile(norms, 90.0)
+
+    eprint('90th pertencile used for rescaling: {}'.format(percentile))
+
+    points = points * radius / percentile
+
+    return points

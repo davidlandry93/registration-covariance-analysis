@@ -4,12 +4,13 @@ import multiprocessing
 import numpy as np
 import os
 import pathlib
+import re
 
 from recov.datasets import create_registration_dataset
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
-from recova.clustering import compute_distribution
+from recova.clustering import compute_distribution, CenteredClusteringAlgorithm
 from recova.file_cache import FileCache
 from recova.util import eprint
 from recova.merge_json_result import merge_result_files
@@ -196,7 +197,7 @@ class RegistrationResult:
             return cached_clustering
 
 
-    def covariance(self, clustering_algorithm):
+    def covariance(self, clustering_algorithm=CenteredClusteringAlgorithm()):
         clustering = self.clustering_of_results(clustering_algorithm)
         clustering = compute_distribution(self.registration_dict(), clustering)
 
@@ -217,8 +218,9 @@ class RegistrationResult:
 
 
 class RegistrationResultDatabase:
-    def __init__(self, database_root):
+    def __init__(self, database_root, exclude=None):
         self.root = pathlib.Path(database_root)
+        self.exclude = (re.compile(exclude) if exclude else None)
 
     def import_file(self, path_to_file):
         try:
@@ -248,7 +250,9 @@ class RegistrationResultDatabase:
                 dataset = components[0]
                 reading = int(components[1])
                 reference = int(components[2])
-                pairs.append(RegistrationResult(self.root, dataset, reading, reference))
+
+                if not self.exclude or not self.exclude.match(dataset):
+                    pairs.append(RegistrationResult(self.root, dataset, reading, reference))
 
         return pairs
 

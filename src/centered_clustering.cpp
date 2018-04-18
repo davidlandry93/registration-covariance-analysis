@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <tuple>
@@ -10,6 +11,7 @@
 #include "centered_clustering.h"
 #include "localized_seed_selection_algorithm.h"
 #include "nabo_adapter.h"
+#include "pointcloud_io.hpp"
 
 namespace recova {
 int point_closest_to_center(const NaboAdapter &knn_algorithm,
@@ -103,11 +105,24 @@ std::vector<int> potential_seeds(const NaboAdapter &knn_algorithm,
 std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
                                       std::unique_ptr<SeedSelectionAlgorithm>&& seed_selector,
                                       const int& k,
-                                      const double& radius) {
+                                      const double& radius,
+                                      const bool log) {
     NaboAdapter knn_algorithm;
     knn_algorithm.set_dataset(dataset);
 
     int seed_index = seed_selector->select(dataset);
+
+    if(log) {
+        std::ofstream output_stream;
+
+        output_stream.open("selected_seed_translation.xyz");
+        eigen_to_xyz<double>(dataset->col(seed_index).topRows(3), output_stream);
+        output_stream.close();
+
+        output_stream.open("selected_seed_rotation.xyz");
+        eigen_to_xyz<double>(dataset->col(seed_index).bottomRows(3), output_stream);
+        output_stream.close();
+    }
 
     return cluster_with_seed(knn_algorithm, dataset->col(seed_index), k, radius);
 }

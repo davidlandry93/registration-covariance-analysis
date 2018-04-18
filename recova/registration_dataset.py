@@ -85,7 +85,7 @@ def data_dict_of_registration_data(registration_data):
 
             data_dict['outlier'] = np.ascontiguousarray(outlier_mask)
 
-    density = density_of_points(lie_vectors)
+    density = density_of_points(lie_vectors, k=100)
     data_dict['density'] = np.ascontiguousarray(density)
 
     return data_dict
@@ -110,12 +110,17 @@ def lie_tensor_of_trails(registration_dataset):
     return positions_of_iterations
 
 
-def points_to_vtk(points, filename, data=None):
+def points_to_vtk(points, filename, data=None, T=np.identity(4)):
+    homo_points = np.ones((4, points.shape[0]))
+    homo_points[0:3, :] = points.T
+    transformed_points = np.dot(T, homo_points)
+
     pointsToVTK(filename,
-                np.ascontiguousarray(points[:,0]),
-                np.ascontiguousarray(points[:,1]),
-                np.ascontiguousarray(points[:,2]),
+                np.ascontiguousarray(transformed_points[0]),
+                np.ascontiguousarray(transformed_points[1]),
+                np.ascontiguousarray(transformed_points[2]),
                 data = data)
+
 
 def registration2lie_cli():
     dataset = json.load(sys.stdin)

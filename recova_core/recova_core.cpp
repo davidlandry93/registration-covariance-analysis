@@ -9,6 +9,7 @@
 #include "centered_clustering.h"
 #include "greedy_seed_selection_algorithm.h"
 #include "grid_pointcloud_separator.h"
+#include "lieroy/algebra_se3.hpp"
 #include "nabo_adapter.h"
 
 namespace p = boost::python;
@@ -62,8 +63,12 @@ p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, do
   auto eigen_matrix = std::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
   *eigen_matrix = ndarray_to_eigen_matrix(m);
 
+  Eigen::Matrix<double,6,1> eigen_seed;
+  eigen_seed << ndarray_to_eigen_matrix(np::array(seed));
+  lieroy::AlgebraSE3<double> lie_seed(eigen_seed);
+
   NaboAdapter knn_algorithm;
-  auto seed_selector = std::unique_ptr<SeedSelectionAlgorithm>(new GreedySeedSelectionAlgorithm(knn_algorithm, 12));
+  auto seed_selector = std::unique_ptr<SeedSelectionAlgorithm>(new GreedySeedSelectionAlgorithm(knn_algorithm, lie_seed, 12));
 
   std::set<int> clustering = run_centered_clustering(eigen_matrix, std::move(seed_selector),  k, radius);
 

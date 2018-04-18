@@ -36,18 +36,11 @@ def index_of_closest_to_ground_truth(dataset):
 
 def distance_of_cluster(dataset, cluster):
     registrations = dataset_to_registrations(dataset)
-    registrations = registrations[cluster]
 
     inv_of_gt = np.linalg.inv(np.array(dataset['metadata']['ground_truth']))
 
-    min_distance = np.inf
-    for point in cluster:
-        reg = registrations[point]
-        distance_to_gt = np.linalg.norm(se3_log(np.dot(inv_of_gt, reg)))
-        if distance_to_gt < min_distance:
-            min_distance = distance_to_gt
-
-    eprint('Cluster has {} distance to GT.'.format(min_distance))
+    distances = [np.linalg.norm(se3_log(np.dot(inv_of_gt, registrations[x]))) for x in cluster]
+    min_distance = min(distances)
 
     return min_distance
 

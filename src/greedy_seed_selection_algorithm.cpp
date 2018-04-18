@@ -2,10 +2,15 @@
 #include <iostream>
 
 #include "greedy_seed_selection_algorithm.h"
+#include "lieroy/algebra_se3.hpp"
+#include "lieroy/se3.hpp"
+
+using namespace lieroy;
 
 namespace recova {
 
-GreedySeedSelectionAlgorithm::GreedySeedSelectionAlgorithm(NaboAdapter& knn_algorithm, const int& k) : knn_algorithm(knn_algorithm), k(k) {}
+
+GreedySeedSelectionAlgorithm::GreedySeedSelectionAlgorithm(NaboAdapter& knn_algorithm, const AlgebraSE3<double>& seed, const int& k) : knn_algorithm(knn_algorithm), seed(seed),  k(k) {}
 
 int GreedySeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& dataset) {
     Eigen::MatrixXi indices(k, dataset->rows());
@@ -15,14 +20,45 @@ int GreedySeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& datas
     std::tie(indices, distances) = knn_algorithm.query(*dataset, k);
     std::vector<float> densities(dataset->cols());
 
+    std::cerr << distances.col(0) << std::endl;
+
+    std::cerr << "KNN query distances has " << distances.rows() << " rows and " << distances.cols() << " columns." << '\n';
+
     for(auto i = 0; i < dataset->cols(); i++) {
-        densities[i] = distances(i, k-1) / (float) k;
+        float density = distances(i, k-1);
+        densities[i] = density;
     }
 
-    int index_of_min = std::min_element(densities.begin(), densities.end()) - densities.begin();
-    std::cerr << index_of_min << '\n';
+    // std::sort(densities.begin(), densities.end(),
+    //           [](const std::tuple<int,float>& a, const std::tuple<int,float>& b) -> bool {
+    //               return std::get<1>(a) > std::get<1>(b);
+    //           });
 
-    return index_of_min;
+    // int index_to_return = -1;
+    // for(auto i = 0; i < densities.size(); i++) {
+    //     // auto delta = seed.as_vector() - dataset->col(std::get<0>(densities[i]));
+
+    //     if(i < 100) {
+    //         auto GT = seed.exp();
+    //         Eigen::Matrix<double,6,1> m_of_t;
+    //         m_of_t << dataset->col(std::get<0>(densities[0]));
+    //         AlgebraSE3<double> algebra_T(m_of_t);
+
+    //         auto se3_delta = GT.inv() * algebra_T.exp();
+
+    //         std::cerr << "Delta transofmration" << std::endl;
+    //         std::cerr << se3_delta << std::endl;
+
+    //     }
+
+    // }
+
+    auto to_return = std::min_element(densities.begin(), densities.end()) - densities.begin();
+    std::cerr << "Returning index: " << to_return << " with value " << densities[to_return] << '\n';
+    std::cerr << "Value of returned index: " << '\n';
+    std::cerr << dataset->col(to_return) << '\n';
+    std::cerr << knn_algorithm.get_id_from_dataset(to_return) << '\n';
+    return to_return;
 }
 
 }

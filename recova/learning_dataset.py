@@ -39,6 +39,7 @@ def vectorize_covariance(cov_matrix):
 
 
 def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
+    eprint(registration_pair)
     descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
     covariance = registration_pair.covariance(clustering_algorithm)
 
@@ -67,7 +68,8 @@ def generate_examples_cli():
     binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
     descriptor_algorithm = MomentGridDescriptor()
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.05)
+    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    clustering_algorithm.rescale = True
 
     registration_pairs = db.registration_pairs()
 
@@ -122,9 +124,12 @@ def generate_cello_dataset_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
+    parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
     args = parser.parse_args()
 
-    db = RegistrationResultDatabase(args.input)
+    db = RegistrationResultDatabase(args.input, args.exclude)
+    output_path = pathlib.Path(args.output)
+
 
     combiner = OverlappingRegionCombiner()
     aligner = IdentityAlignmentAlgorithm()
@@ -132,6 +137,7 @@ def generate_cello_dataset_cli():
     descriptor_algorithm = MomentGridDescriptor()
 
     clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    clustering_algorithm.rescale = True
 
     registration_pairs = db.registration_pairs()
 
@@ -172,12 +178,16 @@ def dataset_summary_cli():
     args = parser.parse_args()
 
     db = RegistrationResultDatabase(args.input)
-    clustering_algorithm = CenteredClusteringAlgorithm(0.05)
+    clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    clustering_algorithm.rescale = True
 
-    writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio'])
+    writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
     writer.writeheader()
     for registration_pair in db.registration_pairs():
+        eprint(registration_pair)
+
         clustering = registration_pair.clustering_of_results(clustering_algorithm)
+        covariance = registration_pair.covariance()
 
         d = {
             'dataset': registration_pair.dataset,
@@ -185,6 +195,8 @@ def dataset_summary_cli():
             'reference': registration_pair.reference,
             'cluster_distance': clustering['cluster_distance'],
             'outlier_ratio': clustering['outlier_ratio'],
+            'condition_number': np.linalg.cond(covariance),
+            'trace': np.trace(covariance),
         }
 
         writer.writerow(d)

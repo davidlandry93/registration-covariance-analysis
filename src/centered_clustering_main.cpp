@@ -1,4 +1,5 @@
 
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -7,12 +8,15 @@
 
 #include "centered_clustering.h"
 #include "greedy_seed_selection_algorithm.h"
+#include "lieroy/algebra_se3.hpp"
 #include "localized_seed_selection_algorithm.h"
 #include "nabo_adapter.h"
+#include "pointcloud_io.hpp"
 #include "seed_selection_algorithm.h"
 #include "util.h"
 
 
+using namespace lieroy;
 using namespace recova;
 using json = nlohmann::json;
 
@@ -43,6 +47,7 @@ DEFINE_double(radius, 1.0, "Radius within which a point need to have n points to
 DEFINE_string(seed, "", "The initial location where to start the cluster. Comma separated list of values representing the vector.");
 DEFINE_int32(n_seed_init, 100, "The number of seeds close the the ground truth to consider during initialization.");
 DEFINE_string(seed_selector, "localized", "The seed selection strategy.");
+DEFINE_bool(vtk_log, true, "Export vtk logs of the clustering procedure.");
 
 int main(int argc, char** argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -53,6 +58,20 @@ int main(int argc, char** argv) {
   std::shared_ptr<Eigen::MatrixXd> eigen_dataset(new Eigen::MatrixXd);
   *eigen_dataset = json_array_to_matrix(json_dataset);
 
+  std::cerr << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
+
+  if(FLAGS_vtk_log) {
+      std::ofstream output_stream;
+
+      output_stream.open("input_cloud_translation.xyz");
+      eigen_to_xyz<double>(eigen_dataset->topRows(3), output_stream);
+      output_stream.close();
+
+      output_stream.open("input_cloud_rotation.xyz");
+      eigen_to_xyz<double>(eigen_dataset->bottomRows(3), output_stream);
+      output_stream.close();
+  }
+
   auto center = parse_seed(FLAGS_seed);
 
 
@@ -61,10 +80,12 @@ int main(int argc, char** argv) {
   if(FLAGS_seed_selector == "localized") {
       seed_selector.reset(new LocalizedSeedSelectionAlgorithm(knn_algorithm, center, FLAGS_n_seed_init, FLAGS_k));
   } else if (FLAGS_seed_selector == "greedy") {
-      seed_selector.reset(new GreedySeedSelectionAlgorithm(knn_algorithm, FLAGS_k));
+      Eigen::Matrix<double,6,1> eigen_center;
+      eigen_center << center;
+      seed_selector.reset(new GreedySeedSelectionAlgorithm(knn_algorithm, AlgebraSE3<double>(eigen_center), FLAGS_k));
   }
 
-  auto cluster = run_centered_clustering(eigen_dataset, std::move(seed_selector), FLAGS_k, FLAGS_radius);
+  auto cluster = run_centered_clustering(eigen_dataset, std::move(seed_selector), FLAGS_k, FLAGS_radius, FLAGS_vtk_log);
 
   json output_document;
   for(auto elt : cluster) {

@@ -15,7 +15,7 @@ from recova.covariance_of_registrations import distribution_of_registrations
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster
-from recova.util import eprint
+from recova.util import eprint, rescale_hypersphere
 
 from pylie import se3_log
 
@@ -40,12 +40,19 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         self.radius = radius
         self.k = k
         self.n_seed_init = n_seed_init
+        self.rescale = False
+        self.seed_selector = 'greedy'
 
     def __repr__(self):
-        return 'centered_{:.5f}_{}'.format(self.radius, self.k)
+        return 'centered_{:.5f}_{}_{}'.format(self.radius, self.k, self.rescale)
 
     def cluster(self, dataset, seed=np.array([0., 0., 0., 0., 0., 0.])):
-        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init)
+        if self.rescale:
+            # Rescale translation and rotation separately so that they don't crush one another.
+            dataset[:,0:3] = rescale_hypersphere(dataset[:,0:3], 1.0)
+            dataset[:,3:6] = rescale_hypersphere(dataset[:,3:6], 1.0)
+
+        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init, seed_selector=self.seed_selector)
 
         clustering_row = {
             'clustering': [center_cluster],
@@ -104,33 +111,7 @@ def inverse_of_cluster(cluster, size_of_dataset):
     return inverse
 
 
-def centered_clustering(dataset, radius, n=12, seed=np.zeros(6)):
-    """
-    :arg dataset: A nd array containing the points to cluster.
-    :returns: The result of the centered clustering algorithm, as a facet.
-    """
-
-    # TODO Replace the call to raw_centered_clustering with a call to the cpp library recova_core
-    center_cluster = raw_centered_clustering(dataset, radius, n, seed)
-
-    clustering_row = {
-        'clustering': [center_cluster],
-        'n_clusters': 1,
-        'radius': radius,
-        'n': n,
-        'outliers': inverse_of_cluster(center_cluster, len(dataset)),
-        'outlier_ratio': 1.0 - (len(center_cluster) / len(dataset)),
-    }
-
-    eprint('{} radius'.format(radius))
-    eprint('{} outliers'.format(len(clustering_row['outliers'])))
-    eprint('{} inliers'.format(len(center_cluster)))
-
-
-    return clustering_row
-
-
-def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100):
+def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100, seed_selector='greedy'):
     """
     :arg dataset: The dataset to cluster (as a numpy matrix).
     :arg radius: The radius in which we have to have enough neighbours to be a core point.
@@ -139,7 +120,7 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
     """
     strings_of_seed = list(map(str, seed.tolist()))
 
-    command = 'centered_clustering -seed_selector {} -k {} -radius {}'.format('greedy', n, radius)
+    command = 'centered_clustering -seed_selector {} -k {} -radius {}'.format(seed_selector, n, radius)
 
     eprint(command)
     stream = io.StringIO()
@@ -227,7 +208,7 @@ def batch_to_vtk(dataset, clustering_batch, output, center_around_gt=False):
     :arg clustering_batch: The full clustering batch dataset.
     """
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(3) as pool:
         pool.starmap(to_vtk, [(dataset, x, '{}_{}'.format(output, i), center_around_gt) for i, x in enumerate(clustering_batch['data'])])
 
 
@@ -250,6 +231,7 @@ def compute_distribution(dataset, clustering):
     :arg cluster: The data row on which we want to compute the distribution of the central cluster.
     :returns: A new data row, this time with a distribution attached.
     """
+
     central_cluster, cluster_distance = find_central_cluster(dataset, clustering['clustering'])
     mean, covariance = distribution_of_cluster(dataset, central_cluster)
 
@@ -293,6 +275,25 @@ def compute_distributions_cli():
     json.dump(batch_with_distributions, sys.stdout)
 
 
+def clustering_to_vtk_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', help='The dataset on which the clustering is applied', type=str)
+    parser.add_argument('output', help='Prefix of the output vtk files', type=str)
+    parser.add_argument('--center_around_gt', action='store_true')
+    args = parser.parse_args()
+
+    print('Loading from stdin')
+    clustering = json.load(sys.stdin)
+
+    print('Loading dataset')
+    with open(args.dataset) as dataset_file:
+        dataset = json.load(dataset_file)
+
+    to_vtk(dataset, clustering, args.output, center_around_gt=args.center_around_gt)
+
+
+
+
 def batch_to_vtk_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='The dataset on which the clustering is applied.', type=str)
@@ -315,8 +316,10 @@ def cli():
     parser.add_argument('algo', type=str, default='centered', help='The name of the clustering algorithm to use. {centered,dbscan}')
     parser.add_argument('--radius', type=float, default=0.005,
                         help='Radius that must contain enough neighbors for a point to be a core point.')
-    parser.add_argument('--n', type=float, default=12,
+    parser.add_argument('--n', type=int, default=12,
                         help='Number of neighbours that must be contained within the radius for a point to be a core point.')
+    parser.add_argument('--rescale_data', action='store_true', help='Scale rotations and translations so that the rotations live within a 1.0 radius sphere and the translations live within a 1.0 radius sphere.')
+    parser.add_argument('--seed_selector', type=str, help='The seed selection strategy to use. <greedy|centered>')
     args = parser.parse_args()
 
     json_dataset = json.load(sys.stdin)
@@ -326,10 +329,11 @@ def cli():
 
     algo.radius = args.radius
     algo.k = args.n
+    algo.rescale = args.rescale_data
+    algo.seed_selector = args.seed_selector
     clustering = algo.cluster(data)
 
-
-    clustering_with_distribution = compute_distribution(data, clustering)
+    clustering_with_distribution = compute_distribution(json_dataset, clustering)
 
     json.dump(clustering_with_distribution, sys.stdout)
 

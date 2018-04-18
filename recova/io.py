@@ -18,7 +18,7 @@ def convert_csv_to_xyz(instream, outstream):
     for row in reader:
         writer.writerow([row['x'], row['y'], row['z']])
 
-def cli():
+def csv2xyz_cli():
     convert_csv_to_xyz(sys.stdin, sys.stdout)
 
 if __name__ == '__main__':

@@ -31,25 +31,14 @@ def pytorch_correlation_repair(C):
     print(C)
     eigvals, eigvecs = torch.eig(C, eigenvectors=True)
 
-    print(eigvals)
-    print(eigvecs)
-
     eigvals = torch.max(torch.zeros(6), eigvals[:,0])
 
-    print(eigvals)
     reconstructed = torch.mm(eigvecs, torch.mm(torch.diag(eigvals), eigvecs))
-    print('Reconstructed')
-    print(reconstructed)
 
     T = 1. / torch.sqrt(torch.diag(eigvals))
     TT = torch.mm(T, torch.t(T))
 
     repaired = reconstructed * TT
-    print('Repaired')
-    print(repaired)
-
-    print('Forbenius norm: {}'.format(torch.norm(C - repaired)))
-
     return repaired
 
 
@@ -65,7 +54,6 @@ def pytorch_nearest_pd(A):
     matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
     """
 
-    print('Computing nearest PD of {}'.format(A.shape))
     B = (A + torch.t(A)) / 2
     _, s, V = torch.svd(B)
 
@@ -137,18 +125,11 @@ def kullback_leibler_pytorch(cov1, cov2):
     det1 = torch.det(corrected_cov1)
     det2 = torch.det(corrected_cov2)
 
-    print('Inverted matrix')
-    print(torch.inverse(corrected_cov2))
-
     A = torch.trace(torch.mm(torch.inverse(corrected_cov1), corrected_cov2))
     B = 6.
     C = float(torch.log(det1) - torch.log(det2))
 
-    print('{} - {} + {}'.format(A,B,C))
-
     kll = 0.5 * (A - B + C)
-
-    print()
 
     return kll
 
@@ -158,6 +139,15 @@ def bat_distance(cov1, cov2):
     B = torch.det(cov1)
     C = torch.det(cov2)
     return 0.5 * torch.log(A / torch.sqrt(B + C))
+
+def hellinger_distance(cov1, cov2):
+    eprint('==== HELLINGER ====')
+    eprint('Condition numbers: {} and {}'.format(np.linalg.cond(cov1), np.linalg.cond(cov2)))
+    eprint(cov1)
+    eprint(np.linalg.det(cov1))
+    eprint(cov2)
+    eprint(np.linalg.det(cov2))
+    return 1.0 - np.power(np.linalg.det(cov1) * np.linalg.det(cov2), 0.25) / np.power(np.linalg.det((cov1 + cov2) / 2.0), 0.5)
 
 
 class CovarianceEstimationModel:
@@ -174,12 +164,11 @@ class CovarianceEstimationModel:
         total_loss = 0.
         for i in range(len(predictions)):
             # loss_of_i = torch.norm(ys[i] - predictions[i])
-            loss_of_i = kullback_leibler(ys[i], predictions[i])
-            print('Loss of {}: {}'.format(i, loss_of_i))
+            loss_of_i = hellinger_distance(ys[i], predictions[i])
             total_loss += loss_of_i
 
-        print('Validation score: {:.2E}'.format(total_loss / len(xs)))
-        print('Log Validation score: {:.2E}'.format(np.log(total_loss / len(xs))))
+        eprint('Validation score: {:.2E}'.format(total_loss / len(xs)))
+        eprint('Log Validation score: {:.2E}'.format(np.log(total_loss / len(xs))))
 
         return total_loss / len(xs)
 
@@ -212,7 +201,8 @@ class KnnModel(CovarianceEstimationModel):
 
 
 class MLPModel(CovarianceEstimationModel):
-    def __init__(self, configuration=[])
+    def __init__(self, configuration=[]):
+        pass
 
 
 def to_upper_triangular(v):
@@ -263,9 +253,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=100)
 
-        # optimizer = optim.SGD([theta], lr=1e-7)
-        # optimizer = optim.Adam([theta], lr=1e-5)
-        optimizer = optim.RMSprop([self.theta], lr=1e-5)
+        optimizer = optim.SGD([self.theta], lr=1e-6)
+        # optimizer = optim.Adam([self.theta], lr=1e-5)
+        # optimizer = optim.RMSprop([self.theta], lr=1e-6)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
         for epoch, (train_set, test_set) in enumerate(selector.split(predictors)):
@@ -275,6 +265,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             ys_train, ys_validation = Variable(torch.Tensor(covariances[train_set])), Variable(torch.Tensor(covariances[test_set]))
 
             sum_of_losses = Variable(torch.Tensor([0.]))
+            losses = np.zeros((len(xs_train)))
 
             for i, x in enumerate(xs_train):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -290,28 +281,29 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
                 optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
                 sum_of_losses += optimization_loss
+                losses[i] = optimization_loss.data.numpy()
                 optimization_loss.backward()
                 optimizer.step()
 
             average_loss = sum_of_losses / len(xs_train)
+            median_loss = np.median(np.array(losses))
 
-            print('Validation score: {:.2E}'.format(self.validate(xs_validation.data.numpy(), ys_validation.data.numpy())))
-            print('Avg Optimization Loss: %f' % average_loss)
+            validation_score = self.validate(xs_validation.data.numpy(), ys_validation.data.numpy())
+            eprint('Avg Optimization Loss: %f' % average_loss)
+            eprint('Median optimization loss: %f' % median_loss)
+            eprint('Validation score: {:.2E}'.format(validation_score))
+            print('{}, {}, {}'.format(epoch, median_loss, validation_score))
 
 
     def predict(self, queries):
         torch_queryes = torch.Tensor(queries)
         metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-        print(metric_matrix)
-
         predictions = torch.zeros(len(queries),6,6)
 
         for i, x in enumerate(queries):
-            print('PREDICTING %d' %i)
             distances = self.compute_distances(self.predictors, metric_matrix, x)
             predictions[i] = self.prediction_from_distances(self.covariances, distances, x)
-            print(predictions[i])
 
         return predictions.data.numpy()
 
@@ -342,52 +334,6 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
 
-def cello_torch(predictors, covariances):
-    alpha = 1e-5
-
-    size_of_predictor = predictors.shape[1]
-    print('Size of predictor: {}'.format(size_of_predictor))
-    sz_of_vector = size_of_vector(size_of_predictor)
-
-    idx = np.arange(len(predictors))
-    np.random.shuffle(idx)
-
-    training_set_size = int(len(predictors) * 0.8)
-
-    predictors_training = Variable(torch.Tensor(predictors[idx[0:training_set_size]]))
-    covariances_training = Variable(torch.Tensor(covariances[idx[0:training_set_size]]))
-
-    predictors_validation = Variable(torch.Tensor(predictors[idx[training_set_size:]]))
-    covariances_validation = Variable(torch.Tensor(covariances[idx[training_set_size:]]))
-
-    theta = Variable(torch.randn(sz_of_vector) / 1000., requires_grad=True)
-
-    optimizer = optim.SGD([theta], lr=1e-5)
-
-    for epoch in range(500):
-        for i, predictor in enumerate(predictors_training):
-            optimizer.zero_grad()
-            metric_matrix = theta_to_metric_matrix(theta)
-
-            distances = compute_distances(predictors_training, metric_matrix, predictor)
-            predicted_cov = predict(predictors_training, covariances_training, distances, predictor)
-
-            loss_lhs = torch.log(torch.norm(predicted_cov))
-            loss_rhs = loss_of_covariance(covariances_training[i], predicted_cov)
-
-            nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
-
-            regularization_term = torch.sum(torch.log(nonzero_distances))
-            loss = (1 - alpha) * (loss_lhs + loss_rhs ) +  alpha * regularization_term
-
-            loss.backward(retain_graph=True)
-            optimizer.step()
-
-
-        print('VALIDATION')
-        print(loss_of_set(predictors_training, covariances_training, metric_matrix, predictors_validation, covariances_validation))
-
-
 def covariance_model_performance(model, predictors, covariances, p_selection=None):
     scores = []
 
@@ -414,9 +360,9 @@ def cello_learning_cli():
     parser.add_argument('algorithm', type=str)
     args = parser.parse_args()
 
-    print('Loading document')
+    eprint('Loading document')
     input_document = json.load(sys.stdin)
-    print('Done loading document')
+    eprint('Done loading document')
 
     predictors = np.array(input_document['data']['predictors'])
 
@@ -435,7 +381,6 @@ def cello_learning_cli():
         for k in ks:
             model = KnnModel(k)
             scores.append(covariance_model_performance(model, predictors, covariances))
-            print('%.5e var %.5e' % scores[-1])
 
         scores = np.array(scores)
         fig, ax = plt.subplots()

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+for f in *.xyz
+do
+    echo ${f%x.xyz}
+    xyz2vtk ${f%.xyz}
+done

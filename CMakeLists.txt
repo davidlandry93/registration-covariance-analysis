@@ -5,6 +5,7 @@ option(PYTHON_BINDINGS "Build the python bindings of the c++ code" ON)
 
 find_package(Eigen3 REQUIRED)
 find_package(gflags REQUIRED)
+find_package(lieroy REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -22,14 +23,15 @@ add_library(recova
   src/util.cpp
   src/centered_clustering.cpp
   src/pointcloud_separator.cpp
-  src/grid_pointcloud_separator.cpp)
+  src/grid_pointcloud_separator.cpp
+  src/xyz_pointcloud_logger.cpp)
 target_include_directories(recova
   PUBLIC include ${EIGEN3_INCLUDE_DIRS})
 set_property(TARGET recova PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_executable(centered_clustering src/centered_clustering_main.cpp src/centered_clustering.cpp src/greedy_seed_selection_algorithm.cpp src/localized_seed_selection_algorithm.cpp)
 target_include_directories(centered_clustering PRIVATE include)
-target_link_libraries(centered_clustering recova nabo_adapter gflags)
+target_link_libraries(centered_clustering recova nabo_adapter gflags lieroy::lieroy)
 
 add_executable(grid_pointcloud_separator src/grid_pointcloud_separator_main.cpp)
 target_link_libraries(grid_pointcloud_separator recova gflags)
@@ -54,6 +56,8 @@ install(TARGETS
   overlapping_region
   point_density
   RUNTIME DESTINATION bin)
+
+install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk DESTINATION bin)
 
 if(PYTHON_BINDINGS)
   add_subdirectory(recova_core)
