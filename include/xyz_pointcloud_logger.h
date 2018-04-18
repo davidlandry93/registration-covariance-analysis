@@ -11,13 +11,13 @@ class XyzPointcloudLogger : public PointcloudLogger {
   public:
     XyzPointcloudLogger(std::string&& output_dir);
 
-    void log(const std::string& label, const Eigen::Matrix<float, Eigen::Dynamic, 3>& cloud);
-    void log(const std::string& label, const Eigen::Matrix<double, Eigen::Dynamic, 3>& cloud);
+    void log(const std::string& label, const Eigen::Matrix<float, 3, Eigen::Dynamic>& cloud);
+    void log(const std::string& label, const Eigen::Matrix<double, 3, Eigen::Dynamic>& cloud);
   private:
     std::string output_dir;
 
     template<typename T>
-    void log(const std::string& label, const Eigen::Matrix<T, Eigen::Dynamic, 3>& cloud);
+    void log(const std::string& label, const Eigen::Matrix<T, 3, Eigen::Dynamic>& cloud);
 };
 
 }

@@ -1,5 +1,6 @@
 
 #include "localized_seed_selection_algorithm.h"
+#include "pointcloud_logger_locator.h"
 
 namespace recova {
 
@@ -36,6 +37,10 @@ int LocalizedSeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& da
             min_distance = distances(k - 1, i);
         }
     }
+
+    PointcloudLoggerLocator logger_locator;
+    PointcloudLogger& logger = logger_locator.get();
+    logger.log(std::string("tototot"), dataset->topRows(3));
 
     return min_index;
 }
