@@ -121,15 +121,21 @@ def dataset_to_registrations(dataset):
 
     return registrations
 
+def englobing_radius(points, percentile):
+    """
+    Find the smallest radius that englobes percentile proportion of points.
+    """
+    norms = np.linalg.norm(points, axis=1)
+    return np.percentile(norms, 90.0)
+
 def rescale_hypersphere(points, radius):
     """
     Rescale points so that they live within an hypersphere of size radius.
     """
-    norms = np.linalg.norm(points, axis=1)
-    percentile = np.percentile(norms, 90.0)
+    englobing_radius = englobing_radius(points, 90.0)
 
-    eprint('90th pertencile used for rescaling: {}'.format(percentile))
+    eprint('90th pertencile used for rescaling: {}'.format(englobing_radius))
 
-    points = points * radius / percentile
+    points = points * radius / englobing_radius
 
     return points

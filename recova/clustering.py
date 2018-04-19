@@ -15,14 +15,14 @@ from recova.covariance_of_registrations import distribution_of_registrations
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster
-from recova.util import eprint, rescale_hypersphere
-
-from pylie import se3_log
+from recova.util import eprint, rescale_hypersphere, englobing_radius
 
 from lieroy.parallel import FunctionWrapper
 
 import recova_core
 
+se3log = FunctionWrapper('log', 'lieroy.se3')
+se3exp = FunctionWrapper('exp', 'lieroy.se3')
 
 class ClusteringAlgorithm:
     def __init__(self):
@@ -42,6 +42,7 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         self.n_seed_init = n_seed_init
         self.rescale = False
         self.seed_selector = 'greedy'
+        self.logging = False
 
     def __repr__(self):
         return 'centered_{:.5f}_{}_{}'.format(self.radius, self.k, self.rescale)
@@ -49,10 +50,17 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
     def cluster(self, dataset, seed=np.array([0., 0., 0., 0., 0., 0.])):
         if self.rescale:
             # Rescale translation and rotation separately so that they don't crush one another.
-            dataset[:,0:3] = rescale_hypersphere(dataset[:,0:3], 1.0)
-            dataset[:,3:6] = rescale_hypersphere(dataset[:,3:6], 1.0)
+            radius_translation = englobing_radius(dataset[:, 0:3], 90.0)
+            radius_rotation = englobing_radius(dataset[:, 3:6], 90.0)
 
-        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init, seed_selector=self.seed_selector)
+            dataset[:,0:3] = dataset[:,0:3] / radius_translation
+            dataset[:,3:6] = dataset[:,3:6] / radius_rotation
+
+            seed[0:3] = seed[0:3] / radius_translation
+            seed[3:6] = seed[3:6] / radius_rotation
+
+
+        center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init, seed_selector=self.seed_selector, logging=self.logging)
 
         clustering_row = {
             'clustering': [center_cluster],
@@ -111,7 +119,7 @@ def inverse_of_cluster(cluster, size_of_dataset):
     return inverse
 
 
-def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100, seed_selector='greedy'):
+def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100, seed_selector='greedy', logging=False):
     """
     :arg dataset: The dataset to cluster (as a numpy matrix).
     :arg radius: The radius in which we have to have enough neighbours to be a core point.
@@ -119,8 +127,9 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
     :returns: The indices of the points that are inside the central cluster as a list.
     """
     strings_of_seed = list(map(str, seed.tolist()))
+    string_of_seed = ','.join(strings_of_seed)
 
-    command = 'centered_clustering -seed_selector {} -k {} -radius {}'.format(seed_selector, n, radius)
+    command = 'centered_clustering -seed_selector {} -k {} -radius {} -seed {} {}'.format(seed_selector, n, radius, string_of_seed, ('--pointcloud_log' if logging else '--nopointcloud_log'))
 
     eprint(command)
     stream = io.StringIO()
@@ -180,7 +189,7 @@ def to_vtk(dataset, clustering, output, center_around_gt=False):
     points_to_vtk(points[:,3:6], '{}_rotation'.format(output, radius), data=data_dict)
 
     mean = np.array(clustering['mean_of_central'])
-    mean = se3_log(mean)
+    mean = se3log(mean)
     covariance = np.array(clustering['covariance_of_central'])
 
     distribution_to_vtk_ellipsoid(mean[0:3], covariance[0:3, 0:3], '{}_translation_ellipsoid'.format(output))
@@ -191,8 +200,6 @@ def center_lie_around_t(points, T):
     """
     Recenter a collection of lie algebra vectors around a new 4x4 T.
     """
-    se3log = FunctionWrapper('log', 'lieroy.se3')
-    se3exp = FunctionWrapper('exp', 'lieroy.se3')
     inv_of_T = np.linalg.inv(T)
 
     for i in range(len(points)):
@@ -327,11 +334,14 @@ def cli():
 
     data = lie_vectors_of_registrations(json_dataset)
 
+    ground_truth = np.array(json_dataset['metadata']['ground_truth'])
+
     algo.radius = args.radius
     algo.k = args.n
     algo.rescale = args.rescale_data
     algo.seed_selector = args.seed_selector
-    clustering = algo.cluster(data)
+    algo.logging = True
+    clustering = algo.cluster(data, seed=se3log(ground_truth))
 
     clustering_with_distribution = compute_distribution(json_dataset, clustering)
 

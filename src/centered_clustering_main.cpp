@@ -11,6 +11,7 @@
 #include "lieroy/algebra_se3.hpp"
 #include "localized_seed_selection_algorithm.h"
 #include "nabo_adapter.h"
+#include "null_pointcloud_logger.h"
 #include "pointcloud_io.hpp"
 #include "pointcloud_logger_locator.h"
 #include "seed_selection_algorithm.h"
@@ -49,7 +50,7 @@ DEFINE_double(radius, 1.0, "Radius within which a point need to have n points to
 DEFINE_string(seed, "", "The initial location where to start the cluster. Comma separated list of values representing the vector.");
 DEFINE_int32(n_seed_init, 100, "The number of seeds close the the ground truth to consider during initialization.");
 DEFINE_string(seed_selector, "localized", "The seed selection strategy.");
-DEFINE_bool(vtk_log, true, "Export vtk logs of the clustering procedure.");
+DEFINE_bool(pointcloud_log, false, "Export pointcloud logging");
 
 int main(int argc, char** argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -63,10 +64,16 @@ int main(int argc, char** argv) {
   std::cerr << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
 
   PointcloudLoggerLocator locator;
-  std::unique_ptr<PointcloudLogger> logger(new XyzPointcloudLogger("."));
+  std::unique_ptr<PointcloudLogger> logger;
+  if(FLAGS_pointcloud_log) {
+      logger.reset(new XyzPointcloudLogger("."));
+  } else {
+      logger.reset(new NullPointcloudLogger);
+  }
   locator.set(std::move(logger));
 
-  if(FLAGS_vtk_log) {
+
+  if(FLAGS_pointcloud_log) {
       std::ofstream output_stream;
 
       output_stream.open("input_cloud_translation.xyz");
@@ -91,7 +98,7 @@ int main(int argc, char** argv) {
       seed_selector.reset(new GreedySeedSelectionAlgorithm(knn_algorithm, AlgebraSE3<double>(eigen_center), FLAGS_k));
   }
 
-  auto cluster = run_centered_clustering(eigen_dataset, std::move(seed_selector), FLAGS_k, FLAGS_radius, FLAGS_vtk_log);
+  auto cluster = run_centered_clustering(eigen_dataset, std::move(seed_selector), FLAGS_k, FLAGS_radius, FLAGS_pointcloud_log);
 
   json output_document;
   for(auto elt : cluster) {

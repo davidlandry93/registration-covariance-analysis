@@ -179,6 +179,7 @@ def dataset_summary_cli():
 
     db = RegistrationResultDatabase(args.input)
     clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    clustering_algorithm.seed_selector = 'localized'
     clustering_algorithm.rescale = True
 
     writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
