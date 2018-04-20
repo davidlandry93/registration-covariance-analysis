@@ -8,11 +8,14 @@ from lieroy.parallel import FunctionWrapper
 
 POSITIVE_STRINGS = ('yes', 'y', 't', 'true', '1')
 
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+
 def empty_to_none(dictionary):
     return dictionary if dictionary else None
+
 
 def parse_dims(dim_string):
     """
@@ -23,6 +26,7 @@ def parse_dims(dim_string):
         raise RuntimeError('Can only generate an ellipsoid with 3 dimensions.')
 
     return dims
+
 
 def run_subprocess(command_string, input=None):
     return subprocess.check_output(
