@@ -43,7 +43,7 @@ setup(
             'registration2vtk = recova.results_to_vtk:cli',
             'registration_2d_plot = recova.single_experiment_plot:cli',
             'registration_heatmap = recova.single_experiment_heatmap:cli',
-            'trails2vtk = recova.trails_to_vtk:cli'
+            'trails2vtk = recova.trails_to_vtk:cli',
             'xyz2descriptor = recova.descriptor:cli',
         ]
     },

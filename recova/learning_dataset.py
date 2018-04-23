@@ -14,11 +14,11 @@ from lie import se3
 
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
-from recova.clustering import CenteredClusteringAlgorithm
+from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
 from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
 from recova.binning import GridBinningAlgorithm
 from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
-from recova.registration_result_database import RegistrationResultDatabase
+from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, nearestPD
 
 
@@ -60,7 +60,7 @@ def generate_examples_cli():
 
     np.set_printoptions(linewidth=120)
 
-    db = RegistrationResultDatabase(args.input)
+    db = RegistrationPairDatabase(args.input)
     output_path = pathlib.Path(args.output)
 
     combiner = OverlappingRegionCombiner()
@@ -127,7 +127,7 @@ def generate_cello_dataset_cli():
     parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
     args = parser.parse_args()
 
-    db = RegistrationResultDatabase(args.input, args.exclude)
+    db = RegistrationPairDatabase(args.input, args.exclude)
     output_path = pathlib.Path(args.output)
 
 
@@ -177,18 +177,21 @@ def dataset_summary_cli():
     parser.add_argument('input', type=str, help='Path to the managed registration result database')
     args = parser.parse_args()
 
-    db = RegistrationResultDatabase(args.input)
-    clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
-    clustering_algorithm.seed_selector = 'localized'
-    clustering_algorithm.rescale = True
+    db = RegistrationPairDatabase(args.input)
+
+    # clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    # clustering_algorithm.seed_selector = 'localized'
+    # clustering_algorithm.rescale = True
+
+    clustering_algorithm = IdentityClusteringAlgorithm()
 
     writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
     writer.writeheader()
     for registration_pair in db.registration_pairs():
         eprint(registration_pair)
 
+        covariance = registration_pair.covariance(clustering_algorithm)
         clustering = registration_pair.clustering_of_results(clustering_algorithm)
-        covariance = registration_pair.covariance()
 
         d = {
             'dataset': registration_pair.dataset,

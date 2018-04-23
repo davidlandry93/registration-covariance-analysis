@@ -18,7 +18,7 @@ from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations
 
 
-class RegistrationResult:
+class RegistrationPair:
     def __init__(self, database_root, dataset, reading, reference):
         self.root = database_root
         self.dataset = dataset
@@ -217,7 +217,7 @@ class RegistrationResult:
 
 
 
-class RegistrationResultDatabase:
+class RegistrationPairDatabase:
     def __init__(self, database_root, exclude=None):
         self.root = pathlib.Path(database_root)
         self.exclude = (re.compile(exclude) if exclude else None)
@@ -231,7 +231,7 @@ class RegistrationResultDatabase:
                 reading = registration_results['metadata']['reading']
                 reference = registration_results['metadata']['reference']
 
-                r = RegistrationResult(self.root, dataset, reading, reference)
+                r = RegistrationPair(self.root, dataset, reading, reference)
                 r.accept_raw_file(path_to_file)
 
         except OSError as e:
@@ -239,7 +239,7 @@ class RegistrationResultDatabase:
             print('OSError for {}'.format(path_to_file))
 
     def get_registration_pair(self, dataset, reading, reference):
-        return RegistrationResult(self.root, dataset, reading, reference)
+        return RegistrationPair(self.root, dataset, reading, reference)
 
     def registration_pairs(self):
         pairs = []
@@ -252,7 +252,7 @@ class RegistrationResultDatabase:
                 reference = int(components[2])
 
                 if not self.exclude or not self.exclude.match(dataset):
-                    pairs.append(RegistrationResult(self.root, dataset, reading, reference))
+                    pairs.append(RegistrationPair(self.root, dataset, reading, reference))
 
         return pairs
 
@@ -270,7 +270,7 @@ def import_files_cli():
     parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str)
     args = parser.parse_args()
 
-    db = RegistrationResultDatabase(args.root)
+    db = RegistrationPairDatabase(args.root)
 
     for registration_file in args.files:
         print(registration_file)

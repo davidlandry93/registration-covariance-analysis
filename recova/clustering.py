@@ -104,6 +104,24 @@ class DBSCANClusteringAlgorithm(ClusteringAlgorithm):
         }
 
 
+class IdentityClusteringAlgorithm(ClusteringAlgorithm):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return 'identity_clustering'
+
+    def cluster(self, dataset, seed=None):
+        return {
+            'clustering': [list(range(0, len(dataset)))],
+            'n_clusters': 1,
+            'outliers': [],
+            'outlier_ratio': 0.0,
+        }
+
+
+
+
 def inverse_of_cluster(cluster, size_of_dataset):
     """Returns a list of points not in cluster."""
     sorted_cluster = sorted(cluster)
@@ -153,7 +171,8 @@ def dbscan_clustering(dataset, radius=0.005, n=12, seed=None):
 def clustering_algorithm_factory(algo_name):
     algo_dict = {
         'centered': CenteredClusteringAlgorithm,
-        'dbscan':  DBSCANClusteringAlgorithm
+        'dbscan':  DBSCANClusteringAlgorithm,
+        'identity': IdentityClusteringAlgorithm
     }
     return algo_dict[algo_name]()
 
