@@ -1,4 +1,10 @@
 
+import numpy as np
+
+from lieroy.parallel import se3_log
+from recova.clustering import compute_distribution
+
+
 class CovarianceComputationAlgorithm:
     def compute(self, registration_pair):
         raise NotImplementedError('CovarianceComputationAlgorithms must implement compute method.')
@@ -22,7 +28,7 @@ class SamplingCovarianceComputationAlgorithm:
 
         if not clustering:
             results = registration_pair.lie_matrix_of_results()
-            clustering = self.clustering_algorithm.cluster(results, seed=ln_se3(registration_pair.ground_truth()))
+            clustering = self.clustering_algorithm.cluster(results, seed=se3_log(registration_pair.ground_truth()))
             registration_pair.cache[self.clustering_algorithm.__repr__()] = clustering
 
         return clustering
