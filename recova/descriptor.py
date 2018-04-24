@@ -10,7 +10,7 @@ import tempfile
 
 from recov.registration_algorithm import IcpAlgorithm
 from recov.datasets import create_registration_dataset
-from recova.io import read_xyz
+from recov.pointcloud_io import read_xyz_stream
 from recova.util import eprint, run_subprocess
 from recova_core import grid_pointcloud_separator
 

@@ -25,7 +25,6 @@ setup(
             'clustering2vtk = recova.clustering:clustering_to_vtk_cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',
-            'csv2xyz = recova.io:csv2xyz_cli',
             'dataset_summary = recova.learning_dataset:dataset_summary_cli',
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
             'find_central_cluster = recova.find_center_cluster:cli',

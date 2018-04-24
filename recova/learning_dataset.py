@@ -15,6 +15,7 @@ from lie import se3
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
+from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
 from recova.binning import GridBinningAlgorithm
 from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
@@ -172,6 +173,23 @@ def generate_cello_dataset_cli():
     with open(args.output, 'w') as json_file:
         json_file.write(json.dumps(output_document))
 
+
+def compute_one_summary_line(registration_pair, covariance_algo):
+    covariance = covariance_algo.compute(registration_pair)
+
+    d = {
+        'dataset': registration_pair.dataset,
+        'reading': registration_pair.reading,
+        'reference': registration_pair.reference,
+        'condition_number': np.linalg.cond(covariance),
+        'trace': np.trace(covariance),
+    }
+
+    eprint('%s done' % str(registration_pair))
+
+    return d
+
+
 def dataset_summary_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('input', type=str, help='Path to the managed registration result database')
@@ -179,28 +197,19 @@ def dataset_summary_cli():
 
     db = RegistrationPairDatabase(args.input)
 
-    # clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
-    # clustering_algorithm.seed_selector = 'localized'
-    # clustering_algorithm.rescale = True
+    clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    clustering_algorithm.seed_selector = 'localized'
+    clustering_algorithm.rescale = True
+    # clustering_algorithm = IdentityClusteringAlgorithm()
 
-    clustering_algorithm = IdentityClusteringAlgorithm()
+    # covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
+
+    covariance_algorithm = CensiCovarianceComputationAlgorithm()
+
+    with multiprocessing.Pool() as p:
+        rows = p.starmap(compute_one_summary_line, [(x, covariance_algorithm) for x in db.registration_pairs()])
 
     writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
     writer.writeheader()
-    for registration_pair in db.registration_pairs():
-        eprint(registration_pair)
-
-        covariance = registration_pair.covariance(clustering_algorithm)
-        clustering = registration_pair.clustering_of_results(clustering_algorithm)
-
-        d = {
-            'dataset': registration_pair.dataset,
-            'reading': registration_pair.reading,
-            'reference': registration_pair.reference,
-            'cluster_distance': clustering['cluster_distance'],
-            'outlier_ratio': clustering['outlier_ratio'],
-            'condition_number': np.linalg.cond(covariance),
-            'trace': np.trace(covariance),
-        }
-
-        writer.writerow(d)
+    for row in rows:
+        writer.writerow(row)

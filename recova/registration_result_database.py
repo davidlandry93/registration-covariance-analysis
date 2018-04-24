@@ -7,6 +7,7 @@ import pathlib
 import re
 
 from recov.datasets import create_registration_dataset
+from recov.pointcloud_io import pointcloud_to_pcd
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
@@ -173,6 +174,23 @@ class RegistrationPair:
 
         return np.array(ground_truth)
 
+    def path_to_reading_pcd(self):
+        path_to_pcd = self.directory_of_pair / 'reading.pcd'
+
+        if not path_to_pcd.exists():
+            pointcloud_to_pcd(self.points_of_reading(), str(path_to_pcd))
+
+        return path_to_pcd
+
+
+    def path_to_reference_pcd(self):
+        path_to_pcd = self.directory_of_pair / 'reference.pcd'
+
+        if not path_to_pcd.exists():
+            pointcloud_to_pcd(self.points_of_reference(), str(path_to_pcd))
+
+        return path_to_pcd
+
 
     def points_of_reading(self):
         reading_file = self.directory_of_pair / 'reading.json'
@@ -198,10 +216,7 @@ class RegistrationPair:
 
 
     def covariance(self, clustering_algorithm=CenteredClusteringAlgorithm()):
-        clustering = self.clustering_of_results(clustering_algorithm)
-        clustering = compute_distribution(self.registration_dict(), clustering)
-
-        return np.array(clustering['covariance_of_central'])
+        raise NotImplementedError('use of covariance() is deprecated. Use the CovarianceComputationAlgorithms instead.')
 
 
     def compute_clustering(self, clustering_algorithm):

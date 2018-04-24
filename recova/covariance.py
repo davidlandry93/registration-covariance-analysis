@@ -1,7 +1,10 @@
 
 import numpy as np
 
+
 from lieroy.parallel import se3_log
+from recov.registration_algorithm import IcpAlgorithm
+from recov.censi import censi_estimate_from_clouds
 from recova.clustering import compute_distribution
 
 
@@ -37,5 +40,14 @@ class SamplingCovarianceComputationAlgorithm:
 
 
 class CensiCovarianceComputationAlgorithm:
+    def __init__(self, registration_algorithm = IcpAlgorithm()):
+        self.algo = registration_algorithm
+
+
     def compute(self, registration_pair):
-        pass
+        path_to_reading = registration_pair.path_to_reading_pcd()
+        path_to_reference = registration_pair.path_to_reference_pcd()
+
+        covariance = censi_estimate_from_clouds(path_to_reading, path_to_reference, registration_pair.ground_truth(), self.algo)
+
+        return np.array(covariance)
