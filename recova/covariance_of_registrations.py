@@ -7,7 +7,7 @@ import numpy as np
 import sys
 
 from recova.registration_dataset import registrations_of_dataset
-from pylie import se3_log, se3_exp, se3_gaussian_distribution_of_sample
+from lieroy.parallel import se3_log, se3_exp, se3_gaussian_distribution_of_sample
 
 
 def compute_one_perturbation(inv_of_mean, registration):

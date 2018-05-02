@@ -137,8 +137,10 @@ def generate_cello_dataset_cli():
     binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
     descriptor_algorithm = MomentGridDescriptor()
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
-    clustering_algorithm.rescale = True
+    # clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    # clustering_algorithm.rescale = True
+
+    clustering_algorithm = IdentityClusteringAlgorithm()
 
     registration_pairs = db.registration_pairs()
 
@@ -177,6 +179,8 @@ def generate_cello_dataset_cli():
 def compute_one_summary_line(registration_pair, covariance_algo):
     covariance = covariance_algo.compute(registration_pair)
 
+    eprint(np.linalg.norm(covariance - covariance.T))
+
     d = {
         'dataset': registration_pair.dataset,
         'reading': registration_pair.reading,
@@ -200,11 +204,11 @@ def dataset_summary_cli():
     clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
     clustering_algorithm.seed_selector = 'localized'
     clustering_algorithm.rescale = True
-    # clustering_algorithm = IdentityClusteringAlgorithm()
+    clustering_algorithm = IdentityClusteringAlgorithm()
 
-    # covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
+    covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
 
-    covariance_algorithm = CensiCovarianceComputationAlgorithm()
+    # covariance_algorithm = CensiCovarianceComputationAlgorithm()
 
     with multiprocessing.Pool() as p:
         rows = p.starmap(compute_one_summary_line, [(x, covariance_algorithm) for x in db.registration_pairs()])

@@ -107,6 +107,17 @@ def kullback_leibler(cov1, cov2):
 
     return kll
 
+
+def bat_distance(cov1, cov2):
+    """Returns the Bhattacharyya distance of two covariance matrices.
+    See https://en.wikipedia.org/wiki/Bhattacharyya_distance."""
+
+    avg_cov = cov1 + cov2 / 2.0
+
+    return 0.5 * np.log(np.linalg.det(avg_cov) / np.sqrt(np.linalg.det(cov1) * np.linalg.det(cov2)))
+
+
+
 def dataset_to_registrations(dataset):
     """
     Turn a json dataset into a series of numpy 4x4 registrations.

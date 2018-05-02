@@ -16,7 +16,13 @@ from torch.autograd import Variable
 from sklearn.neighbors import DistanceMetric, BallTree, KDTree
 
 import recova.util
-from recova.util import eprint
+from recova.util import eprint, bat_distance
+
+def norm_distance(cov1, cov2):
+    return np.linalg.norm(np.dot(np.linalg.inv(cov1), cov2) - np.identity(6))
+
+def pytorch_norm_distance(cov1, cov2):
+    return torch.norm(torch.mm(torch.inverse(cov1), cov2) - Variable(torch.eye(6)))
 
 def pytorch_is_pd(A):
     try:
@@ -99,15 +105,22 @@ def kullback_leibler(cov1, cov2):
     cov1 and cov2 must be numpy matrices.
     See http://bit.ly/2FAYCgu."""
 
-    corrected_cov1 = recova.util.nearestPD(cov1)
-    corrected_cov2 = recova.util.nearestPD(cov2)
+    # corrected_cov1 = recova.util.nearestPD(cov1)
+    # corrected_cov2 = recova.util.nearestPD(cov2)
 
-    det1 = np.linalg.det(corrected_cov1)
-    det2 = np.linalg.det(corrected_cov2)
+    # det1 = np.linalg.det(corrected_cov1)
+    # det2 = np.linalg.det(corrected_cov2)
 
-    A = np.trace(np.dot(np.linalg.inv(corrected_cov1), corrected_cov2))
+    det1 = np.linalg.det(cov1)
+    det2 = np.linalg.det(cov2)
+
+    # A = np.trace(np.dot(np.linalg.inv(corrected_cov1), corrected_cov2))
+    A = np.trace(np.dot(np.linalg.inv(cov1), cov2))
     B = 6.
     C = float(np.log(det1) - np.log(det2))
+
+    # eprint('Det1: %f Det2: %f' % (det1, det2))
+    # eprint('A %f B %f C %f' % (A,B,C))
 
 
     kll = 0.5 * (A - B + C)
@@ -119,13 +132,13 @@ def kullback_leibler_pytorch(cov1, cov2):
     cov1 and cov2 must be numpy matrices.
     See http://bit.ly/2FAYCgu."""
 
-    corrected_cov1 = nearestPD(cov1.data.numpy())
-    corrected_cov2 = nearestPD(cov2.data.numpy())
+    # corrected_cov1 = nearestPD(cov1.data.numpy())
+    # corrected_cov2 = nearestPD(cov2.data.numpy())
 
-    det1 = torch.det(corrected_cov1)
-    det2 = torch.det(corrected_cov2)
+    det1 = torch.det(cov1)
+    det2 = torch.det(cov2)
 
-    A = torch.trace(torch.mm(torch.inverse(corrected_cov1), corrected_cov2))
+    A = torch.trace(torch.mm(torch.inverse(cov1), cov2))
     B = 6.
     C = float(torch.log(det1) - torch.log(det2))
 
@@ -133,7 +146,7 @@ def kullback_leibler_pytorch(cov1, cov2):
 
     return kll
 
-def bat_distance(cov1, cov2):
+def bat_distance_pytorch(cov1, cov2):
     avg_cov = cov1 + cov2 / 2
     A = torch.det(avg_cov)
     B = torch.det(cov1)
@@ -164,7 +177,7 @@ class CovarianceEstimationModel:
         total_loss = 0.
         for i in range(len(predictions)):
             # loss_of_i = torch.norm(ys[i] - predictions[i])
-            loss_of_i = hellinger_distance(ys[i], predictions[i])
+            loss_of_i = norm_distance(ys[i], predictions[i])
             total_loss += loss_of_i
 
         eprint('Validation score: {:.2E}'.format(total_loss / len(xs)))
@@ -244,8 +257,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.alpha = alpha
 
     def fit(self, predictors, covariances):
-        self.predictors = Variable(torch.Tensor(predictors))
-        self.covariances = Variable(torch.Tensor(covariances))
+        predictors_train, predictors_test, covariances_train, covariances_test = sklearn.model_selection.train_test_split(predictors, covariances, test_size=0.25)
+
+
+        self.predictors = Variable(torch.Tensor(predictors_train))
+        self.covariances = Variable(torch.Tensor(covariances_train))
 
         # Initialize a distance metric.
         sz_of_vector = size_of_vector(predictors.shape[1])
@@ -258,17 +274,19 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         # optimizer = optim.RMSprop([self.theta], lr=1e-6)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
-        for epoch, (train_set, test_set) in enumerate(selector.split(predictors)):
+        for epoch, (train_set, test_set)  in enumerate(selector.split(predictors_train)):
             optimizer.zero_grad()
 
-            xs_train, xs_validation = Variable(torch.Tensor(predictors[train_set])), Variable(torch.Tensor(predictors[test_set]))
-            ys_train, ys_validation = Variable(torch.Tensor(covariances[train_set])), Variable(torch.Tensor(covariances[test_set]))
+            xs_train, xs_validation = Variable(torch.Tensor(predictors_train[train_set])), Variable(torch.Tensor(predictors_train[test_set]))
+            ys_train, ys_validation = Variable(torch.Tensor(covariances_train[train_set])), Variable(torch.Tensor(covariances_train[test_set]))
 
             sum_of_losses = Variable(torch.Tensor([0.]))
             losses = np.zeros((len(xs_train)))
 
+
             for i, x in enumerate(xs_train):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
+
 
                 distances = self.compute_distances(xs_train, metric_matrix, x)
                 prediction = self.prediction_from_distances(ys_train, distances, x)
@@ -288,15 +306,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             average_loss = sum_of_losses / len(xs_train)
             median_loss = np.median(np.array(losses))
 
-            validation_score = self.validate(xs_validation.data.numpy(), ys_validation.data.numpy())
+            validation_score = self.validate(predictors_test, covariances_test)
             eprint('Avg Optimization Loss: %f' % average_loss)
             eprint('Median optimization loss: %f' % median_loss)
             eprint('Validation score: {:.2E}'.format(validation_score))
-            print('{}, {}, {}'.format(epoch, median_loss, validation_score))
+            eprint('Epoch: %d' % epoch)
+            print('{}, {}, {}'.format(epoch, average_loss.data[0], validation_score))
 
 
     def predict(self, queries):
-        torch_queryes = torch.Tensor(queries)
         metric_matrix = self.theta_to_metric_matrix(self.theta)
 
         predictions = torch.zeros(len(queries),6,6)
@@ -323,12 +341,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def prediction_from_distances(self, covariances, distances, x):
-        zero_distances = distances < 1e-10
-        distances.masked_fill(zero_distances, 1.)
+        # zero_distances = distances < 1e-10
+        # distances.masked_fill(zero_distances, 1.)
+        # weights = torch.clamp(1. - distances, min=0.)
 
-        weights = torch.clamp(1. - distances, min=0.)
+        weights = torch.exp(-distances)
+
         predicted_cov = torch.sum(covariances * weights.view(-1,1,1), 0) / torch.sum(weights)
 
+        # eprint('Sum of weights: %f' % torch.sum(weights))
         return predicted_cov
 
 
@@ -379,6 +400,7 @@ def cello_learning_cli():
         scores = []
         ks = list(range(1,20))
         for k in ks:
+            eprint('K: %d' % k)
             model = KnnModel(k)
             scores.append(covariance_model_performance(model, predictors, covariances))
 
