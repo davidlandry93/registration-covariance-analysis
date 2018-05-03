@@ -177,7 +177,8 @@ class CovarianceEstimationModel:
         total_loss = 0.
         for i in range(len(predictions)):
             # loss_of_i = torch.norm(ys[i] - predictions[i])
-            loss_of_i = norm_distance(ys[i], predictions[i])
+            loss_of_i = kullback_leibler(ys[i], predictions[i])
+            loss_of_i = kullback_leibler(predictions[i], ys[i])
             total_loss += loss_of_i
 
         eprint('Validation score: {:.2E}'.format(total_loss / len(xs)))
@@ -253,7 +254,7 @@ def size_of_vector(n):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-6):
+    def __init__(self, alpha=1e-4):
         self.alpha = alpha
 
     def fit(self, predictors, covariances):
@@ -272,7 +273,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         optimizer = optim.SGD([self.theta], lr=1e-6)
         # optimizer = optim.Adam([self.theta], lr=1e-5)
         # optimizer = optim.RMSprop([self.theta], lr=1e-6)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
         for epoch, (train_set, test_set)  in enumerate(selector.split(predictors_train)):
             optimizer.zero_grad()
@@ -293,6 +294,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
                 loss_A = torch.log(torch.norm(prediction))
                 loss_B = torch.log(torch.norm(torch.mm(torch.inverse(prediction), ys_train[i]) - Variable(torch.eye(6))))
+
+
+                # loss_B = torch.sum(torch.inverse(prediction) * ys_train[i])
+                # eprint(loss_B)
+
+                # eprint('Loss of correspondence: {}'.format(loss_B[0]))
 
                 nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
                 regularization_term = torch.sum(torch.log(nonzero_distances))
