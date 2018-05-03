@@ -48,8 +48,17 @@ def nearestPD(A):
     matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
     """
 
+    if isPD(A):
+        return A
+
     B = (A + A.T) / 2
-    _, s, V = np.linalg.svd(B)
+    try:
+        _, s, V = np.linalg.svd(B)
+    except np.linalg.LinAlgError:
+        print('SVD did not converge when trying to fix matrix A')
+        print(A)
+        print(A - A.T)
+        raise
 
     H = np.dot(V.T, np.dot(np.diag(s), V))
 
@@ -108,6 +117,10 @@ def kullback_leibler(cov1, cov2):
     return kll
 
 
+def hellinger_distance(cov1, cov2):
+    return 1.0 - np.power(np.linalg.det(cov1) * np.linalg.det(cov2), 0.25) / np.power(np.linalg.det((cov1 + cov2) / 2.0), 0.5)
+
+
 def bat_distance(cov1, cov2):
     """Returns the Bhattacharyya distance of two covariance matrices.
     See https://en.wikipedia.org/wiki/Bhattacharyya_distance."""
@@ -116,6 +129,8 @@ def bat_distance(cov1, cov2):
 
     return 0.5 * np.log(np.linalg.det(avg_cov) / np.sqrt(np.linalg.det(cov1) * np.linalg.det(cov2)))
 
+def norm_distance(cov1, cov2):
+    return np.linalg.norm(np.dot(np.linalg.inv(cov1), cov2) - np.identity(6))
 
 
 def dataset_to_registrations(dataset):

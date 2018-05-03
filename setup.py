@@ -33,7 +33,7 @@ setup(
             'generate_learning_dataset = recova.learning_dataset:generate_examples_cli',
             'import_registration_files = recova.registration_result_database:import_files_cli',
             'json_cat = recova.json_util:json_cat_cli',
-            'learn_recov = recova.learning:cello_learning_cli',
+            'learn_recov = recova.learning.learning:cli',
             'merge_json_result = recova.merge_json_result:cli',
             'pca_align = recova.alignment:pca_alignment_cli',
             'recov_plot = recova.recov_plot:cli',
