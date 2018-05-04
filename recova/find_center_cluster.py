@@ -5,8 +5,7 @@ import json
 import numpy as np
 import sys
 
-from lieroy.parallel import FunctionWrapper
-from pylie import se3_log
+from lieroy.parallel import FunctionWrapper, se3_log
 from recova.covariance_of_registrations import distribution_of_registrations
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint, dataset_to_registrations

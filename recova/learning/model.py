@@ -3,8 +3,6 @@ import numpy as np
 
 from recova.util import eprint, kullback_leibler
 
-import pdb
-
 
 class CovarianceEstimationModel:
     def fit(self, xs, ys):
@@ -18,19 +16,18 @@ class CovarianceEstimationModel:
         predictions = self.predict(xs)
 
         if np.any(np.isnan(predictions)):
-            pdb.set_trace()
             raise ValueError('NaNs found in provided predictions')
 
+        losses = []
 
         total_loss = 0.
         for i in range(len(predictions)):
-            loss_of_i = kullback_leibler(ys[i], predictions[i])
-            loss_of_i = kullback_leibler(predictions[i], ys[i])
-            total_loss += loss_of_i
+            losses.append(kullback_leibler(ys[i], predictions[i]) + kullback_leibler(predictions[i], ys[i]))
 
-        eprint('Validation score: {:.2E}'.format(total_loss / len(xs)))
-        eprint('Log Validation score: {:.2E}'.format(np.log(total_loss / len(xs))))
+        losses = np.array(losses)
 
-        return total_loss / len(xs)
+        eprint('Validation score: {:.2E}'.format(np.mean(losses)))
+
+        return (losses.mean(), losses.std())
 
 

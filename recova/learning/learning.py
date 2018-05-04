@@ -12,6 +12,8 @@ from recova.learning import model_factory
 def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('algorithm', type=str)
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5)
+    parser.add_argument('-a', '--alpha', type=float, default=1e-4)
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -30,8 +32,11 @@ def cli():
 
     model = model_factory(args.algorithm)
 
+    model.learning_rate = args.learning_rate
+    model.alpha = args.alpha
+
     learning_run = model.fit(predictors, covariances)
-    print(learning_run)
+    json.dump(learning_run, sys.stdout)
 
 
 if __name__ == '__main__':

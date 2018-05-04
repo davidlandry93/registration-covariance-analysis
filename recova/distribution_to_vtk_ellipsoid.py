@@ -12,7 +12,7 @@ import numpy as np
 import pyevtk
 import sys
 
-from pylie import se3_log
+from lieroy.parallel import se3_log
 from recova.util import parse_dims
 
 

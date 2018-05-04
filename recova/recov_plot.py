@@ -74,8 +74,30 @@ def plot_cov_against_density(args):
     plt.show()
 
 
+def plot_loss_on_time(args):
+    learning_run = json.load(sys.stdin)
+
+    fig, ax = plt.subplots()
+
+    loss = np.array(learning_run['validation_loss'])
+    optimization_loss = np.array(learning_run['optimization_loss'])
+    loss_std = np.array(learning_run['validation_std'])
+
+    ax.fill_between(range(0, len(loss)), loss+loss_std, loss-loss_std, alpha=0.5)
+    ax.plot(loss, label='Validation loss')
+    ax.plot(optimization_loss, label='Optimization loss')
+
+    ax.legend()
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Validation loss')
+    ax.set_title('Evolution of validation loss during learning')
+
+    plt.show()
+
+
 functions_of_plots = {
-    'cov_on_density': plot_cov_against_density
+    'cov_on_density': plot_cov_against_density,
+    'loss_on_time': plot_loss_on_time
 }
 
 

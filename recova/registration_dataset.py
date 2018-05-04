@@ -5,7 +5,7 @@ import numpy as np
 import sys
 
 from pyevtk.hl import pointsToVTK
-from pylie import se3_log
+from lieroy.parallel import se3_log
 
 from recova.density import density_of_points
 from recova.util import empty_to_none, eprint, dataset_to_registrations
