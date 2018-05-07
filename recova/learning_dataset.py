@@ -39,18 +39,17 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, clustering_algorithm):
+def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, covariance_algo):
     eprint(registration_pair)
     descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
-    covariance = registration_pair.covariance(clustering_algorithm)
+    covariance = covariance_algo.compute(registration_pair)
 
     _, t = registration_pair.combined_realigned(combining_algorithm, alignment_algorithm)
 
     adj_of_t = se3.adjoint(t)
-    rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T))
-    vectorized_covariance = vectorize_covariance(rotated_covariance)
+    rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T)).tolist()
 
-    return (descriptor, vectorized_covariance)
+    return (descriptor, rotated_covariance)
 
 
 def generate_examples_cli():
@@ -69,13 +68,16 @@ def generate_examples_cli():
     binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
     descriptor_algorithm = MomentGridDescriptor()
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.2)
-    clustering_algorithm.rescale = True
+    # clustering_algorithm = CenteredClusteringAlgorithm(0.2)
+    # clustering_algorithm.rescale = True
+
+    clustering_algorithm = IdentityClusteringAlgorithm()
+    covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
 
     registration_pairs = db.registration_pairs()
 
     with multiprocessing.Pool() as pool:
-        examples = pool.starmap(generate_one_example, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
+        examples = pool.starmap(generate_one_example, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, covariance_algo) for x in registration_pairs])
 
     xs, ys = zip(*examples)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from math import ceil, sqrt
 import numpy as np
 import subprocess
 import sys
@@ -169,3 +170,16 @@ def rescale_hypersphere(points, radius):
     points = points * radius / englobing_radius
 
     return points
+
+
+def to_upper_triangular(v):
+    n = ceil((-1 + sqrt(8. * len(v))) / 2.)
+    matrix = np.zeros((n,n))
+
+    counter = 0
+    for i in range(n):
+        for j in range(n - i):
+            matrix[i,j + i] = v[counter]
+            counter += 1
+
+    return matrix

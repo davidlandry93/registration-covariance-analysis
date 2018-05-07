@@ -22,7 +22,9 @@ class CovarianceEstimationModel:
 
         total_loss = 0.
         for i in range(len(predictions)):
-            losses.append(kullback_leibler(ys[i], predictions[i]) + kullback_leibler(predictions[i], ys[i]))
+            loss = np.linalg.norm(ys[i] - predictions[i], ord='fro')
+            losses.append(loss)
+            # losses.append(kullback_leibler(ys[i], predictions[i]) + kullback_leibler(predictions[i], ys[i]))
 
         losses = np.array(losses)
 

@@ -5,7 +5,7 @@ import numpy as np
 import sys
 
 import recova.util
-from recova.util import eprint, bat_distance
+from recova.util import eprint, bat_distance, to_upper_triangular
 from recova.learning import model_factory
 
 
@@ -22,13 +22,9 @@ def cli():
 
     sys.stdin = open('/dev/tty')
 
-    predictors = np.array(input_document['data']['predictors'])
+    predictors = np.array(input_document['data']['xs'])
 
-    np_examples = []
-    covariances = np.empty((len(predictors), 6, 6))
-    for i, example_batch in enumerate(input_document['data']['errors']):
-        errors = np.array(example_batch)
-        covariances[i,:,:] = np.dot(errors.T, errors)
+    covariances = np.array(input_document['data']['ys'])
 
     model = model_factory(args.algorithm)
 

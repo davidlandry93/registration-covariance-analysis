@@ -222,7 +222,6 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         weights = self.distances_to_weights(distances)
         sum_of_weights = torch.sum(weights, dim=0)
-        eprint(sum_of_weights)
 
         return not (sum_of_weights == 0.0).any()
 
