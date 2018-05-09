@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+   echo "usage: recov_explore_alpha <path_to_dataset>"
+fi
+
+OUTPUT_NAME=$(date +%Y-%m-%d)-alpha
+
+for i in $(seq 0 9); do
+    echo "Learning with alpha 1e-${i}"
+    cat $1 | learn_recov cello --alpha 1e-${i} > ${OUTPUT_NAME}-${i}.json 2> ${OUTPUT_NAME}-${i}.out
+done

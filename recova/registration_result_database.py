@@ -5,18 +5,20 @@ import numpy as np
 import os
 import pathlib
 import re
+import sys
 
 from recov.datasets import create_registration_dataset
 from recov.pointcloud_io import pointcloud_to_pcd
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
-from recova.clustering import compute_distribution, CenteredClusteringAlgorithm
+from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
+from recova.covariance import covariance_algorithm_factory
 from recova.file_cache import FileCache
 from recova.util import eprint
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
-from recova.registration_dataset import lie_vectors_of_registrations
+from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
 
 
 class RegistrationPair:
@@ -85,7 +87,7 @@ class RegistrationPair:
 
         reg_dict = self.registration_dict()
 
-        return lie_vectors_of_registrations(reg_dict)
+        return positions_of_registration_data(reg_dict)
 
     @property
     def registration_file(self):
@@ -253,8 +255,15 @@ class RegistrationPairDatabase:
             print(e)
             print('OSError for {}'.format(path_to_file))
 
+        return (dataset, reading, reference)
+
     def get_registration_pair(self, dataset, reading, reference):
-        return RegistrationPair(self.root, dataset, reading, reference)
+        pair = RegistrationPair(self.root, dataset, reading, reference)
+
+        if not pair.pair_exists():
+            raise RuntimeError('Registration pair {} does not exist'.format(str(pair)))
+
+        return pair
 
     def registration_pairs(self):
         pairs = []
@@ -271,8 +280,10 @@ class RegistrationPairDatabase:
 
         return pairs
 
-def import_pointclouds_of_one_pair(registration_pair, dataset_type, pointcloud_root):
+def import_pointclouds_of_one_pair(pair_id, database, dataset_type, pointcloud_root):
+    registration_pair = database.get_registration_pair(*pair_id)
     print(registration_pair)
+
     dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
     registration_pair.import_pointclouds(dataset)
 
@@ -287,11 +298,40 @@ def import_files_cli():
 
     db = RegistrationPairDatabase(args.root)
 
+    added_pairs_ids = set()
     for registration_file in args.files:
         print(registration_file)
-        db.import_file(registration_file)
+        pair_id = db.import_file(registration_file)
+        added_pairs_ids.add(pair_id)
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 
     with multiprocessing.Pool() as pool:
-        pool.starmap(import_pointclouds_of_one_pair, [(x, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])
+        pool.starmap(import_pointclouds_of_one_pair, [(x, db, args.pointcloud_dataset_type, pointcloud_root) for x in added_pairs_ids])
+
+
+def distribution_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database_root', type=str)
+    parser.add_argument('dataset', type=str)
+    parser.add_argument('reading', type=int)
+    parser.add_argument('reference', type=int)
+    parser.add_argument('--covariance', type=str, help='The covariance estimation algorithm to use. <sampling|censi>', default='sampling')
+    parser.add_argument('--clustering', type=str, help='The name of the clustering algorithm used by some sampling covariance algorithms.', default='identity')
+    args = parser.parse_args()
+
+    database = RegistrationPairDatabase(args.database_root)
+    pair = database.get_registration_pair(args.dataset, args.reading, args.reference)
+
+    clustering_algo = clustering_algorithm_factory(args.clustering)
+    covariance_algo = covariance_algorithm_factory(args.covariance)
+    covariance_algo.clustering_algorithm = clustering_algo
+
+    covariance = covariance_algo.compute(pair)
+
+    output_dict = {
+        'mean': pair.ground_truth().tolist(),
+        'covariance': covariance.tolist()
+    }
+
+    json.dump(output_dict, sys.stdout)

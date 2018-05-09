@@ -14,6 +14,7 @@ def cli():
     parser.add_argument('algorithm', type=str)
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5)
     parser.add_argument('-a', '--alpha', type=float, default=1e-4)
+    parser.add_argument('-b', '--beta', type=float, default=1e3)
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -30,6 +31,7 @@ def cli():
 
     model.learning_rate = args.learning_rate
     model.alpha = args.alpha
+    model.beta = args.beta
 
     learning_run = model.fit(predictors, covariances)
     json.dump(learning_run, sys.stdout)

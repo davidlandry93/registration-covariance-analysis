@@ -12,7 +12,10 @@ class CovarianceEstimationModel:
         raise NotImplementedError('CovarianceEstimationModels must implement predict method')
 
     def validate(self, xs, ys):
-        """Given a validation set, outputs a loss."""
+        losses = self.validation_errors(xs, ys)
+        return (losses.mean(), losses.std())
+
+    def validation_errors(self, xs, ys):
         predictions = self.predict(xs)
 
         if np.any(np.isnan(predictions)):
@@ -28,8 +31,7 @@ class CovarianceEstimationModel:
 
         losses = np.array(losses)
 
-        eprint('Validation score: {:.2E}'.format(np.mean(losses)))
 
-        return (losses.mean(), losses.std())
+        return losses
 
 

@@ -59,7 +59,7 @@ install(TARGETS
   point_density
   RUNTIME DESTINATION bin)
 
-install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk DESTINATION bin)
+install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk bin/recov_explore_alpha DESTINATION bin)
 
 if(PYTHON_BINDINGS)
   add_subdirectory(recova_core)

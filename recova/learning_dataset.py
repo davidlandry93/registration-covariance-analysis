@@ -181,8 +181,6 @@ def generate_cello_dataset_cli():
 def compute_one_summary_line(registration_pair, covariance_algo):
     covariance = covariance_algo.compute(registration_pair)
 
-    eprint(np.linalg.norm(covariance - covariance.T))
-
     d = {
         'dataset': registration_pair.dataset,
         'reading': registration_pair.reading,

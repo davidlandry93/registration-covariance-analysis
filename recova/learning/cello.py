@@ -72,13 +72,14 @@ def bat_distance_pytorch(cov1, cov2):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000.):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
+        self.beta = beta
 
     def fit(self, predictors, covariances):
-        predictors_train, predictors_test, covariances_train, covariances_test = sklearn.model_selection.train_test_split(predictors, covariances, test_size=0.25)
+        predictors_train, predictors_test, covariances_train, covariances_test = sklearn.model_selection.train_test_split(predictors, covariances, test_size=0.3)
 
 
         self.predictors = Variable(torch.Tensor(predictors_train))
@@ -86,7 +87,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         # Initialize a distance metric.
         sz_of_vector = size_of_vector(predictors.shape[1])
-        self.theta = Variable(torch.randn(sz_of_vector) / 1000., requires_grad=True)
+        self.theta = Variable(torch.randn(sz_of_vector) / self.beta, requires_grad=True)
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=10)
 
@@ -95,10 +96,17 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         validation_losses = []
         validation_stds = []
         optimization_losses = []
+        validation_errors = []
+        optimization_errors = []
 
         epoch = 0
         keep_going = True
-        while epoch < self.n_iterations and keep_going:
+
+        best_loss = np.inf
+        best_model = []
+        n_epoch_without_improvement = 0
+
+        while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < 20:
             optimizer.zero_grad()
             train_set, test_set = next(selector.split(predictors_train))
 
@@ -124,33 +132,52 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
                 sum_of_losses += optimization_loss
                 losses[i] = optimization_loss.data.numpy()
+
+
                 optimization_loss.backward()
                 optimizer.step()
+
+            indiv_optimization_errors = self.validation_errors(xs_train.numpy(), ys_train.numpy())
+            optimization_errors.append(indiv_optimization_errors.tolist())
+
 
             average_loss = sum_of_losses / len(xs_train)
             median_loss = np.median(np.array(losses))
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
             queries_have_neighbor = self.queries_have_neighbor(predictors_test, metric_matrix, self.predictors)
-            eprint('Queries have neighbor: {}'.format(queries_have_neighbor))
 
             epoch = epoch + 1
 
             if queries_have_neighbor:
                 validation_score, validation_std = self.validate(predictors_test, covariances_test)
 
+                eprint('-- Validation of epoch %d --' % epoch)
+
+                if validation_score < best_loss:
+                    eprint('** New best model! **')
+                    n_epoch_without_improvement = 0
+                    best_loss = validation_score
+                    best_model = self.theta.detach().numpy()
+                else:
+                    n_epoch_without_improvement += 1
+
                 eprint('Avg Optimization Loss: %f' % average_loss)
-                eprint('Median optimization loss: %f' % median_loss)
                 eprint('Validation score: {:.2E}'.format(validation_score))
                 eprint('Validation std: {:.2E}'.format(validation_std))
-                eprint('Epoch: %d' % epoch)
+                eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
+                eprint()
 
+                losses = self.validation_errors(predictors_test, covariances_test)
+                validation_errors.append(losses.tolist())
                 validation_losses.append(validation_score)
                 validation_stds.append(validation_std)
                 optimization_losses.append(float(average_loss.data.numpy()[0]))
-                eprint(average_loss.data.numpy()[0])
+
+
             else:
                 keep_going = False
+                eprint('Stopping because elements in the validation dataset have no neighbors.')
 
 
         return {
@@ -158,8 +185,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'metadata': self.metadata(),
             'validation_loss': validation_losses,
             'validation_std': validation_stds,
+            'validation_errors': validation_errors,
             'optimization_loss': optimization_losses,
-            'model': self.theta.tolist()
+            'optimization_errors': optimization_errors,
+            'model': best_model.tolist()
         }
 
 
@@ -178,6 +207,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         for i, x in enumerate(queries):
             distances = self.compute_distances(self.predictors, metric_matrix, x)
+
             predictions[i] = self.prediction_from_distances(self.covariances, distances, x)
 
         return predictions.data.numpy()
@@ -199,9 +229,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
     def distances_to_weights(self, distances):
         # zero_distances = distances < 1e-10
         # distances.masked_fill(zero_distances, 1.)
+        # eprint(distances)
         # weights = torch.clamp(1. - distances, min=0.)
 
-        return torch.exp(-distances)
+        weights = torch.exp(-distances)
+
+        # Points that were a perfect match should have no weight.
+        weights.masked_fill(weights == 1.0, 0.0)
+        return weights
 
 
     def prediction_from_distances(self, covariances, distances, x):

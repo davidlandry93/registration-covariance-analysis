@@ -1,11 +1,12 @@
 
+import argparse
 import numpy as np
 
 
 from lieroy.parallel import se3_log
 from recov.registration_algorithm import IcpAlgorithm
 from recov.censi import censi_estimate_from_clouds
-from recova.clustering import compute_distribution
+from recova.clustering import compute_distribution, IdentityClusteringAlgorithm
 
 
 class CovarianceComputationAlgorithm:
@@ -14,7 +15,7 @@ class CovarianceComputationAlgorithm:
 
 
 class SamplingCovarianceComputationAlgorithm:
-    def __init__(self, clustering_algorithm):
+    def __init__(self, clustering_algorithm=IdentityClusteringAlgorithm()):
         self.clustering_algorithm = clustering_algorithm
 
     def __repr__(self):
@@ -33,7 +34,7 @@ class SamplingCovarianceComputationAlgorithm:
 
             registration_pair.cache[self.__repr__()] = covariance.tolist()
 
-        return covariance
+        return np.array(covariance)
 
 
     def clustering_of_pair(self, registration_pair):
@@ -69,3 +70,12 @@ class CensiCovarianceComputationAlgorithm:
             registration_pair.cache[self.__repr__()] = covariance
 
         return np.array(covariance)
+
+
+def covariance_algorithm_factory(algo):
+    dict_of_algos = {
+        'censi': CensiCovarianceComputationAlgorithm(),
+        'sampling': SamplingCovarianceComputationAlgorithm()
+    }
+
+    return dict_of_algos[algo]
