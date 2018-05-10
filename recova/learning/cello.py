@@ -1,5 +1,6 @@
 from math import ceil, sqrt
 import numpy as np
+import time
 import torch
 import torch.optim as optim
 from torch.autograd import Variable
@@ -37,7 +38,7 @@ def upper_triangular_mask(n):
     return v >= v.view(n,1)
 
 
-def size_of_vector(n):
+def size_of_triangular_vector(n):
     """The size of a vector representing an nxn upper triangular matrix."""
     return int((n * n + n) / 2.)
 
@@ -72,28 +73,33 @@ def bat_distance_pytorch(cov1, cov2):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000.):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.beta = beta
+        self.train_set_size = train_set_size
 
     def fit(self, predictors, covariances):
         training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
+
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
 
-        predictors_test = torch.Tensor(predictors_test, device='cuda')
-        covariances_test = torch.Tensor(covariances_test, device='cuda')
-        covariances_test = covariances_test.cuda()
+        self.model_predictors = torch.Tensor(predictors_train).cuda()
+        self.model_covariances = torch.Tensor(covariances_train).cuda()
+
+        predictors_validation = torch.Tensor(predictors_test).cuda()
+        covariances_validation = torch.Tensor(covariances_test).cuda()
+
+        result = self._fit(predictors_validation, covariances_validation)
 
 
-        self.predictors = Variable(torch.Tensor(predictors_train, device='cuda'))
-        self.covariances = Variable(torch.Tensor(covariances_train, device='cuda'))
-        self.covariances = self.covariances.cuda()
 
-        # Initialize a distance metric.
-        sz_of_vector = size_of_vector(predictors.shape[1])
-        self.theta = Variable(torch.randn(sz_of_vector, device='cuda') / self.beta, requires_grad=True)
+    def _fit(self, predictors_validation, covariances_validation):
+        """
+        Given a validation set, train weights theta that optimize the validation error of the model.
+        """
+        self.theta = self.create_metric_weights()
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=10)
 
@@ -102,7 +108,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         validation_losses = []
         validation_stds = []
         optimization_losses = []
-        validation_errors = []
+        validation_errors_log = []
         optimization_errors = []
 
         epoch = 0
@@ -112,54 +118,41 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         best_model = []
         n_epoch_without_improvement = 0
 
+        identity = torch.eye(6).cuda()
+
         while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < 20:
+            epoch_start = time.time()
             optimizer.zero_grad()
-            train_set, test_set = next(selector.split(predictors_train))
 
-            xs_train, xs_validation = Variable(torch.Tensor(predictors_train[train_set], device='cuda')), Variable(torch.Tensor(predictors_train[test_set]))
-            ys_train, ys_validation = Variable(torch.Tensor(covariances_train[train_set])), Variable(torch.Tensor(covariances_train[test_set]))
-            ys_train = ys_train.cuda()
+            losses = torch.zeros(len(self.model_predictors)).cuda()
 
-            sum_of_losses = Variable(torch.Tensor([0.], device='cuda'))
-            losses = np.zeros((len(xs_train)))
-
-
-
-            for i, x in enumerate(xs_train):
+            for i in range(len(self.model_predictors)):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-                distances = self.compute_distances(xs_train, metric_matrix, x)
-
-                prediction = self.prediction_from_distances(ys_train, distances)
+                distances = self.compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
+                prediction = self.prediction_from_distances(self.model_covariances, distances)
 
                 loss_A = torch.log(torch.norm(prediction))
-                loss_B = torch.log(torch.norm(torch.mm(torch.inverse(prediction), ys_train[i]) - Variable(torch.eye(6, device='cuda'))))
+                loss_B = torch.log(torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity))
                 nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
                 regularization_term = torch.sum(torch.log(nonzero_distances))
 
                 optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
-                optimization_loss = optimization_loss.cpu()
-                sum_of_losses += optimization_loss
-                losses[i] = optimization_loss.data.numpy()
-
+                losses[i] = optimization_loss
 
                 optimization_loss.backward()
                 optimizer.step()
 
-            indiv_optimization_errors = self.validation_errors(xs_train, ys_train)
+            indiv_optimization_errors = self._validation_errors(self.model_predictors, self.model_covariances)
             optimization_errors.append(indiv_optimization_errors.tolist())
 
 
-            average_loss = sum_of_losses / len(xs_train)
-            median_loss = np.median(np.array(losses))
-
             metric_matrix = self.theta_to_metric_matrix(self.theta)
-            queries_have_neighbor = self.queries_have_neighbor(predictors_test, metric_matrix, self.predictors)
 
-            epoch = epoch + 1
-
-            if queries_have_neighbor:
-                validation_score, validation_std = self.validate(predictors_test, covariances_test)
+            if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
+                validation_errors = self._validation_errors(predictors_validation, covariances_validation).data
+                validation_score = torch.mean(validation_errors).data
+                optimization_score = torch.mean(indiv_optimization_errors).data
 
                 eprint('-- Validation of epoch %d --' % epoch)
 
@@ -171,22 +164,20 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:   {:.4E}'.format(average_loss.data[0]))
+                eprint('Avg Optim Loss:   {:.4E}'.format(optimization_score))
                 eprint('Validation score: {:.4E}'.format(validation_score))
-                eprint('Validation std:   {:.4E}'.format(validation_std))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
-                losses = self.validation_errors(predictors_test.cuda(), covariances_test.cuda())
-                validation_errors.append(losses.tolist())
+                validation_errors_log.append(validation_errors.cpu().detach().numpy().tolist())
                 validation_losses.append(validation_score)
-                validation_stds.append(validation_std)
-                optimization_losses.append(float(average_loss.data.numpy()[0]))
-
-
+                optimization_losses.append(optimization_score)
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
+
+            epoch = epoch + 1
+            eprint('Epoch took {} seconds'.format(time.time() - epoch_start))
 
 
         return {
@@ -202,6 +193,30 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'model': best_model.tolist()
         }
 
+    def create_metric_weights(self):
+        size_of_vector = size_of_triangular_vector(self.model_predictors.shape[1])
+        return Variable(torch.randn(size_of_vector).cuda() / self.beta, requires_grad=True)
+
+    def validation_errors(self, xs, ys):
+        return self._validation_errors(torch.Tensor(xs).cuda(), torch.Tensor(ys).cuda())
+
+    def _validation_errors(self, xs, ys):
+        predictions = self._predict(xs)
+
+        losses = (predictions - ys).pow(2.0)
+        losses = torch.sqrt(losses.sum(dim=2).sum(dim=1))
+
+
+        return losses
+
+    def validate(self, xs, ys):
+        return self._validate(torch.Tensor(xs).cuda(), torch.Tensor(xs).cuda())
+
+    def _validate(self, xs, ys):
+        validation_errors = self._validation_errors(xs,ys)
+        return torch.mean(validation_errors)
+
+
 
     def metadata(self):
         return {
@@ -212,16 +227,18 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def predict(self, queries):
+        return self._predict(torch.Tensor(queries).cuda())
+
+    def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
+        predictions = torch.zeros(len(predictors),6,6).cuda()
 
-        predictions = torch.zeros(len(queries),6,6, device='cuda')
-
-        for i, x in enumerate(queries):
-            distances = self.compute_distances(self.predictors, metric_matrix, x)
-
-            predictions[i] = self.prediction_from_distances(self.covariances, distances)
+        for i in range(len(predictors)):
+            distances = self.compute_distances(self.model_predictors, metric_matrix, predictors[i])
+            predictions[i] = self.prediction_from_distances(self.model_covariances, distances)
 
         return predictions
+
 
 
     def theta_to_metric_matrix(self, theta):
