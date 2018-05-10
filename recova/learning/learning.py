@@ -16,6 +16,7 @@ def cli():
     parser.add_argument('-a', '--alpha', type=float, default=1e-4)
     parser.add_argument('-b', '--beta', type=float, default=1e3)
     parser.add_argument('-n', '--n_iterations', type=int, default=200)
+    parser.add_argument('-w', '--convergence_window', type=int, default=20, help='N of iterations without improvement before ending training.')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -34,8 +35,12 @@ def cli():
     model.alpha = args.alpha
     model.beta = args.beta
     model.n_iterations = args.n_iterations
+    model.convergence_window = args.convergence_window
 
     learning_run = model.fit(predictors, covariances)
+
+    eprint(learning_run)
+
     json.dump(learning_run, sys.stdout)
 
 

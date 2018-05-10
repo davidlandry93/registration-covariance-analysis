@@ -22,12 +22,11 @@ class CovarianceEstimationModel:
         if torch.isnan(predictions).any():
             raise ValueError('NaNs found in provided predictions')
 
-        losses = torch.zeros(len(predictions), device='cuda')
+        losses = torch.zeros(len(predictions))
 
         total_loss = 0.
         for i in range(len(predictions)):
             losses[i] = torch.norm(ys[i] - predictions[i])
-            # losses.append(kullback_leibler(ys[i], predictions[i]) + kullback_leibler(predictions[i], ys[i]))
 
         return losses
 

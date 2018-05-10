@@ -73,25 +73,31 @@ def bat_distance_pytorch(cov1, cov2):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.beta = beta
         self.train_set_size = train_set_size
+        self.convergence_window = convergence_window
 
     def fit(self, predictors, covariances):
         training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
 
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
 
-        self.model_predictors = torch.Tensor(predictors_train).cuda()
-        self.model_covariances = torch.Tensor(covariances_train).cuda()
+        self.model_predictors = torch.Tensor(predictors_train)
+        self.model_covariances = torch.Tensor(covariances_train)
 
-        predictors_validation = torch.Tensor(predictors_test).cuda()
-        covariances_validation = torch.Tensor(covariances_test).cuda()
+        predictors_validation = torch.Tensor(predictors_test)
+        covariances_validation = torch.Tensor(covariances_test)
 
         result = self._fit(predictors_validation, covariances_validation)
+
+        result['train_set'] = training_indices
+        result['validation_set'] = test_indices
+
+        return result
 
 
 
@@ -108,8 +114,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         validation_losses = []
         validation_stds = []
         optimization_losses = []
+        optimization_stds = []
         validation_errors_log = []
-        optimization_errors = []
+        optimization_errors_log = []
 
         epoch = 0
         keep_going = True
@@ -118,13 +125,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         best_model = []
         n_epoch_without_improvement = 0
 
-        identity = torch.eye(6).cuda()
-
-        while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < 20:
+        while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < self.convergence_window:
             epoch_start = time.time()
             optimizer.zero_grad()
 
-            losses = torch.zeros(len(self.model_predictors)).cuda()
+            losses = torch.zeros(len(self.model_predictors))
 
             for i in range(len(self.model_predictors)):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -133,7 +138,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 prediction = self.prediction_from_distances(self.model_covariances, distances)
 
                 loss_A = torch.log(torch.norm(prediction))
-                loss_B = torch.log(torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity))
+                # loss_B = torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity)
+
+                loss_B = torch.trace(torch.mm(torch.inverse(prediction), self.model_covariances[i]))
+
                 nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
                 regularization_term = torch.sum(torch.log(nonzero_distances))
 
@@ -144,15 +152,16 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimizer.step()
 
             indiv_optimization_errors = self._validation_errors(self.model_predictors, self.model_covariances)
-            optimization_errors.append(indiv_optimization_errors.tolist())
-
+            optimization_score = torch.mean(indiv_optimization_errors).data
+            optimization_errors_log.append(indiv_optimization_errors.detach().tolist())
+            optimization_losses.append(optimization_score.item())
+            optimization_stds.append(torch.std(indiv_optimization_errors).detach().item())
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
             if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
                 validation_errors = self._validation_errors(predictors_validation, covariances_validation).data
                 validation_score = torch.mean(validation_errors).data
-                optimization_score = torch.mean(indiv_optimization_errors).data
 
                 eprint('-- Validation of epoch %d --' % epoch)
 
@@ -160,7 +169,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                     eprint('** New best model! **')
                     n_epoch_without_improvement = 0
                     best_loss = validation_score
-                    best_model = self.theta.detach().cpu().numpy()
+                    best_model = self.theta.detach().numpy()
                 else:
                     n_epoch_without_improvement += 1
 
@@ -169,9 +178,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
-                validation_errors_log.append(validation_errors.cpu().detach().numpy().tolist())
-                validation_losses.append(validation_score)
-                optimization_losses.append(optimization_score)
+                validation_errors_log.append(validation_errors.detach().numpy().tolist())
+                validation_losses.append(validation_score.detach().item())
+                validation_stds.append(torch.std(validation_errors).detach().item())
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
@@ -183,22 +192,21 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return {
             'what': 'model learning',
             'metadata': self.metadata(),
-            'train_set': training_indices,
-            'validation_set': test_indices,
             'validation_loss': validation_losses,
-            'validation_std': validation_stds,
-            'validation_errors': validation_errors,
             'optimization_loss': optimization_losses,
-            'optimization_errors': optimization_errors,
-            'model': best_model.tolist()
+            'validation_errors': validation_errors_log,
+            'optimization_errors': optimization_errors_log,
+            'model': best_model.tolist(),
+            'validation_std': validation_stds,
+            'optimization_std': optimization_stds,
         }
 
     def create_metric_weights(self):
         size_of_vector = size_of_triangular_vector(self.model_predictors.shape[1])
-        return Variable(torch.randn(size_of_vector).cuda() / self.beta, requires_grad=True)
+        return Variable(torch.randn(size_of_vector) / self.beta, requires_grad=True)
 
     def validation_errors(self, xs, ys):
-        return self._validation_errors(torch.Tensor(xs).cuda(), torch.Tensor(ys).cuda())
+        return self._validation_errors(torch.Tensor(xs), torch.Tensor(ys))
 
     def _validation_errors(self, xs, ys):
         predictions = self._predict(xs)
@@ -210,7 +218,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return losses
 
     def validate(self, xs, ys):
-        return self._validate(torch.Tensor(xs).cuda(), torch.Tensor(xs).cuda())
+        return self._validate(torch.Tensor(xs), torch.Tensor(xs))
 
     def _validate(self, xs, ys):
         validation_errors = self._validation_errors(xs,ys)
@@ -227,11 +235,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def predict(self, queries):
-        return self._predict(torch.Tensor(queries).cuda())
+        return self._predict(torch.Tensor(queries))
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
-        predictions = torch.zeros(len(predictors),6,6).cuda()
+        predictions = torch.zeros(len(predictors),6,6)
 
         for i in range(len(predictors)):
             distances = self.compute_distances(self.model_predictors, metric_matrix, predictors[i])
@@ -242,16 +250,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def theta_to_metric_matrix(self, theta):
-        cpu_theta = theta.cpu()
-        up = to_upper_triangular(cpu_theta)
-        return torch.mm(up, up.transpose(0,1)).cuda()
+        up = to_upper_triangular(theta)
+        return torch.mm(up, up.transpose(0,1))
 
 
     def compute_distances(self, predictors, metric_matrix, predictor):
-        pytorch_predictors = predictors
-        pytorch_predictor = predictor
-
-        delta = pytorch_predictors.cuda() - pytorch_predictor.view(1, pytorch_predictor.shape[0]).cuda()
+        delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
         return torch.sum(lhs * delta, 1).squeeze()
 
