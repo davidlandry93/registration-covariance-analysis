@@ -1,3 +1,5 @@
+import time
+
 from math import ceil, sqrt
 import numpy as np
 import torch
@@ -108,6 +110,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         n_epoch_without_improvement = 0
 
         while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < 20:
+            epoch_start = time.time()
             optimizer.zero_grad()
             train_set, test_set = next(selector.split(predictors_train))
 
@@ -179,6 +182,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
+
+            eprint('Epoch took {} seconds'.format(time.time() - epoch_start))
 
 
         return {
