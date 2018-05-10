@@ -49,6 +49,8 @@ def generate_one_example(registration_pair, combining_algorithm, alignment_algor
     adj_of_t = se3.adjoint(t)
     rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T)).tolist()
 
+    eprint('Max of covariance: {}'.format(np.max(rotated_covariance)))
+
     return (descriptor, rotated_covariance)
 
 
@@ -56,11 +58,12 @@ def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
+    parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
 
-    db = RegistrationPairDatabase(args.input)
+    db = RegistrationPairDatabase(args.input, args.exclude)
     output_path = pathlib.Path(args.output)
 
     combiner = OverlappingRegionCombiner()
@@ -201,9 +204,10 @@ def dataset_summary_cli():
 
     db = RegistrationPairDatabase(args.input)
 
-    clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
-    clustering_algorithm.seed_selector = 'localized'
-    clustering_algorithm.rescale = True
+    # clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    # clustering_algorithm.seed_selector = 'localized'
+    # clustering_algorithm.rescale = True
+
     clustering_algorithm = IdentityClusteringAlgorithm()
 
     covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)

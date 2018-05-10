@@ -75,31 +75,52 @@ def plot_cov_against_density(args):
 
 
 def plot_loss_on_time(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--median', action='store_true', help='Wether we should use medians or averages to plot the loss.')
+    parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
+    args = parser.parse_args(args)
+
     learning_run = json.load(sys.stdin)
 
+
+    if args.median:
+        validation_errors = np.array(learning_run['validation_errors'])
+        validation_data = np.percentile(validation_errors, [0.25, 0.5, 0.75], axis=1)
+
+        optimization_errors = np.array(learning_run['optimization_errors'])
+        optimization_data = np.percentile(optimization_errors, [0.25, 0.5, 0.75], axis=1)
+    else:
+        optimization_loss = np.array(learning_run['optimization_loss'])
+        optimization_std = np.array(learning_run['optimization_errors']).std(axis=1)
+
+        optimization_data = np.empty((3, len(optimization_std)))
+        optimization_data[0] = optimization_loss - optimization_std
+        optimization_data[1] = optimization_loss
+        optimization_data[2] = optimization_loss + optimization_std
+
+        validation_loss = np.array(learning_run['validation_loss'])
+        validation_std = np.array(learning_run['validation_std'])
+
+        validation_data = np.empty((3, len(learning_run['validation_std'])))
+        validation_data[0] = validation_loss - validation_std
+        validation_data[1] = validation_loss
+        validation_data[2] = validation_loss + validation_std
+
+
     fig, ax = plt.subplots()
+    std_ax = ax.twinx()
 
-    loss = np.array(learning_run['validation_loss'])
-    optimization_loss = np.array(learning_run['optimization_loss'])
-    loss_std = np.array(learning_run['validation_std'])
+    if args.std:
+        ax.fill_between(range(0, validation_data.shape[1]), validation_data[2], validation_data[0], alpha=0.5)
 
-    validation_errors = np.array(learning_run['validation_errors'])
-    validation_percentiles = np.percentile(validation_errors, [0.0, 0.25, 0.5, 0.75, 100], axis=1)
+    ax.plot(validation_data[1], label='Validation loss')
+    std_ax.plot(validation_std, label='Validation standard deviation', linestyle='--', alpha=0.7)
 
-    optimization_errors = np.array(learning_run['optimization_errors'])
-    optimization_percentiles = np.percentile(optimization_errors, [0.0, 0.25, 0.5, 0.75, 100], axis=1)
+    if args.std:
+        ax.fill_between(range(0, validation_data.shape[1]), optimization_data[2], optimization_data[0], alpha=0.5)
 
-    print('Last validation errors')
-    print(np.sort(validation_errors[-1]))
-    print(validation_percentiles[4])
-
-    # ax.fill_between(range(0, len(loss)), validation_percentiles[4], validation_percentiles[0], alpha=0.3, color='blue')
-    ax.fill_between(range(0, len(loss)), validation_percentiles[3], validation_percentiles[1], alpha=0.5)
-    ax.plot(validation_percentiles[2], label='Validation loss')
-
-    # ax.fill_between(range(0, len(loss)), optimization_percentiles[4], optimization_percentiles[0], alpha=0.3, color='orange')
-    # ax.fill_between(range(0, len(loss)), optimization_percentiles[4], optimization_percentiles[0], alpha=0.5)
-    # ax.plot(optimization_percentiles[2], label='Optimization loss')
+    ax.plot(optimization_data[1], label='Optimization loss')
+    std_ax.plot(optimization_std, label='Optimization standard deviation', linestyle='--', alpha=0.7)
 
     ax.legend()
     ax.set_xlabel('Epoch')
@@ -123,7 +144,6 @@ def cli():
 
     if args.name not in functions_of_plots:
         raise RuntimeError('Plot \"{}\" is undefined.'.format(args.name))
-
 
     functions_of_plots[args.name](args.rest)
 

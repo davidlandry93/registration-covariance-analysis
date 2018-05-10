@@ -79,7 +79,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.beta = beta
 
     def fit(self, predictors, covariances):
-        predictors_train, predictors_test, covariances_train, covariances_test = sklearn.model_selection.train_test_split(predictors, covariances, test_size=0.3)
+        training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
+        predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
 
 
         self.predictors = Variable(torch.Tensor(predictors_train))
@@ -162,9 +163,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optimization Loss: %f' % average_loss)
-                eprint('Validation score: {:.2E}'.format(validation_score))
-                eprint('Validation std: {:.2E}'.format(validation_std))
+                eprint('Avg Optim Loss:   {:.4E}'.format(average_loss.data[0]))
+                eprint('Validation score: {:.4E}'.format(validation_score))
+                eprint('Validation std:   {:.4E}'.format(validation_std))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
@@ -183,6 +184,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return {
             'what': 'model learning',
             'metadata': self.metadata(),
+            'train_set': training_indices,
+            'validation_set': test_indices,
             'validation_loss': validation_losses,
             'validation_std': validation_stds,
             'validation_errors': validation_errors,
