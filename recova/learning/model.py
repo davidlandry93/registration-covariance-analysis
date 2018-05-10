@@ -1,5 +1,6 @@
 
 import numpy as np
+import torch
 
 from recova.util import eprint, kullback_leibler
 
@@ -18,19 +19,15 @@ class CovarianceEstimationModel:
     def validation_errors(self, xs, ys):
         predictions = self.predict(xs)
 
-        if np.any(np.isnan(predictions)):
+        if torch.isnan(predictions).any():
             raise ValueError('NaNs found in provided predictions')
 
-        losses = []
+        losses = torch.zeros(len(predictions), device='cuda')
 
         total_loss = 0.
         for i in range(len(predictions)):
-            loss = np.linalg.norm(ys[i] - predictions[i], ord='fro')
-            losses.append(loss)
+            losses[i] = torch.norm(ys[i] - predictions[i])
             # losses.append(kullback_leibler(ys[i], predictions[i]) + kullback_leibler(predictions[i], ys[i]))
-
-        losses = np.array(losses)
-
 
         return losses
 
