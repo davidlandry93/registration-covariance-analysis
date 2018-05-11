@@ -36,6 +36,7 @@ setup(
             'json_cat = recova.json_util:json_cat_cli',
             'learn_recov = recova.learning.learning:cli',
             'merge_json_result = recova.merge_json_result:cli',
+            'model_validation_vtk = recova.model_validation_vtk:cli',
             'pca_align = recova.alignment:pca_alignment_cli',
             'recov_plot = recova.recov_plot:cli',
             'registration2covariance = recova.covariance_of_registrations:cli',

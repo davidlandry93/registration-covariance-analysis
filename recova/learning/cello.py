@@ -171,7 +171,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                     eprint('** New best model! **')
                     n_epoch_without_improvement = 0
                     best_loss = validation_score
-                    best_model = self.theta.detach().numpy()
+                    best_model = self.export_model()
                 else:
                     n_epoch_without_improvement += 1
 
@@ -198,9 +198,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'optimization_loss': optimization_losses,
             'validation_errors': validation_errors_log,
             'optimization_errors': optimization_errors_log,
-            'model': best_model.tolist(),
+            'model': best_model,
             'validation_std': validation_stds,
             'optimization_std': optimization_stds,
+            'best_loss': float(best_loss)
         }
 
     def create_metric_weights(self):
@@ -237,7 +238,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def predict(self, queries):
-        return self._predict(torch.Tensor(queries))
+        return self._predict(torch.Tensor(queries)).numpy()
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -295,4 +296,17 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         sum_of_weights = torch.sum(weights, dim=0)
 
         return not (sum_of_weights == 0.0).any()
+
+    def export_model(self):
+       return {
+           'theta': self.theta.detach().tolist(),
+           'covariances' : self.model_covariances.detach().tolist(),
+           'predictors': self.model_predictors.detach().tolist()
+       }
+
+    def import_model(self, model):
+        self.theta = torch.Tensor(model['theta'])
+        self.model_covariances = torch.Tensor(model['covariances'])
+        self.model_predictors = torch.Tensor(model['predictors'])
+
 

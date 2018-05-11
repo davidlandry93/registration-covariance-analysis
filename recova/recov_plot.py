@@ -73,17 +73,16 @@ def plot_cov_against_density(args):
 
     plt.show()
 
+def plot_loss_comparison(ax, learning_runs, std=False):
+    for learning_run in learning_runs:
+        validation_loss = np.array(learning_run['validation_loss'])
+        validation_std = np.array(learning_run['validation_std'])
+        ax.plot(validation_loss, label='Validation loss, Alpha: {}, Lr: {}'.format(learning_run['metadata']['alpha'], learning_run['metadata']['learning_rate']))
+        if std:
+            ax.fill_between(range(0, len(validation_loss)), validation_loss + validation_std, validation_loss - validation_std, alpha=0.5)
 
-def plot_loss_on_time(args):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--median', action='store_true', help='Wether we should use medians or averages to plot the loss.')
-    parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
-    args = parser.parse_args(args)
-
-    learning_run = json.load(sys.stdin)
-
-
-    if args.median:
+def plot_single_loss(ax, learning_run, median=False, std=False):
+    if median:
         validation_errors = np.array(learning_run['validation_errors'])
         validation_data = np.percentile(validation_errors, [0.25, 0.5, 0.75], axis=1)
 
@@ -107,27 +106,43 @@ def plot_loss_on_time(args):
         validation_data[2] = validation_loss + validation_std
 
 
-    fig, ax = plt.subplots()
     std_ax = ax.twinx()
 
-    if args.std:
+    if std:
         ax.fill_between(range(0, validation_data.shape[1]), validation_data[2], validation_data[0], alpha=0.5)
 
     ax.plot(validation_data[1], label='Validation loss')
     std_ax.plot(validation_std, label='Validation standard deviation', linestyle='--', alpha=0.7)
 
-    if args.std:
+    if std:
         ax.fill_between(range(0, validation_data.shape[1]), optimization_data[2], optimization_data[0], alpha=0.5)
 
     ax.plot(optimization_data[1], label='Optimization loss')
     std_ax.plot(optimization_std, label='Optimization standard deviation', linestyle='--', alpha=0.7)
 
+
+
+def plot_loss_on_time(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--median', action='store_true', help='Wether we should use medians or averages to plot the loss.')
+    parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
+    args = parser.parse_args(args)
+
+    learning_run = json.load(sys.stdin)
+
+    fig, ax = plt.subplots()
+
+    if isinstance(learning_run, dict):
+        plot_single_loss(ax, learning_run, median=args.median, std=args.std)
+    elif isinstance(learning_run, list):
+        plot_loss_comparison(ax, learning_run, std=args.std)
+
     ax.legend()
     ax.set_xlabel('Epoch')
-    ax.set_ylabel('Frobenius norm  error (median)')
+    ax.set_ylabel('Frobenius norm  error')
     ax.set_title('Evolution of validation loss during learning')
-
     plt.show()
+
 
 
 functions_of_plots = {
