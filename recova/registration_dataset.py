@@ -111,6 +111,9 @@ def lie_tensor_of_trails(registration_dataset):
 
 
 def points_to_vtk(points, filename, data=None, T=np.identity(4)):
+    if len(points) == 0:
+        raise RuntimeError('Cannot export empty pointcloud to vtk')
+
     homo_points = np.ones((4, points.shape[0]))
     homo_points[0:3, :] = points.T
     transformed_points = np.dot(T, homo_points)
