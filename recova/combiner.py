@@ -28,8 +28,8 @@ class OverlappingRegionCombiner(PointcloudCombiner):
         cmd_template = 'overlapping_region'
 
         input_dict = {
-            'reading': reading,
-            'reference': reference,
+            'reading': reading.tolist(),
+            'reference': reference.tolist(),
             't': ground_truth.tolist()
         }
 

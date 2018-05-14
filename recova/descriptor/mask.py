@@ -48,8 +48,8 @@ class OverlapMaskGenerator(MaskGenerator):
         reference = pair.points_of_reference()
 
         input_dict = {
-            'reading': reading,
-            'reference': reference,
+            'reading': reading.tolist(),
+            'reference': reference.tolist(),
             't': pair.ground_truth().tolist()
         }
 
@@ -90,8 +90,8 @@ class GridMaskGenerator(MaskGenerator):
         for i in range(3):
             linspaces.append(np.linspace(-self.span[i] / 2.0, self.span[i] / 2.0, num=self.n[i] + 1, endpoint=True))
 
-        reference = np.array(pair.points_of_reference())
-        reading = np.array(pair.points_of_reading())
+        reference = pair.points_of_reference()
+        reading = pair.points_of_reading()
 
         n_of_bins = self.n[0] * self.n[1] * self.n[2]
 
@@ -142,11 +142,8 @@ def cli():
     db = RegistrationPairDatabase(args.database)
     pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
 
-    reading = np.array(pair.points_of_reading())
-    reference = np.array(pair.points_of_reference())
-
-    print(reading)
-    print(reference)
+    reading = pair.points_of_reading()
+    reference = pair.points_of_reference()
 
     mask_generator = mask_generator_factory(args.mask)
 

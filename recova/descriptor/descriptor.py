@@ -70,8 +70,8 @@ class MomentsDescriptorAlgo:
         return 'moments'
 
     def compute(self, pair, reading_mask, reference_mask):
-        reading = np.array(pair.points_of_reading())
-        reference = np.array(pair.points_of_reference())
+        reading = pair.points_of_reading()
+        reference = pair.points_of_reference()
 
         reading = reading[reading_mask]
         reference = reference[reference_mask]

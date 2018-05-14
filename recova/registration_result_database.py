@@ -203,7 +203,8 @@ class RegistrationPair:
         if self._points_of_reading is None:
             reading_file = self.directory_of_pair / 'reading.json'
             with reading_file.open() as f:
-                self._points_of_reading = json.load(f)
+                reading_points = json.load(f)
+                self._points_of_reading = np.array(reading_points)
 
         return self._points_of_reading
 
@@ -213,7 +214,8 @@ class RegistrationPair:
             reference_file = self.directory_of_pair / 'reference.json'
 
             with reference_file.open() as f:
-                self._points_of_reference = json.load(f)
+                reference_points = json.load(f)
+                self._points_of_reference = np.array(reference_points)
 
         return self._points_of_reference
 
