@@ -2,6 +2,7 @@
 import argparse
 import json
 import numpy as np
+import time
 
 from recova.learning.learning import model_loader
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
@@ -46,7 +47,9 @@ def cli():
     xs_validation = xs[learning_run['validation_set']]
     ys_validation = ys[learning_run['validation_set']]
 
+    pred_begin = time.time()
     ys_predicted = model.predict(xs_validation)
+    print((time.time() - pred_begin) / len(xs))
 
     errors = frobenius(ys_validation - ys_predicted)
     print(np.mean(errors))

@@ -75,9 +75,6 @@ def apply_t_to_points(points, T):
 def distribution_to_vtk_ellipsoid(mean, covariance, filename):
     eig_vals, eig_vecs = np.linalg.eig(covariance)
 
-    print(eig_vals)
-    print(eig_vecs)
-
     T = np.identity(4)
     T[0:3,0:3] = eig_vecs
     T[0:3,3] = mean
@@ -91,7 +88,6 @@ def distribution_to_vtk_ellipsoid(mean, covariance, filename):
             eig_vals[i] = 1e-6
 
     points, connectivity, offsets = make_ellipsoid_mesh(*np.sqrt(eig_vals))
-    print(filename)
 
     points_transformed = apply_t_to_points(points, T)
 

@@ -256,6 +256,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         up = to_upper_triangular(theta)
         return torch.mm(up, up.transpose(0,1))
 
+    def _metric_matrix(self):
+        return self.theta_to_metric_matrix(self.theta)
+
+    def metric_matrix(self):
+        return self._metric_matrix().numpy()
+
 
     def compute_distances(self, predictors, metric_matrix, predictor):
         delta = predictors - predictor.view(1, predictor.shape[0])
