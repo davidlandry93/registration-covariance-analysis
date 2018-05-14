@@ -41,7 +41,11 @@ def vectorize_covariance(cov_matrix):
 
 def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, covariance_algo):
     eprint(registration_pair)
+
+    descriptor_start = time.time()
     descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
+    eprint('Descriptor took {} seconds'.format(time.time() - descriptor_start))
+
     covariance = covariance_algo.compute(registration_pair)
 
     _, t = registration_pair.combined_realigned(combining_algorithm, alignment_algorithm)
@@ -79,7 +83,7 @@ def generate_examples_cli():
 
     registration_pairs = db.registration_pairs()
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(1) as pool:
         examples = pool.starmap(generate_one_example, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, covariance_algo) for x in registration_pairs])
 
     xs, ys = zip(*examples)
@@ -107,78 +111,6 @@ def generate_examples_cli():
             }
         }, dataset_file)
 
-
-def cello_examples_of_registration_pair(pair, combiner, aligner, binner, descriptor, clustering):
-    descriptor = pair.descriptor(combiner,
-                                 aligner,
-                                 binner,
-                                 descriptor)
-
-    print(pair)
-    clustering = pair.clustering_of_results(clustering)
-    clustering = np.array(clustering['clustering'][0])
-
-    errors = pair.lie_matrix_of_results()
-    clustered_errors = errors[clustering]
-
-    print(clustered_errors.shape)
-
-    return descriptor, clustered_errors
-
-
-def generate_cello_dataset_cli():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
-    parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
-    parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
-    args = parser.parse_args()
-
-    db = RegistrationPairDatabase(args.input, args.exclude)
-    output_path = pathlib.Path(args.output)
-
-
-    combiner = OverlappingRegionCombiner()
-    aligner = IdentityAlignmentAlgorithm()
-    binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
-    descriptor_algorithm = MomentGridDescriptor()
-
-    # clustering_algorithm = CenteredClusteringAlgorithm(0.2)
-    # clustering_algorithm.rescale = True
-
-    clustering_algorithm = IdentityClusteringAlgorithm()
-
-    registration_pairs = db.registration_pairs()
-
-    with multiprocessing.Pool() as pool:
-        examples = pool.starmap(cello_examples_of_registration_pair, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, clustering_algorithm) for x in registration_pairs])
-
-    predictors = []
-    all_errors = []
-
-    for predictor, errors in examples:
-        predictors.append(predictor)
-        all_errors.append(errors.tolist())
-
-    output_document = {
-        'metadata': {
-            'what': 'cello_dataset',
-            'date': str(datetime.datetime.today()),
-            'combiner': str(combiner),
-            'binner': str(binning_algorithm),
-            'descriptor': str(descriptor_algorithm),
-            'clustering': str(clustering_algorithm)
-        },
-        'statistics': {
-            'n_examples': len(predictors)
-        },
-        'data': {
-            'predictors': predictors,
-            'errors': all_errors
-        }
-    }
-
-    with open(args.output, 'w') as json_file:
-        json_file.write(json.dumps(output_document))
 
 
 def compute_one_summary_line(registration_pair, covariance_algo):

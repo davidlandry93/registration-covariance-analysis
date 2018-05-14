@@ -71,7 +71,19 @@ class GridMaskGenerator(MaskGenerator):
         return 'grid_{}_{}'.format(self.span, self.n)
 
     def labels(self):
-        pass
+        labels = []
+
+        for i in range(self.n[0]):
+            for j in range(self.n[1]):
+                for k in range(self.n[2]):
+                    labels.append('grid_x{}on{}_y{}on{}_z{}on{}'.format(
+                        i, self.n[0],
+                        j, self.n[1],
+                        k, self.n[2]
+                    ))
+
+        return labels
+
 
     def compute(self, pair):
         linspaces = []

@@ -29,6 +29,9 @@ class RegistrationPair:
         self.reference = reference
         self.cache = FileCache(self.directory_of_pair / 'cache')
 
+        self._points_of_reading = None
+        self._points_of_reference = None
+
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
 
@@ -115,7 +118,7 @@ class RegistrationPair:
 
             return combined_realigned, t
         else:
-            return self.cache[combined_realigned_name], np.array(self.cache[transform_name])
+            return np.array(self.cache[combined_realigned_name]), np.array(self.cache[transform_name])
 
 
     def compute_combined_realigned(self, combiner, aligner):
@@ -124,6 +127,8 @@ class RegistrationPair:
         initial_estimate = self.initial_estimate()
 
         combined = combiner.compute(reading, reference, self.initial_estimate())
+
+        eprint(combined)
 
         T = aligner.align(combined)
         np_combined = np.array(combined)
@@ -195,15 +200,22 @@ class RegistrationPair:
 
 
     def points_of_reading(self):
-        reading_file = self.directory_of_pair / 'reading.json'
-        with reading_file.open() as f:
-            return json.load(f)
+        if self._points_of_reading is None:
+            reading_file = self.directory_of_pair / 'reading.json'
+            with reading_file.open() as f:
+                self._points_of_reading = json.load(f)
+
+        return self._points_of_reading
 
 
     def points_of_reference(self):
-        reading_file = self.directory_of_pair / 'reference.json'
-        with reading_file.open() as f:
-            return json.load(f)
+        if self._points_of_reference is None:
+            reference_file = self.directory_of_pair / 'reference.json'
+
+            with reference_file.open() as f:
+                self._points_of_reference = json.load(f)
+
+        return self._points_of_reference
 
 
     def clustering_of_results(self, clustering_algorithm):

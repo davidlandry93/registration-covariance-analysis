@@ -1,7 +1,8 @@
 
 import json
+import numpy as np
 
-from recova.util import run_subprocess
+from recova.util import eprint, run_subprocess
 
 class PointcloudCombiner:
     """A pointcloud combiner takes the reading and outputs a single pointcloud which we use for learning."""
@@ -32,11 +33,16 @@ class OverlappingRegionCombiner(PointcloudCombiner):
             't': ground_truth.tolist()
         }
 
-        with open('tst.json', 'w') as f:
-            json.dump(input_dict, f)
-
         response = run_subprocess(cmd_template, json.dumps(input_dict))
-        return json.loads(response)
+
+        response = json.loads(response)
+        reading_points = np.array(response['reading'])
+        reference_points = np.array(response['reference'])
+
+        eprint(reading_points.shape)
+        eprint(reference_points.shape)
+
+        return np.vstack((reading_points, reference_points))
 
     def __repr__(self):
         return 'overlapping-region_gt'
