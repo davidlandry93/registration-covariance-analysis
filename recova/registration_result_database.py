@@ -5,17 +5,20 @@ import numpy as np
 import os
 import pathlib
 import re
+import subprocess
 import sys
 
+from io import StringIO
+
 from recov.datasets import create_registration_dataset
-from recov.pointcloud_io import pointcloud_to_pcd
+from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
 from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
 from recova.covariance import covariance_algorithm_factory
 from recova.file_cache import FileCache
-from recova.util import eprint
+from recova.util import eprint, run_subprocess
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
@@ -244,6 +247,39 @@ class RegistrationPair:
         distribution = compute_distribution(self.registration_dict(), clustering_row)
 
         return distribution
+
+
+    def _normals_of_pcd(self, pcd, k=18):
+        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'
+        cmd_string = cmd_template.format(pcd, k)
+
+        eprint(cmd_string)
+        response = run_subprocess(cmd_string)
+        stream = StringIO(response)
+        normals = read_xyz_stream(stream)
+
+        return normals
+
+
+    def normals_of_reading(self):
+        normals = self.cache['reading_normals']
+        if not normals:
+            normals = self._normals_of_pcd(self.path_to_reading_pcd())
+            self.cache['reading_normals'] = normals.tolist()
+        else:
+            normals = np.array(normals)
+
+        return normals
+
+    def normals_of_reference(self):
+        normals = self.cache['reference_normals']
+        if not normals:
+            normals = self._normals_of_pcd(self.path_to_reference_pcd())
+            self.cache['reference_normals'] = normals.tolist()
+        else:
+            normals = np.array(normals)
+
+        return normals
 
 
 

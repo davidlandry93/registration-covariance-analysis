@@ -58,7 +58,6 @@ p::list eigen_matrix_to_list(const Eigen::MatrixXd& eigen_m) {
 np::ndarray eigen_matrix_to_ndarray(const Eigen::MatrixXd& eigen_m) {
   return np::array(eigen_matrix_to_list(eigen_m));
 }
-
 p::list centered_clustering(const np::ndarray& m, const p::list& seed, int k, double radius) {
   auto eigen_matrix = std::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd);
   *eigen_matrix = ndarray_to_eigen_matrix(m);

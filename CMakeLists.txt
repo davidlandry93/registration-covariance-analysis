@@ -1,13 +1,17 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.5)
 project(recova VERSION 0.1)
 
 option(PYTHON_BINDINGS "Build the python bindings of the c++ code" ON)
 
+find_package(Boost)
 find_package(Eigen3 REQUIRED)
 find_package(gflags REQUIRED)
 find_package(lieroy REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(PCL 1.3 REQUIRED COMPONENTS common io features)
+
+add_definitions(${PCL_DEFINITIONS})
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,6 +53,15 @@ target_include_directories(overlapping_region PRIVATE include)
 add_executable(json2xyz src/json2xyz_main.cpp)
 target_include_directories(json2xyz PRIVATE include)
 
+message(STATUS ${PCL_INCLUDE_DIRS})
+message(STATUS ${EIGEN3_INCLUDE_DIRS})
+
+include_directories(${PCL_INCLUDE_DIRS})
+
+add_executable(normals_of_cloud src/normals_of_cloud_main.cpp)
+target_include_directories(normals_of_cloud PRIVATE include ${EIGEN3_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS} PUBLIC)
+target_link_libraries(normals_of_cloud gflags ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_FEATURES_LIBRARIES})
+
 
 # Installation
 install(TARGETS
@@ -57,9 +70,10 @@ install(TARGETS
   json2xyz
   overlapping_region
   point_density
+  normals_of_cloud
   RUNTIME DESTINATION bin)
 
-install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk bin/recov_explore_alpha DESTINATION bin)
+install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk bin/recov_explore_alpha bin/one_registration DESTINATION bin)
 
 if(PYTHON_BINDINGS)
   add_subdirectory(recova_core)

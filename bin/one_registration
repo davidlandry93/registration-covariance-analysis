@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+
+import argparse
+import numpy as np
+import tempfile
+import yaml
+
+from recov.registration_algorithm import AlgorithmFactory
+from recov.datasets import create_registration_dataset
+from recov.util import run_subprocess
+
+from lieroy import se3
+
+cmd_string = ('pmicp --initTranslation {} --initRotation {} --config {} {} {}')
+
+def cli_friendly_list(l):
+    return ','.join([str(x) for x in l])
+
+def cli_friendly_matrix(m):
+    rows = [','.join([str(term) for term in row]) for row in m]
+    return ','.join(rows)
+
+def compute_registration(dataset, reading, reference, algo, perturbation):
+    initial_estimate = np.dot(perturbation, dataset.ground_truth(reading, reference))
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        yaml.dump(algo.config_dict(), stream=f)
+
+        command_to_run = cmd_string.format(cli_friendly_list(initial_estimate[0:3,3].tolist()),
+                                           cli_friendly_matrix(initial_estimate[0:3,0:3].tolist()),
+                                           f.name,
+                                           dataset.path_of_cloud_file(reference, 'csv'),
+                                           dataset.path_of_cloud_file(reading, 'csv'))
+
+        print(command_to_run)
+        response = run_subprocess(command_to_run)
+
+    return response
+
+def register_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('kind', help='The kind of dataset user. <oru|ethz>.', type=str)
+    parser.add_argument('dataset', help='Path to the dataset')
+    parser.add_argument('reading', help='The index of the reading in the dataset', type=int)
+    parser.add_argument('reference', help='The index of the reference in the dataset', type=int)
+    parser.add_argument('algo', help='Name of the registration algorithm to use')
+    parser.add_argument('--perturbation_translation', help='Range of perturbations in translation (default 0.0)', default=0.0, type=float)
+    parser.add_argument('--perturbation_rotation', help='Range of the perturbations in rotation (default 0.0)', default=0.0, type=float)
+    args = parser.parse_args()
+
+    perturbation = se3.sample_uniform(range_translation=args.perturbation_translation, range_rotation=args.perturbation_rotation, n_samples=1)[0]
+
+    algo = AlgorithmFactory.create(args.algo)
+    algo.use_vtk_inspector(True)
+    dataset = create_registration_dataset(args.kind, args.dataset)
+
+    ran_command = compute_registration(dataset, args.reading, args.reference, algo, perturbation)
+
+
+if __name__ == '__main__':
+    register_cli()
