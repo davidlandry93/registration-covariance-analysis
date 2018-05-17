@@ -62,7 +62,7 @@ class DescriptorAlgo:
         raise NotImplementedError('Descriptor algorithms must implement labels method')
 
 
-class MomentsDescriptorAlgo:
+class MomentsDescriptorAlgo(DescriptorAlgo):
     def __init__(self):
         pass
 
@@ -106,9 +106,102 @@ class MomentsDescriptorAlgo:
 
         return labels
 
+
+
+class NormalHistogramDescriptionAlgo(DescriptorAlgo):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return 'norm_histogram'
+
+    def compute(self, pair, reading_mask, reference_mask):
+        normals_reading = pair.normals_of_reading()
+
+        normals_reference = pair.normals_of_reference()[reference_mask]
+
+        normals = np.vstack((normals_reading, normals_reference))
+
+        ref_lines = self.reference_lines()
+        histogram = np.zeros(len(ref_lines))
+
+        distances = np.empty((len(normals), len(ref_lines)))
+        for i, line in enumerate(ref_lines):
+            distances[:,i] = self.point_to_line_distances(np.array([0.,0.,0.]), line, normals)
+
+        # for normal in normals:
+        #     distances = [self.point_to_line_distance(np.array([0., 0., 0.]), x, normal) for x in ref_lines]
+        #     histogram[np.argmin(distances)] += 1.
+
+        eprint(distances)
+
+        mins = np.argmin(distances, axis=1)
+        eprint(mins)
+
+        histogram = np.zeros(len(ref_lines))
+
+        for minimum in mins:
+            histogram[minimum] += 1.
+
+        eprint(histogram)
+
+        return histogram / np.sum(histogram)
+
+
+    def labels(self):
+        return ['norm_line{}'.format(x) for x in range(len(self.reference_lines()))]
+
+    def reference_lines(self):
+        # Here we define the lines with two points.
+        # For every line x1 is the origin.
+        lines = []
+
+        # Four lines parallel to the xy plane.
+        lines.append([1., 0., 0.])
+        lines.append([0., 1., 0.])
+        lines.append([1., 1., 0.])
+        lines.append([-1., 1., 0.])
+
+        lines.append([0., 0., 1.])
+
+        lines.append([1., 1., 1.])
+        lines.append([-1., 1., 1.])
+        lines.append([1., -1., 1.])
+        lines.append([-1., -1., 1.])
+
+        return np.array(lines)
+
+    def point_to_line_distance(self, line1, line2, point):
+        """
+        See http://mathworld.wolfram.com/Point-LineDistance3-Dimensional.html.
+        """
+        distance_squared = ((np.square(np.linalg.norm(line1 - point)) * np.square(np.linalg.norm(line2 - line1))
+                            - np.square(np.dot((line1 - point), (line2 - line1))))
+                            / np.square(np.linalg.norm(line2 - line1)))
+
+
+        return np.sqrt(distance_squared)
+
+    def point_to_line_distances(self, line1, line2, points):
+        og_minus_point = line1 - points
+        n_og_minus_point = np.linalg.norm(og_minus_point, axis=1)
+        n_line_vector_square = np.square(np.linalg.norm(line2 - line1))
+
+        A = n_og_minus_point * n_line_vector_square
+        B = np.square(np.dot(og_minus_point, (line2-line1).reshape((3,1)))).squeeze()
+        C = n_line_vector_square
+
+        return (A - B) / C
+
+
+
+
+
 def descriptor_algo_factory(descriptor):
     if descriptor == 'moments':
         return MomentsDescriptorAlgo()
+    elif descriptor == 'normal_histogram':
+        return NormalHistogramDescriptionAlgo()
     else:
         raise ValueError('No descriptor called {}'.format(descriptor))
 

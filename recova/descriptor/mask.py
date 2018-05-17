@@ -25,6 +25,18 @@ class MaskGenerator:
         raise NotImplementedError('Mask generators must implement labels method')
 
 
+class IdentityMaskGenerator(MaskGenerator):
+    def __repr__(self):
+        return 'identity'
+
+    def compute(self, pair):
+        return MaskPair(np.ones((1, len(pair.points_of_reading())), dtype=bool),
+                        np.ones((1, len(pair.points_of_reference())), dtype=bool))
+
+    def labels(self):
+        return ['identity']
+
+
 class OverlapMaskGenerator(MaskGenerator):
     """Return a mask containing only overlapping points."""
 
@@ -128,6 +140,10 @@ def mask_generator_factory(mask_name):
         return GridMaskGenerator()
     elif mask_name == 'overlap':
         return OverlapMaskGenerator()
+    elif mask_name == 'identity':
+        return IdentityMaskGenerator()
+    else:
+        raise ValueError('Unknown mask generator {}'.format(mask_name))
 
 
 def cli():
