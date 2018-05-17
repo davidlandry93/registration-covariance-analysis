@@ -49,15 +49,31 @@ class OverlapMaskGenerator(MaskGenerator):
 
 
     def labels(self):
-        return ['overlap_{}']
+        return ['overlap_{}'.format(self.radius)]
 
 
     def compute(self, pair):
+        cached_reading_entry = pair.cache['{}_reading'.format(repr(self))]
+        cached_reference_entry = pair.cache['{}_reference'.format(repr(self))]
+
+        if cached_reading_entry  is not None and cached_reference_entry is not None:
+            return MaskPair(np.array(cached_reading_entry, dtype=bool), np.array(cached_reference_entry, dtype=bool))
+        else:
+            reading_array, reference_array = self._compute(pair)
+            pair.cache['{}_reading'.format(repr(self))] = reading_array
+            pair.cache['{}_reference'.format(repr(self))] = reference_array
+            return MaskPair(np.array(reading_array, dtype=bool), np.array(reference_array, dtype=bool))
+
+
+    def _compute(self, pair):
         cmd_template = 'overlapping_region -radius {} -mask'
         cmd_string = cmd_template.format(self.radius)
 
         reading = pair.points_of_reading()
         reference = pair.points_of_reference()
+
+        eprint('Len reading: {}'.format(len(reading)))
+        eprint('Len reference: {}'.format(len(reference)))
 
         input_dict = {
             'reading': reading.tolist(),
@@ -65,13 +81,14 @@ class OverlapMaskGenerator(MaskGenerator):
             't': pair.ground_truth().tolist()
         }
 
-        with open('/home/dlandry/example_input.json', 'w') as f:
-            json.dump(input_dict, f)
-
         response = run_subprocess(cmd_string, json.dumps(input_dict))
         response = json.loads(response)
 
-        return MaskPair(np.array([response['reading']], dtype=bool), np.array([response['reference']], dtype=bool))
+        reading_mask = [response['reading']]
+        reference_mask = [response['reference']]
+
+        return reading_mask, reference_mask
+
 
 
 class GridMaskGenerator(MaskGenerator):

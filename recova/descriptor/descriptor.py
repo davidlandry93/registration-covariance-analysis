@@ -19,7 +19,8 @@ class Descriptor:
         self.description_algo = description_algorithm
 
     def __repr__(self):
-        return 'descriptor_{}_{}'.format(mask_generator.__repr__(), description_algorithm.__repr__())
+        return 'descriptor_{}_{}'.format(self.mask_generator.__repr__(),
+                                         self.description_algo.__repr__())
 
     def compute(self, pair):
         """
@@ -27,7 +28,13 @@ class Descriptor:
         """
         reading_masks, reference_masks = self.mask_generator.compute(pair)
 
-        descriptors = [self.description_algo.compute(pair, reading_masks[i], reference_masks[i]) for i in range(len(reading_masks))]
+        eprint(reading_masks.shape)
+        eprint(reference_masks.shape)
+
+        descriptors = []
+        for i in range(len(reading_masks)):
+            descriptor = self.description_algo.compute(pair, reading_masks[i], reference_masks[i])
+            descriptors.append(descriptor)
 
         flattened_descriptor = []
         for l in descriptors:
@@ -62,6 +69,33 @@ class DescriptorAlgo:
         raise NotImplementedError('Descriptor algorithms must implement labels method')
 
 
+class ConcatDescriptorAlgo(DescriptorAlgo):
+    def __init__(self, algos):
+        self.algos = algos
+
+    def __repr__(self):
+        algo_reprs = [repr(x) for x in self.algos]
+
+        return '_'.join(algo_reprs)
+
+    def compute(self, pair, reading_mask, reference_mask):
+        descriptors = []
+        eprint(self.algos)
+        for algo in self.algos:
+            eprint(algo)
+            descriptor = algo.compute(pair, reading_mask, reference_mask)
+            descriptors.append(descriptor)
+
+        return np.concatenate(descriptors)
+
+    def labels(self):
+        labels = []
+        for algo in self.algos:
+            labels.extend(algo.labels())
+        return labels
+
+
+
 class MomentsDescriptorAlgo(DescriptorAlgo):
     def __init__(self):
         pass
@@ -75,9 +109,6 @@ class MomentsDescriptorAlgo(DescriptorAlgo):
 
         reading = reading[reading_mask]
         reference = reference[reference_mask]
-
-        print(reading.shape)
-        print(reference.shape)
 
         points = np.vstack((reading, reference))
 
@@ -116,9 +147,17 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         return 'norm_histogram'
 
     def compute(self, pair, reading_mask, reference_mask):
-        normals_reading = pair.normals_of_reading()
+        eprint(reading_mask.shape)
+        eprint('Len reading mask: {}'.format(len(reading_mask)))
+        eprint('Len reading normals: {}'.format(len(pair.normals_of_reading())))
 
+        eprint('Len ref mask: {}'.format(len(reference_mask)))
+        eprint('Len ref normals: {}'.format(len(pair.normals_of_reference())))
+
+        normals_reading = pair.normals_of_reading()[reading_mask]
         normals_reference = pair.normals_of_reference()[reference_mask]
+
+        eprint(normals_reading.shape)
 
         normals = np.vstack((normals_reading, normals_reference))
 
@@ -129,15 +168,8 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         for i, line in enumerate(ref_lines):
             distances[:,i] = self.point_to_line_distances(np.array([0.,0.,0.]), line, normals)
 
-        # for normal in normals:
-        #     distances = [self.point_to_line_distance(np.array([0., 0., 0.]), x, normal) for x in ref_lines]
-        #     histogram[np.argmin(distances)] += 1.
-
-        eprint(distances)
 
         mins = np.argmin(distances, axis=1)
-        eprint(mins)
-
         histogram = np.zeros(len(ref_lines))
 
         for minimum in mins:
@@ -222,17 +254,14 @@ def cli():
     mask = recova.descriptor.mask.mask_generator_factory(args.mask)
     descriptor_algo = descriptor_algo_factory(args.descriptor)
 
-    descriptor_algo = Descriptor(mask, descriptor_algo)
+    descriptor = Descriptor(mask, descriptor_algo)
 
     descriptor_compute_start = time.time()
-    descriptor = descriptor_algo.compute(pair)
+    computed_descriptor = descriptor.compute(pair)
     eprint('Descriptor took {} seconds'.format(time.time() - descriptor_compute_start))
 
-    print(descriptor)
-    print(descriptor_algo.labels())
-
-    print(len(descriptor))
-    print(len(descriptor_algo.labels()))
+    print(computed_descriptor)
+    print(descriptor.labels())
 
 
 if __name__ == '__main__':

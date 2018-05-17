@@ -98,6 +98,9 @@ int main(int argc, char** argv) {
         json reading_mask = std::vector<int>(overlapping_from_reading_mask.size());
         json reference_mask = std::vector<int>(overlapping_from_reference_mask.size());
 
+        std::cerr << "Readin mask size: " << reading_mask.size() << '\n';
+        std::cerr << "Ref mask size: " << reference_mask.size() << '\n';
+
         int overlapping_in_reading = 0;
         for(auto i = 0; i < reading_mask.size(); ++i) {
             if (overlapping_from_reading_mask[i]) {
@@ -109,7 +112,7 @@ int main(int argc, char** argv) {
         }
 
         int overlapping_in_reference = 0;
-        for(auto i = 0; i < reading_mask.size(); ++i) {
+        for(auto i = 0; i < reference_mask.size(); ++i) {
             if (overlapping_from_reference_mask[i]) {
                 reference_mask[i] = 1;
                 overlapping_in_reference++;

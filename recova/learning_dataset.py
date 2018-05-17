@@ -17,6 +17,8 @@ from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
+from recova.descriptor.mask import OverlapMaskGenerator
+from recova.descriptor.descriptor import ConcatDescriptorAlgo, Descriptor, MomentsDescriptorAlgo, NormalHistogramDescriptionAlgo
 from recova.binning import GridBinningAlgorithm
 from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
 from recova.registration_result_database import RegistrationPairDatabase
@@ -39,23 +41,16 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm, covariance_algo):
+def generate_one_example(registration_pair, descriptor, covariance_algo):
     eprint(registration_pair)
 
     descriptor_start = time.time()
-    descriptor = registration_pair.descriptor(combining_algorithm, alignment_algorithm, binning_algorithm, descriptor_algorithm)
+    descriptor = descriptor.compute(registration_pair)
     eprint('Descriptor took {} seconds'.format(time.time() - descriptor_start))
-
     covariance = covariance_algo.compute(registration_pair)
+    eprint('Example took {} seconds'.format(time.time() - descriptor_start))
 
-    _, t = registration_pair.combined_realigned(combining_algorithm, alignment_algorithm)
-
-    adj_of_t = se3.adjoint(t)
-    rotated_covariance = np.dot(adj_of_t, np.dot(covariance, adj_of_t.T)).tolist()
-
-    eprint('Max of covariance: {}'.format(np.max(rotated_covariance)))
-
-    return (descriptor, rotated_covariance)
+    return (descriptor, covariance)
 
 
 def generate_examples_cli():
@@ -70,10 +65,6 @@ def generate_examples_cli():
     db = RegistrationPairDatabase(args.input, args.exclude)
     output_path = pathlib.Path(args.output)
 
-    combiner = OverlappingRegionCombiner()
-    aligner = IdentityAlignmentAlgorithm()
-    binning_algorithm = GridBinningAlgorithm(10., 10., 5., 3, 3, 3)
-    descriptor_algorithm = MomentGridDescriptor()
 
     # clustering_algorithm = CenteredClusteringAlgorithm(0.2)
     # clustering_algorithm.rescale = True
@@ -83,8 +74,14 @@ def generate_examples_cli():
 
     registration_pairs = db.registration_pairs()
 
-    with multiprocessing.Pool(1) as pool:
-        examples = pool.starmap(generate_one_example, [(x, combiner, aligner, binning_algorithm, descriptor_algorithm, covariance_algo) for x in registration_pairs])
+
+
+    mask_generator = OverlapMaskGenerator()
+    description_algo = ConcatDescriptorAlgo([MomentsDescriptorAlgo(), NormalHistogramDescriptionAlgo()])
+    descriptor = Descriptor(mask_generator, description_algo)
+
+    with multiprocessing.Pool() as pool:
+        examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
 
     xs, ys = zip(*examples)
 
