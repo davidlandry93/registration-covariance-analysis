@@ -58,6 +58,7 @@ def generate_examples_cli():
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
     parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
+    parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -80,7 +81,7 @@ def generate_examples_cli():
     description_algo = ConcatDescriptorAlgo([MomentsDescriptorAlgo(), NormalHistogramDescriptionAlgo()])
     descriptor = Descriptor(mask_generator, description_algo)
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(args.n_cores) as pool:
         examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
 
     xs, ys = zip(*examples)
