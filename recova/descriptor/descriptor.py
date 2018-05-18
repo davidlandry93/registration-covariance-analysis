@@ -28,9 +28,6 @@ class Descriptor:
         """
         reading_masks, reference_masks = self.mask_generator.compute(pair)
 
-        eprint(reading_masks.shape)
-        eprint(reference_masks.shape)
-
         descriptors = []
         for i in range(len(reading_masks)):
             descriptor = self.description_algo.compute(pair, reading_masks[i], reference_masks[i])
@@ -147,17 +144,8 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         return 'norm_histogram'
 
     def compute(self, pair, reading_mask, reference_mask):
-        eprint(reading_mask.shape)
-        eprint('Len reading mask: {}'.format(len(reading_mask)))
-        eprint('Len reading normals: {}'.format(len(pair.normals_of_reading())))
-
-        eprint('Len ref mask: {}'.format(len(reference_mask)))
-        eprint('Len ref normals: {}'.format(len(pair.normals_of_reference())))
-
         normals_reading = pair.normals_of_reading()[reading_mask]
         normals_reference = pair.normals_of_reference()[reference_mask]
-
-        eprint(normals_reading.shape)
 
         normals = np.vstack((normals_reading, normals_reference))
 
@@ -174,8 +162,6 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
 
         for minimum in mins:
             histogram[minimum] += 1.
-
-        eprint(histogram)
 
         return histogram / np.sum(histogram)
 

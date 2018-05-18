@@ -11,7 +11,7 @@ import sys
 from io import StringIO
 
 from recov.datasets import create_registration_dataset
-from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream
+from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
@@ -62,14 +62,14 @@ class RegistrationPair:
 
     def import_pointclouds(self, pointcloud_dataset):
         """Import the reading and the reference that were used to generate the results from a pointcloud_dataset."""
-        reading_file = self.directory_of_pair / 'reading.json'
-        reference_file = self.directory_of_pair / 'reference.json'
+        reading_file = self.directory_of_pair / 'reading.xyz'
+        reference_file = self.directory_of_pair / 'reference.xyz'
 
         with reading_file.open('w') as f:
-            json.dump(pointcloud_dataset.points_of_cloud(self.reading).tolist(), f)
+            pointcloud_to_xyz(pointcloud_dataset.points_of_cloud(self.reading), f)
 
         with reference_file.open('w') as f:
-            json.dump(pointcloud_dataset.points_of_cloud(self.reference).tolist(), f)
+            pointcloud_to_xyz(pointcloud_dataset.points_of_cloud(self.reference), f)
 
 
     def pair_exists(self):
@@ -110,63 +110,6 @@ class RegistrationPair:
         return registration_dict
 
 
-    def combined_realigned(self, combiner, aligner):
-        combined_realigned_name = 'cb_{}_{}'.format(combiner, aligner)
-        transform_name = 'cbt_{}_{}'.format(combiner, aligner)
-
-        if not self.cache[combined_realigned_name]:
-            combined_realigned, t = self.compute_combined_realigned(combiner, aligner)
-            self.cache[combined_realigned_name] = combined_realigned.tolist()
-            self.cache[transform_name] = t.tolist()
-
-            return combined_realigned, t
-        else:
-            return np.array(self.cache[combined_realigned_name]), np.array(self.cache[transform_name])
-
-
-    def compute_combined_realigned(self, combiner, aligner):
-        reading = self.points_of_reading()
-        reference = self.points_of_reference()
-        initial_estimate = self.initial_estimate()
-
-        combined = combiner.compute(reading, reference, self.initial_estimate())
-
-        eprint(combined)
-
-        T = aligner.align(combined)
-        np_combined = np.array(combined)
-
-        homo_combined = to_homogeneous(np_combined)
-
-        aligned = np.dot(T, homo_combined).T
-
-        return aligned, T
-
-
-    def descriptor(self, combiner, aligner, binner, descriptor_algorithm):
-        descriptor_name = '{}_{}_{}_{}'.format(combiner, aligner, binner, descriptor_algorithm)
-
-        descriptor = self.cache[descriptor_name]
-        if not descriptor:
-            descriptor = self.compute_descriptor(combiner, aligner, binner, descriptor_algorithm)
-            self.cache[descriptor_name] = descriptor
-
-        return descriptor
-
-
-    def compute_descriptor(self, combiner, aligner, binner, descriptor_algorithm):
-        reading = self.points_of_reading()
-        reference = self.points_of_reference()
-        initial_estimate = self.initial_estimate()
-
-        combined_realigned, _ = self.combined_realigned(combiner, aligner)
-
-        binned = binner.compute(combined_realigned.tolist())
-        descriptor = descriptor_algorithm.compute(combined_realigned, binned)
-
-        return descriptor
-
-
     def initial_estimate(self):
         if not self.registration_file.exists():
             self.merge_raw_results()
@@ -204,21 +147,21 @@ class RegistrationPair:
 
     def points_of_reading(self):
         if self._points_of_reading is None:
-            reading_file = self.directory_of_pair / 'reading.json'
+            reading_file = self.directory_of_pair / 'reading.xyz'
             with reading_file.open() as f:
-                reading_points = json.load(f)
-                self._points_of_reading = np.array(reading_points)
+                reading_points = read_xyz_stream(f)
+                self._points_of_reading = reading_points
 
         return self._points_of_reading
 
 
     def points_of_reference(self):
         if self._points_of_reference is None:
-            reference_file = self.directory_of_pair / 'reference.json'
+            reference_file = self.directory_of_pair / 'reference.xyz'
 
             with reference_file.open() as f:
-                reference_points = json.load(f)
-                self._points_of_reference = np.array(reference_points)
+                reference_points = read_xyz_stream(f)
+                self._points_of_reference = reference_points
 
         return self._points_of_reference
 
@@ -330,8 +273,7 @@ class RegistrationPairDatabase:
 
         return pairs
 
-def import_pointclouds_of_one_pair(pair_id, database, dataset_type, pointcloud_root):
-    registration_pair = database.get_registration_pair(*pair_id)
+def import_pointclouds_of_one_pair(registration_pair, database, dataset_type, pointcloud_root):
     print(registration_pair)
 
     dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
@@ -343,21 +285,24 @@ def import_files_cli():
     parser.add_argument('files', nargs='*', type=str, help='The files to import')
     parser.add_argument('--root', help='Location of the registration result database', type=str)
     parser.add_argument('--pointcloud_root', help='Location of the point clouds designated by the pairs', type=str)
-    parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str)
+    parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str, default='ethz')
+    parser.add_argument('--pointcloud_only', help='Only do the pointcloud importation', action='store_true')
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.root)
 
     added_pairs_ids = set()
-    for registration_file in args.files:
-        print(registration_file)
-        pair_id = db.import_file(registration_file)
-        added_pairs_ids.add(pair_id)
+
+    if not args.pointcloud_only:
+        for registration_file in args.files:
+            print(registration_file)
+            pair_id = db.import_file(registration_file)
+            added_pairs_ids.add(pair_id)
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 
     with multiprocessing.Pool() as pool:
-        pool.starmap(import_pointclouds_of_one_pair, [(x, db, args.pointcloud_dataset_type, pointcloud_root) for x in added_pairs_ids])
+        pool.starmap(import_pointclouds_of_one_pair, [(x, db, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])
 
 
 def distribution_cli():
@@ -385,3 +330,7 @@ def distribution_cli():
     }
 
     json.dump(output_dict, sys.stdout)
+
+
+if __name__ == '__main__':
+    import_files_cli()

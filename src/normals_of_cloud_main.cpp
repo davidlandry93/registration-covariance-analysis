@@ -39,9 +39,6 @@ int main(int argc, char** argv) {
     ne.setKSearch(FLAGS_k);
     ne.compute(*cloud_normals);
 
-    std::cerr << cloud->points.size() << " points in the cloud" << '\n';
-    std::cerr << cloud_normals->points.size() << " normals in the vector" << '\n';
-
     for(auto normal : cloud_normals->points) {
         std::cout << normal.normal_x << " " << normal.normal_y << " " << normal.normal_z << '\n';
     }

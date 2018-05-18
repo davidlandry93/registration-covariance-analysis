@@ -84,17 +84,22 @@ def generate_examples_cli():
     with multiprocessing.Pool(args.n_cores) as pool:
         examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
 
-    xs, ys = zip(*examples)
+    xs = []
+    ys = []
+    for p in examples:
+        x, y = p
+        xs.append(x.tolist())
+        ys.append(y.tolist())
+
 
     with open(args.output, 'w') as dataset_file:
         json.dump({
             'metadata': {
                 'what': 'learning_dataset',
                 'date': str(datetime.datetime.today()),
-                'combiner': str(combiner),
-                'binner': str(binning_algorithm),
-                'descriptor': str(descriptor_algorithm),
-                'clustering': str(clustering_algorithm)
+                'descriptor': str(descriptor),
+                'clustering': str(clustering_algorithm),
+                'descriptor_labels': descriptor.labels()
             },
             'statistics': {
                 'n_examples': len(xs)

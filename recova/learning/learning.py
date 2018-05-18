@@ -48,8 +48,6 @@ def cli():
 
     learning_run = model.fit(predictors, covariances)
 
-    eprint(learning_run)
-
     json.dump(learning_run, sys.stdout)
 
 
