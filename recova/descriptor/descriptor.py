@@ -22,14 +22,11 @@ class Descriptor:
         return 'descriptor_{}_{}'.format(self.mask_generator.__repr__(),
                                          self.description_algo.__repr__())
 
-    def compute(self, pair):
+    def _compute(self, pair):
         """
         Compute the value of the descriptor for a pointcloud pair.
         """
         reading_masks, reference_masks = self.mask_generator.compute(pair)
-
-        eprint(reading_masks.shape)
-        eprint(reference_masks.shape)
 
         descriptors = []
         for i in range(len(reading_masks)):
@@ -41,7 +38,19 @@ class Descriptor:
             for element in l:
                 flattened_descriptor.append(element)
 
-        return np.array(flattened_descriptor)
+        return flattened_descriptor
+
+    def compute(self, pair):
+        cached_descriptor = pair.cache[repr(self)]
+
+        if cached_descriptor is None:
+            descriptor = self._compute(pair)
+            pair.cache[repr(self)] = descriptor
+            return np.array(descriptor)
+
+        else:
+            return np.array(cached_descriptor)
+
 
     def labels(self):
         mask_labels = self.mask_generator.labels()
@@ -80,9 +89,7 @@ class ConcatDescriptorAlgo(DescriptorAlgo):
 
     def compute(self, pair, reading_mask, reference_mask):
         descriptors = []
-        eprint(self.algos)
         for algo in self.algos:
-            eprint(algo)
             descriptor = algo.compute(pair, reading_mask, reference_mask)
             descriptors.append(descriptor)
 
@@ -147,17 +154,8 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         return 'norm_histogram'
 
     def compute(self, pair, reading_mask, reference_mask):
-        eprint(reading_mask.shape)
-        eprint('Len reading mask: {}'.format(len(reading_mask)))
-        eprint('Len reading normals: {}'.format(len(pair.normals_of_reading())))
-
-        eprint('Len ref mask: {}'.format(len(reference_mask)))
-        eprint('Len ref normals: {}'.format(len(pair.normals_of_reference())))
-
         normals_reading = pair.normals_of_reading()[reading_mask]
         normals_reference = pair.normals_of_reference()[reference_mask]
-
-        eprint(normals_reading.shape)
 
         normals = np.vstack((normals_reading, normals_reference))
 
@@ -175,9 +173,10 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         for minimum in mins:
             histogram[minimum] += 1.
 
-        eprint(histogram)
-
-        return histogram / np.sum(histogram)
+        if np.sum(histogram) == 0.:
+            return histogram
+        else:
+            return histogram / np.sum(histogram)
 
 
     def labels(self):

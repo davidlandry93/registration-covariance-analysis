@@ -36,6 +36,54 @@ class IdentityMaskGenerator(MaskGenerator):
     def labels(self):
         return ['identity']
 
+class ConcatMaskGenerator(MaskGenerator):
+    def __init__(self, generators):
+        self.generators = generators
+
+    def __repr__(self):
+        return '_'.join([repr(g) for g in self.generators])
+
+    def compute(self, pair):
+        len_reading = len(pair.points_of_reading())
+        len_reference = len(pair.points_of_reference())
+
+        reading_masks = np.ones((1, len_reading), dtype=bool)
+        reference_masks = np.ones((1, len_reference), dtype=bool)
+
+        for g in self.generators:
+            reading_masks_to_add, reference_masks_to_add = g.compute(pair)
+
+            n_masks = len(reading_masks_to_add) * len(reading_masks)
+            new_reading_masks = np.empty((n_masks, len_reading), dtype=bool)
+            new_reference_masks = np.empty((n_masks, len_reference), dtype=bool)
+            for i in range(len(reading_masks)):
+                for j in range(len(reading_masks_to_add)):
+                    new_reading_masks[i * n_masks + j] = np.logical_and(reading_masks_to_add[j], reading_masks[i])
+                    new_reference_masks[i * n_masks + j] = np.logical_and(reference_masks_to_add[j], reference_masks[i])
+
+            reading_masks = new_reading_masks
+            reference_masks = new_reference_masks
+
+        return MaskPair(reading_masks, reference_masks)
+
+    def labels(self):
+        label_list = []
+        for g in self.generators:
+            new_label_list = []
+
+            if not label_list:
+                new_label_list = g.labels()
+            else:
+                for l in label_list:
+                    for gl in g.labels():
+                        new_label_list.append('{}_{}'.format(l, gl))
+
+            label_list = new_label_list
+
+        return label_list
+
+
+
 
 class OverlapMaskGenerator(MaskGenerator):
     """Return a mask containing only overlapping points."""
@@ -72,9 +120,6 @@ class OverlapMaskGenerator(MaskGenerator):
         reading = pair.points_of_reading()
         reference = pair.points_of_reference()
 
-        eprint('Len reading: {}'.format(len(reading)))
-        eprint('Len reference: {}'.format(len(reference)))
-
         input_dict = {
             'reading': reading.tolist(),
             'reference': reference.tolist(),
@@ -92,7 +137,7 @@ class OverlapMaskGenerator(MaskGenerator):
 
 
 class GridMaskGenerator(MaskGenerator):
-    def __init__(self, spanx=10., spany=10., spanz=10., nx=3, ny=3, nz=3):
+    def __init__(self, spanx=10., spany=10., spanz=5., nx=3, ny=3, nz=3):
         self.span = (spanx, spany, spanz)
         self.n = (nx, ny, nz)
 
@@ -159,17 +204,23 @@ def mask_generator_factory(mask_name):
         return OverlapMaskGenerator()
     elif mask_name == 'identity':
         return IdentityMaskGenerator()
+    elif mask_name == 'overlap_then_grid':
+        overlap = OverlapMaskGenerator()
+        grid = GridMaskGenerator(nx=3, ny=3, nz=3, spanx=10., spany=10., spanz=5.)
+
+        return ConcatMaskGenerator([overlap, grid])
     else:
         raise ValueError('Unknown mask generator {}'.format(mask_name))
 
 
 def cli():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Apply as point selection mask on a pair of pointclouds.')
     parser.add_argument('database', type=str, help='Location of the registration result database to use.')
     parser.add_argument('dataset', type=str)
     parser.add_argument('reading', type=int)
     parser.add_argument('reference', type=int)
     parser.add_argument('mask', type=str)
+    parser.add_argument('--output', type=str, default='.', help='Output directory of the visualization.')
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.database)
@@ -182,12 +233,10 @@ def cli():
 
     reading_masks, reference_masks = mask_generator.compute(pair)
 
-    print(reading.shape)
-    print(reading_masks.shape)
-    print(reading[reading_masks[0]])
 
     for i in range(len(reading_masks)):
         if reading_masks[i].any():
-            points_to_vtk(reading[reading_masks[i]], '{}_reading_{}'.format(mask_generator.__repr__(), i))
+            points_to_vtk(reading[reading_masks[i]], args.output + '/' + '{}_reading_{}'.format(mask_generator.__repr__(), i))
+
         if reference_masks[i].any():
-            points_to_vtk(reference[reference_masks[i]], '{}_reference_{}'.format(mask_generator.__repr__(), i))
+            points_to_vtk(reference[reference_masks[i]], args.output + '/' + '{}_reference_{}'.format(mask_generator.__repr__(), i))

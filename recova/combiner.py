@@ -39,9 +39,6 @@ class OverlappingRegionCombiner(PointcloudCombiner):
         reading_points = np.array(response['reading'])
         reference_points = np.array(response['reference'])
 
-        eprint(reading_points.shape)
-        eprint(reference_points.shape)
-
         return np.vstack((reading_points, reference_points))
 
     def __repr__(self):

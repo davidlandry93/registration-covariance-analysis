@@ -16,11 +16,8 @@ from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
-from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
-from recova.descriptor.mask import OverlapMaskGenerator
+from recova.descriptor.mask import OverlapMaskGenerator, GridMaskGenerator, ConcatMaskGenerator
 from recova.descriptor.descriptor import ConcatDescriptorAlgo, Descriptor, MomentsDescriptorAlgo, NormalHistogramDescriptionAlgo
-from recova.binning import GridBinningAlgorithm
-from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, nearestPD
 
@@ -58,6 +55,7 @@ def generate_examples_cli():
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
     parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
+    parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -75,25 +73,34 @@ def generate_examples_cli():
     registration_pairs = db.registration_pairs()
 
 
+    grid = GridMaskGenerator()
+    overlap = OverlapMaskGenerator()
+    mask_generator = ConcatMaskGenerator([overlap,grid])
 
-    mask_generator = OverlapMaskGenerator()
-    description_algo = ConcatDescriptorAlgo([MomentsDescriptorAlgo(), NormalHistogramDescriptionAlgo()])
+    moments = MomentsDescriptorAlgo()
+    normal_histogram = NormalHistogramDescriptionAlgo()
+    description_algo = ConcatDescriptorAlgo([moments, normal_histogram])
     descriptor = Descriptor(mask_generator, description_algo)
 
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(args.n_cores) as pool:
         examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
 
-    xs, ys = zip(*examples)
+    xs = []
+    ys = []
+    for p in examples:
+        x, y = p
+        xs.append(x.tolist())
+        ys.append(y.tolist())
+
 
     with open(args.output, 'w') as dataset_file:
         json.dump({
             'metadata': {
                 'what': 'learning_dataset',
                 'date': str(datetime.datetime.today()),
-                'combiner': str(combiner),
-                'binner': str(binning_algorithm),
-                'descriptor': str(descriptor_algorithm),
-                'clustering': str(clustering_algorithm)
+                'descriptor': str(descriptor),
+                'clustering': str(clustering_algorithm),
+                'descriptor_labels': descriptor.labels()
             },
             'statistics': {
                 'n_examples': len(xs)
