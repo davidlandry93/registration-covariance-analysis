@@ -16,11 +16,8 @@ from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
-from recova.descriptor import OccupancyGridDescriptor, MomentGridDescriptor
-from recova.descriptor.mask import OverlapMaskGenerator
+from recova.descriptor.mask import OverlapMaskGenerator, GridMaskGenerator, ConcatMaskGenerator
 from recova.descriptor.descriptor import ConcatDescriptorAlgo, Descriptor, MomentsDescriptorAlgo, NormalHistogramDescriptionAlgo
-from recova.binning import GridBinningAlgorithm
-from recova.combiner import ReferenceOnlyCombiner, OverlappingRegionCombiner
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, nearestPD
 
@@ -76,9 +73,13 @@ def generate_examples_cli():
     registration_pairs = db.registration_pairs()
 
 
+    grid = GridMaskGenerator()
+    overlap = OverlapMaskGenerator()
+    mask_generator = ConcatMaskGenerator([overlap,grid])
 
-    mask_generator = OverlapMaskGenerator()
-    description_algo = ConcatDescriptorAlgo([MomentsDescriptorAlgo(), NormalHistogramDescriptionAlgo()])
+    moments = MomentsDescriptorAlgo()
+    normal_histogram = NormalHistogramDescriptionAlgo()
+    description_algo = ConcatDescriptorAlgo([moments, normal_histogram])
     descriptor = Descriptor(mask_generator, description_algo)
 
     with multiprocessing.Pool(args.n_cores) as pool:

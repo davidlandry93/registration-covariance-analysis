@@ -22,7 +22,7 @@ class Descriptor:
         return 'descriptor_{}_{}'.format(self.mask_generator.__repr__(),
                                          self.description_algo.__repr__())
 
-    def compute(self, pair):
+    def _compute(self, pair):
         """
         Compute the value of the descriptor for a pointcloud pair.
         """
@@ -38,7 +38,19 @@ class Descriptor:
             for element in l:
                 flattened_descriptor.append(element)
 
-        return np.array(flattened_descriptor)
+        return flattened_descriptor
+
+    def compute(self, pair):
+        cached_descriptor = pair.cache[repr(self)]
+
+        if cached_descriptor is None:
+            descriptor = self._compute(pair)
+            pair.cache[repr(self)] = descriptor
+            return np.array(descriptor)
+
+        else:
+            return np.array(cached_descriptor)
+
 
     def labels(self):
         mask_labels = self.mask_generator.labels()
@@ -77,9 +89,7 @@ class ConcatDescriptorAlgo(DescriptorAlgo):
 
     def compute(self, pair, reading_mask, reference_mask):
         descriptors = []
-        eprint(self.algos)
         for algo in self.algos:
-            eprint(algo)
             descriptor = algo.compute(pair, reading_mask, reference_mask)
             descriptors.append(descriptor)
 
@@ -163,7 +173,10 @@ class NormalHistogramDescriptionAlgo(DescriptorAlgo):
         for minimum in mins:
             histogram[minimum] += 1.
 
-        return histogram / np.sum(histogram)
+        if np.sum(histogram) == 0.:
+            return histogram
+        else:
+            return histogram / np.sum(histogram)
 
 
     def labels(self):
