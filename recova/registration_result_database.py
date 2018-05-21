@@ -271,6 +271,8 @@ class RegistrationPairDatabase:
                 if not self.exclude or not self.exclude.match(dataset):
                     pairs.append(RegistrationPair(self.root, dataset, reading, reference))
 
+        pairs = sorted(pairs, key=lambda x: x.pair_id)
+
         return pairs
 
 def import_pointclouds_of_one_pair(registration_pair, database, dataset_type, pointcloud_root):
