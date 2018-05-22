@@ -10,7 +10,7 @@ import pathlib
 import time
 import sys
 
-from lie import se3
+from lieroy import se3
 
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
