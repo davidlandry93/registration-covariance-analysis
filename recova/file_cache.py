@@ -29,6 +29,7 @@ class FileCache:
 
         with demanded_file.open('w') as f:
             json.dump(value, f)
+            f.flush()
 
     def __delitem__(self, key):
         demanded_file = self.filename_of_key
