@@ -132,4 +132,4 @@ def apply_mask_cli():
             points_to_vtk(reference[reference_masks[i]], args.output + '/' + '{}_reference_{}'.format(mask_generator.__repr__(), i))
 
 if __name__ == '__main__':
-    apply_mask_cli()
+    cli()

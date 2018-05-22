@@ -35,6 +35,8 @@ class RegistrationPair:
         self._points_of_reading = None
         self._points_of_reference = None
 
+        self._normals = {}
+
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
 
@@ -204,25 +206,46 @@ class RegistrationPair:
         return normals
 
 
-    def normals_of_reading(self):
-        normals = self.cache['reading_normals']
-        if not normals:
-            normals = self._normals_of_pcd(self.path_to_reading_pcd())
-            self.cache['reading_normals'] = normals.tolist()
-        else:
-            normals = np.array(normals)
+    def normals_of_cloud(self, label):
+        """
+        Computes the normal of the pointcloud designated by label.
+        label can be reading_normals or reference_normals.
+        """
+        cache_file = self.directory_of_pair / (label + '.xyz')
+        pcd_of_label = {
+            'reading_normals': self.path_to_reading_pcd(),
+            'reference_normals': self.path_to_reference_pcd()
+        }
 
-        return normals
+        if label in self._normals:
+            # We have the normals in memory.
+            return self._normals[label]
+        elif cache_file.exists():
+            # We have the normals in cache.
+            with cache_file.open() as f:
+                normals = read_xyz_stream(f)
+
+            self._normals[label] = normals
+            return normals
+        else:
+            # We need to compute the normals.
+            normals = self._normals_of_pcd(pcd_of_label[label])
+
+            # Cache them.
+            with cache_file.open('w') as f:
+                pointcloud_to_xyz(normals, f)
+
+            # Save them in memory.
+            self._normals[label] = normals
+            return normals
+
+
+    def normals_of_reading(self):
+        return self.normals_of_cloud('reading_normals')
+
 
     def normals_of_reference(self):
-        normals = self.cache['reference_normals']
-        if not normals:
-            normals = self._normals_of_pcd(self.path_to_reference_pcd())
-            self.cache['reference_normals'] = normals.tolist()
-        else:
-            normals = np.array(normals)
-
-        return normals
+        return self.normals_of_cloud('reference_normals')
 
 
 

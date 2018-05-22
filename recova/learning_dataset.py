@@ -68,11 +68,11 @@ def generate_examples_cli():
 
     descriptor_config = {
         'mask': {
-            'name': 'grid',
-            'n': (10,10,10),
-            'span': (20.,20.,5.)
+            'name': 'cylinder',
+            'n': (8,5,3),
+            'span': (20.,2 * np.pi,5.)
         },
-        'algo': { 'name': 'occupancy' }
+        'algo': { 'name': 'normals_histogram' }
     }
     descriptor = descriptor_factory(descriptor_config)
 
@@ -95,7 +95,7 @@ def generate_examples_cli():
                 'what': 'learning_dataset',
                 'date': str(datetime.datetime.today()),
                 'descriptor': str(descriptor),
-                'clustering': str(clustering_algorithm),
+                'covariance_algo': str(covariance_algo),
                 'descriptor_labels': descriptor.labels(),
                 'descriptor_config': descriptor_config
             },
