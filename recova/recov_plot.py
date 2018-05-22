@@ -73,11 +73,18 @@ def plot_cov_against_density(args):
 
     plt.show()
 
-def plot_loss_comparison(ax, learning_runs, std=False):
-    for learning_run in learning_runs:
+def plot_loss_comparison(ax, learning_runs, std=False, labels=[]):
+    if len(labels) == len(learning_runs):
+        labels_to_use = labels
+    else:
+        labels_to_use = ['Validation loss, Alpha: {}, Lr: {}'.format(x['metadata']['alpha'], x['metadata']['learning_rate']) for x in learning_runs]
+
+
+    for i, learning_run in enumerate(learning_runs):
         validation_loss = np.array(learning_run['validation_loss'])
         validation_std = np.array(learning_run['validation_std'])
-        ax.plot(validation_loss, label='Validation loss, Alpha: {}, Lr: {}'.format(learning_run['metadata']['alpha'], learning_run['metadata']['learning_rate']))
+
+        ax.plot(validation_loss, label=labels_to_use[i])
         if std:
             ax.fill_between(range(0, len(validation_loss)), validation_loss + validation_std, validation_loss - validation_std, alpha=0.5)
 
@@ -126,6 +133,7 @@ def plot_loss_on_time(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--median', action='store_true', help='Wether we should use medians or averages to plot the loss.')
     parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
+    parser.add_argument('--labels', '-l', type=str, default='', help='Comma separated list of labels for the different plots.')
     args = parser.parse_args(args)
 
     learning_run = json.load(sys.stdin)
@@ -133,9 +141,11 @@ def plot_loss_on_time(args):
     fig, ax = plt.subplots()
 
     if isinstance(learning_run, dict):
-        plot_single_loss(ax, learning_run, median=args.median, std=args.std)
+        plot_single_loss(ax, learning_run, median=args.median, std=args.std, )
     elif isinstance(learning_run, list):
-        plot_loss_comparison(ax, learning_run, std=args.std)
+        
+
+        plot_loss_comparison(ax, learning_run, std=args.std, labels=args.labels.split(','))
 
     ax.legend()
     ax.set_xlabel('Epoch')

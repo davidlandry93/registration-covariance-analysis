@@ -3,7 +3,6 @@ import collections
 import json
 import numpy as np
 
-from recova.registration_dataset import points_to_vtk
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, run_subprocess
 
@@ -134,6 +133,62 @@ class OverlapMaskGenerator(MaskGenerator):
 
         return reading_mask, reference_mask
 
+class CylinderGridMask(MaskGenerator):
+    def __init__(self, spanr=20., spantheta=2 * np.pi, spanz=5., nr=3, ntheta=3, nz=3):
+        self.span = (spanr, spantheta, spanz)
+        self.n = (nr, ntheta, nz)
+
+    def __repr__(self):
+        return 'cylinder_{}_{}'.format(self.span, self.n)
+
+    def labels(self):
+        pass
+
+    def compute_for_cloud(self, cloud):
+        n_points = len(cloud)
+        n_masks = self.n[0] * self.n[1] * self.n[2]
+
+        masks = np.zeros((n_masks, n_points), dtype=np.bool)
+
+        cylindrical_cloud = np.empty(cloud.shape)
+        cylindrical_cloud[:,0] = np.linalg.norm(cloud[:, 0:2], axis=1)
+        cylindrical_cloud[:,1] = np.arctan2(cloud[:,1], cloud[:,0])
+        cylindrical_cloud[:,2] = cloud[:,2]
+
+        delta_r = self.span[0] / self.n[0]
+        delta_theta = self.span[1] / self.n[1]
+        delta_z = self.span[2] / self.n[2]
+
+        bins = np.empty(cylindrical_cloud.shape)
+
+        bins[:,0] = (cylindrical_cloud[:,0] + (self.span[0] / 2.)) // delta_r
+        bins[:,1] = (cylindrical_cloud[:,1] + (self.span[1] / 2.)) // delta_theta
+        bins[:,2] = (cylindrical_cloud[:,2] + (self.span[2] / 2.)) // delta_z
+
+        bins = bins.astype(np.int)
+
+        for i, point in enumerate(cylindrical_cloud):
+            r, theta, z = point
+            bin = bins[i]
+
+            if (bin[0] >= self.n[0] or
+                bin[0] < 0 or
+                bin[1] >= self.n[1] or
+                bin[1] < 0 or
+                bin[2] >= self.n[2] or
+                bin[2] < 0):
+                continue
+            else:
+                masks[bin[0] * self.n[1] * self.n[2] + bin[1] * self.n[2] + bin[2]][i] = True
+
+        return masks
+
+    def compute(self, pair):
+        masks_reading = self.compute_for_cloud(pair.points_of_reading())
+        masks_reference = self.compute_for_cloud(pair.points_of_reference())
+
+        return MaskPair(masks_reading, masks_reference)
+
 
 
 class GridMaskGenerator(MaskGenerator):
@@ -197,46 +252,3 @@ class GridMaskGenerator(MaskGenerator):
 
         return MaskPair(reading_masks, reference_masks)
 
-def mask_generator_factory(mask_name):
-    if mask_name == 'grid':
-        return GridMaskGenerator()
-    elif mask_name == 'overlap':
-        return OverlapMaskGenerator()
-    elif mask_name == 'identity':
-        return IdentityMaskGenerator()
-    elif mask_name == 'overlap_then_grid':
-        overlap = OverlapMaskGenerator()
-        grid = GridMaskGenerator(nx=3, ny=3, nz=3, spanx=10., spany=10., spanz=5.)
-
-        return ConcatMaskGenerator([overlap, grid])
-    else:
-        raise ValueError('Unknown mask generator {}'.format(mask_name))
-
-
-def cli():
-    parser = argparse.ArgumentParser(description='Apply as point selection mask on a pair of pointclouds.')
-    parser.add_argument('database', type=str, help='Location of the registration result database to use.')
-    parser.add_argument('dataset', type=str)
-    parser.add_argument('reading', type=int)
-    parser.add_argument('reference', type=int)
-    parser.add_argument('mask', type=str)
-    parser.add_argument('--output', type=str, default='.', help='Output directory of the visualization.')
-    args = parser.parse_args()
-
-    db = RegistrationPairDatabase(args.database)
-    pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
-
-    reading = pair.points_of_reading()
-    reference = pair.points_of_reference()
-
-    mask_generator = mask_generator_factory(args.mask)
-
-    reading_masks, reference_masks = mask_generator.compute(pair)
-
-
-    for i in range(len(reading_masks)):
-        if reading_masks[i].any():
-            points_to_vtk(reading[reading_masks[i]], args.output + '/' + '{}_reading_{}'.format(mask_generator.__repr__(), i))
-
-        if reference_masks[i].any():
-            points_to_vtk(reference[reference_masks[i]], args.output + '/' + '{}_reference_{}'.format(mask_generator.__repr__(), i))

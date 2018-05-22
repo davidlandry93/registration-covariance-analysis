@@ -16,8 +16,7 @@ from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
-from recova.descriptor.mask import OverlapMaskGenerator, GridMaskGenerator, ConcatMaskGenerator
-from recova.descriptor.descriptor import ConcatDescriptorAlgo, Descriptor, MomentsDescriptorAlgo, NormalHistogramDescriptionAlgo
+from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, nearestPD
 
@@ -39,7 +38,7 @@ def vectorize_covariance(cov_matrix):
 
 
 def generate_one_example(registration_pair, descriptor, covariance_algo):
-    eprint(registration_pair)
+    print(registration_pair)
 
     descriptor_start = time.time()
     descriptor = descriptor.compute(registration_pair)
@@ -61,26 +60,23 @@ def generate_examples_cli():
     np.set_printoptions(linewidth=120)
 
     db = RegistrationPairDatabase(args.input, args.exclude)
-    output_path = pathlib.Path(args.output)
-
-
-    # clustering_algorithm = CenteredClusteringAlgorithm(0.2)
-    # clustering_algorithm.rescale = True
-
-    clustering_algorithm = IdentityClusteringAlgorithm()
-    covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
-
     registration_pairs = db.registration_pairs()
 
+    output_path = pathlib.Path(args.output)
 
-    grid = GridMaskGenerator()
-    overlap = OverlapMaskGenerator()
-    mask_generator = ConcatMaskGenerator([overlap,grid])
+    covariance_algo = SamplingCovarianceComputationAlgorithm()
 
-    moments = MomentsDescriptorAlgo()
-    normal_histogram = NormalHistogramDescriptionAlgo()
-    description_algo = ConcatDescriptorAlgo([moments, normal_histogram])
-    descriptor = Descriptor(mask_generator, description_algo)
+    descriptor_config = {
+        'mask': {
+            'name': 'cylinder',
+            'n': (8,5,3),
+            'span': (20.,2 * np.pi,5.)
+        },
+        'algo': { 'name': 'normals_histogram' }
+    }
+    descriptor = descriptor_factory(descriptor_config)
+
+    eprint('Using descriptor: {}'.format(repr(descriptor)))
 
     with multiprocessing.Pool(args.n_cores) as pool:
         examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
@@ -99,8 +95,9 @@ def generate_examples_cli():
                 'what': 'learning_dataset',
                 'date': str(datetime.datetime.today()),
                 'descriptor': str(descriptor),
-                'clustering': str(clustering_algorithm),
-                'descriptor_labels': descriptor.labels()
+                'covariance_algo': str(covariance_algo),
+                'descriptor_labels': descriptor.labels(),
+                'descriptor_config': descriptor_config
             },
             'statistics': {
                 'n_examples': len(xs)
@@ -157,3 +154,7 @@ def dataset_summary_cli():
     writer.writeheader()
     for row in rows:
         writer.writerow(row)
+
+
+if __name__ == '__main__':
+    generate_examples_cli()

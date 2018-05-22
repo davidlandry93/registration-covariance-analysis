@@ -47,6 +47,7 @@ def cli():
     model.convergence_window = args.convergence_window
 
     learning_run = model.fit(predictors, covariances)
+    learning_run['metadata']['descriptor_config'] = input_document['metadata']['descriptor_config']
 
     json.dump(learning_run, sys.stdout)
 

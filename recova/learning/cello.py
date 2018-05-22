@@ -84,6 +84,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.convergence_window = convergence_window
 
     def fit(self, predictors, covariances):
+        eprint('Training with descriptors of size {}'.format(predictors.shape[1]))
+
         training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
 
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
@@ -175,8 +177,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:   {:.4E}'.format(optimization_score))
-                eprint('Validation score: {:.4E}'.format(validation_score))
+                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score))
+                eprint('Validation score: {:.8E}'.format(validation_score))
+                eprint('Validation std:   {:.8E}'.format(validation_errors.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
