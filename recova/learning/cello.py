@@ -90,8 +90,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
 
-        self.model_predictors = torch.Tensor(predictors_train)
-        self.model_covariances = torch.Tensor(covariances_train)
+        self.model_predictors = Variable(torch.Tensor(predictors_train))
+        self.model_covariances = Variable(torch.Tensor(covariances_train))
 
         predictors_validation = torch.Tensor(predictors_test)
         covariances_validation = torch.Tensor(covariances_test)
@@ -133,7 +133,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             epoch_start = time.time()
             optimizer.zero_grad()
 
-            losses = torch.zeros(len(self.model_predictors))
+            losses = Variable(torch.zeros(len(self.model_predictors)))
 
             for i in range(len(self.model_predictors)):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -157,15 +157,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
             indiv_optimization_errors = self._validation_errors(self.model_predictors, self.model_covariances)
             optimization_score = torch.mean(indiv_optimization_errors).data
-            optimization_errors_log.append(indiv_optimization_errors.detach().tolist())
-            optimization_losses.append(optimization_score.item())
-            optimization_stds.append(torch.std(indiv_optimization_errors).detach().item())
+            optimization_errors_log.append(indiv_optimization_errors.data.numpy().tolist())
+            optimization_losses.append(optimization_score[0])
+            optimization_stds.append(torch.std(indiv_optimization_errors).data[0])
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-            if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
-                validation_errors = self._validation_errors(predictors_validation, covariances_validation).data
-                validation_score = torch.mean(validation_errors).data
+            if self.queries_have_neighbor(self.model_predictors, metric_matrix, Variable(predictors_validation)):
+                validation_errors = self._validation_errors(Variable(predictors_validation), Variable(covariances_validation)).data
+                validation_score = torch.mean(validation_errors)
 
                 eprint('-- Validation of epoch %d --' % epoch)
 
@@ -177,15 +177,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score))
+                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score[0]))
                 eprint('Validation score: {:.8E}'.format(validation_score))
                 eprint('Validation std:   {:.8E}'.format(validation_errors.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
-                validation_errors_log.append(validation_errors.detach().numpy().tolist())
-                validation_losses.append(validation_score.detach().item())
-                validation_stds.append(torch.std(validation_errors).detach().item())
+                validation_errors_log.append(validation_errors.numpy().tolist())
+                validation_losses.append(validation_score)
+                validation_stds.append(torch.std(validation_errors))
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
@@ -245,7 +245,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
-        predictions = torch.zeros(len(predictors),6,6)
+        predictions = Variable(torch.zeros(len(predictors),6,6))
 
         for i in range(len(predictors)):
             distances = self.compute_distances(self.model_predictors, metric_matrix, predictors[i])
@@ -267,6 +267,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def compute_distances(self, predictors, metric_matrix, predictor):
+
         delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
         return torch.sum(lhs * delta, 1).squeeze()
@@ -297,7 +298,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         """Check if every descriptor in queries has at least one neighbour in the learned model."""
 
         n_predictors = len(predictors)
-        distances = torch.zeros([len(examples), n_predictors])
+        distances = Variable(torch.zeros([len(examples), n_predictors]))
         for i in range(n_predictors):
             distances[:, i] = self.compute_distances(examples, metric_matrix, predictors[i])
 
@@ -308,9 +309,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def export_model(self):
        return {
-           'theta': self.theta.detach().tolist(),
-           'covariances' : self.model_covariances.detach().tolist(),
-           'predictors': self.model_predictors.detach().tolist()
+           'theta': self.theta.data.numpy().tolist(),
+           'covariances' : self.model_covariances.data.numpy().tolist(),
+           'predictors': self.model_predictors.data.numpy().tolist()
        }
 
     def import_model(self, model):
