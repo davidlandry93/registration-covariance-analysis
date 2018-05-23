@@ -3,7 +3,7 @@ import argparse
 import json
 import time
 
-from recova.descriptor.algo import ConcatDescriptorAlgo, MomentsDescriptorAlgo, NormalsHistogramDescriptionAlgo, OccupancyDescriptorAlgo
+from recova.descriptor.algo import CensiDescriptor, ConcatDescriptorAlgo, MomentsDescriptorAlgo, NormalsHistogramDescriptionAlgo, OccupancyDescriptorAlgo
 from recova.descriptor.descriptor import Descriptor, DescriptorConcat 
 from recova.descriptor.mask import ConcatMaskGenerator, IdentityMaskGenerator, CylinderGridMask, GridMaskGenerator, OverlapMaskGenerator
 from recova.registration_dataset import points_to_vtk
@@ -25,6 +25,8 @@ def single_description_algo_factory(config):
         instance = NormalsHistogramDescriptionAlgo()
     elif config['name'] == 'occupancy':
         instance = OccupancyDescriptorAlgo()
+    elif config['name'] == 'censi':
+        instance = CensiDescriptor()
     else:
         raise ValueError('No description algo named {}'.format(config['name']))
 

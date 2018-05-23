@@ -55,6 +55,7 @@ def generate_examples_cli():
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
     parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
     parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
+    parser.add_argument('-c', '--config', type=str, help='Path to a json config for the descriptor.')
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -66,14 +67,9 @@ def generate_examples_cli():
 
     covariance_algo = SamplingCovarianceComputationAlgorithm()
 
-    descriptor_config = {
-        'mask': {
-            'name': 'cylinder',
-            'n': (8,5,3),
-            'span': (20.,2 * np.pi,5.)
-        },
-        'algo': { 'name': 'normals_histogram' }
-    }
+    with open(args.config) as f:
+        descriptor_config = json.load(f)
+
     descriptor = descriptor_factory(descriptor_config)
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))

@@ -1,4 +1,9 @@
 import numpy as np
+import tempfile
+
+from recov.censi import censi_estimate_from_clouds
+from recov.registration_algorithm import IcpAlgorithm
+from recov.pointcloud_io import pointcloud_to_pcd
 
 class DescriptorAlgo:
     def __init__(self):
@@ -173,4 +178,41 @@ class NormalsHistogramDescriptionAlgo(DescriptorAlgo):
         C = n_line_vector_square
 
         return (A - B) / C
+
+
+
+class CensiDescriptor(DescriptorAlgo):
+    def __init__(self, scale_factor=100.):
+        self.scale_factor = scale_factor
+
+    def __repr__(self):
+        return 'censi_{}'.format(self.scale_factor)
+
+    def labels(self):
+        labels = []
+
+        for dim1 in ['x', 'y', 'z', 'a', 'b', 'c']:
+            for dim2 in ['x', 'y', 'z', 'a', 'b', 'c']:
+                labels.append('censi_{}{}'.format(dim1, dim2))
+
+        return labels
+
+
+    def compute(self, pair, reading_mask, reference_mask):
+        reading = pair.points_of_reading()[reading_mask]
+        reference = pair.points_of_reference()[reference_mask]
+
+
+        with tempfile.NamedTemporaryFile(prefix=(repr(pair) + 'reading'), suffix='.pcd') as reading_file:
+            reading_file_name = reading_file.name
+
+        with tempfile.NamedTemporaryFile(prefix=(repr(pair) + 'reference'), suffix='.pcd') as reference_file:
+            reference_file_name = reference_file.name
+
+        pointcloud_to_pcd(reading, reading_file_name)
+        pointcloud_to_pcd(reference, reference_file_name)
+
+        censi_estimate = censi_estimate_from_clouds(reading_file_name, reference_file_name, pair.ground_truth(), IcpAlgorithm())
+
+        return self.scale_factor * np.array(censi_estimate).flatten()
 

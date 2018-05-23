@@ -142,7 +142,18 @@ class CylinderGridMask(MaskGenerator):
         return 'cylinder_{}_{}'.format(self.span, self.n)
 
     def labels(self):
-        pass
+        labels = []
+        for i in range(self.n[0]):
+            for j in range(self.n[1]):
+                for k in range(self.n[2]):
+                    labels.append('cylindergrid_r{}on{}_theta{}on{}_z{}on{}'.format(
+                        i, self.n[0],
+                        j, self.n[1],
+                        k, self.n[2]
+                    ))
+
+        return labels
+
 
     def compute_for_cloud(self, cloud):
         n_points = len(cloud)
@@ -160,7 +171,6 @@ class CylinderGridMask(MaskGenerator):
         delta_z = self.span[2] / self.n[2]
 
         bins = np.empty(cylindrical_cloud.shape)
-
         bins[:,0] = (cylindrical_cloud[:,0] + (self.span[0] / 2.)) // delta_r
         bins[:,1] = (cylindrical_cloud[:,1] + (self.span[1] / 2.)) // delta_theta
         bins[:,2] = (cylindrical_cloud[:,2] + (self.span[2] / 2.)) // delta_z

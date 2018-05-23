@@ -59,7 +59,7 @@ class CensiCovarianceComputationAlgorithm:
 
 
     def compute(self, registration_pair):
-        covariance = registration_pair.cache[self.__repr__()]
+        covariance = registration_pair.cache[repr(self)]
 
         if not covariance:
             path_to_reading = registration_pair.path_to_reading_pcd()
@@ -67,7 +67,7 @@ class CensiCovarianceComputationAlgorithm:
 
             covariance = censi_estimate_from_clouds(path_to_reading, path_to_reference, registration_pair.ground_truth(), self.algo)
 
-            registration_pair.cache[self.__repr__()] = covariance
+            registration_pair.cache[repr(self)] = covariance
 
         return np.array(covariance)
 
