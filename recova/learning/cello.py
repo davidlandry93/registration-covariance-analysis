@@ -278,12 +278,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return self._metric_matrix().numpy()
 
 
-<<<<<<< HEAD
-    def compute_distances(self, predictors, metric_matrix, predictor):
-
-=======
     def _compute_distances(self, predictors, metric_matrix, predictor):
->>>>>>> f266fdc0fbed710f949f42c96fde8df2b006fb0e
         delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
         return torch.sum(lhs * delta, 1).squeeze()
