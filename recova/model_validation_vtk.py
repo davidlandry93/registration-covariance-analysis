@@ -7,7 +7,7 @@ import time
 
 from recova.learning.learning import model_loader
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
-from recova.util import eprint
+from recova.util import eprint, kullback_leibler
 
 def frobenius(tensor):
     print(tensor.shape)
@@ -53,10 +53,18 @@ def cli():
     print((time.time() - pred_begin) / len(xs))
 
     errors = frobenius(ys_validation - ys_predicted)
+
+    klls = []
+    for i in range(len(ys_validation)):
+        kll_left = kullback_leibler(ys_validation[i], ys_predicted[i])
+        kll_right = kullback_leibler(ys_predicted[i], ys_validation[i])
+        klls.append(kll_left + kll_right)
+
     print(np.mean(errors))
+    print(np.mean(np.array(klls)))
 
     with open(args.output + '/summary.csv', 'w') as summary_file:
-        writer = csv.DictWriter(summary_file, ['location', 'reading', 'reference', 'loss'])
+        writer = csv.DictWriter(summary_file, ['location', 'reading', 'reference', 'loss', 'kullback_leibler'])
         writer.writeheader()
 
         for i in range(len(ys_predicted)):
@@ -73,7 +81,8 @@ def cli():
                 'location': dataset['data']['pairs'][index_of_example]['dataset'],
                 'reading': dataset['data']['pairs'][index_of_example]['reading'],
                 'reference': dataset['data']['pairs'][index_of_example]['reference'],
-                'loss': errors[i]
+                'loss': errors[i],
+                'kullback_leibler': klls[i]
             })
 
 

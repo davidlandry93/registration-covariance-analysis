@@ -83,10 +83,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.train_set_size = train_set_size
         self.convergence_window = convergence_window
 
-    def fit(self, predictors, covariances):
+    def fit(self, predictors, covariances, train_set=None, test_set=None):
         eprint('Training with descriptors of size {}'.format(predictors.shape[1]))
 
-        training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
+        if train_set and test_set:
+            training_indices = train_set
+            test_indices = test_set
+        else:
+            training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
 
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
 
@@ -140,7 +144,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
                 # eprint(metric_matrix)
 
-                distances = self.compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
+                distances = self._compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
 
                 # eprint(self.distances_to_weights(distances))
 
@@ -173,10 +177,6 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             if self.queries_have_neighbor(self.model_predictors, metric_matrix, Variable(predictors_validation)):
                 validation_errors = self._validation_errors(Variable(predictors_validation), Variable(covariances_validation)).data
                 validation_score = torch.mean(validation_errors)
-
-                dists = self.compute_distances(self.model_predictors, metric_matrix, predictors_validation[0])
-                # eprint('Weights')
-                # eprint(self.distances_to_weights(dists))
 
 
                 eprint('-- Validation of epoch %d --' % epoch)
@@ -260,7 +260,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         predictions = Variable(torch.zeros(len(predictors),6,6))
 
         for i in range(len(predictors)):
-            distances = self.compute_distances(self.model_predictors, metric_matrix, predictors[i])
+            distances = self._compute_distances(self.model_predictors, metric_matrix, predictors[i])
             predictions[i] = self.prediction_from_distances(self.model_covariances, distances)
 
         return predictions
@@ -278,12 +278,19 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return self._metric_matrix().numpy()
 
 
+<<<<<<< HEAD
     def compute_distances(self, predictors, metric_matrix, predictor):
 
+=======
+    def _compute_distances(self, predictors, metric_matrix, predictor):
+>>>>>>> f266fdc0fbed710f949f42c96fde8df2b006fb0e
         delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
-        
         return torch.sum(lhs * delta, 1).squeeze()
+
+    def compute_distances(self, predictor):
+        metric_matrix = self.theta_to_metric_matrix(self.theta)
+        return self._compute_distances(self.model_predictors, metric_matrix, torch.Tensor(predictor)).detach().numpy()
 
     def distances_to_weights(self, distances):
         # zero_distances = distances < 1e-10
@@ -313,7 +320,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         n_predictors = len(predictors)
         distances = Variable(torch.zeros([len(examples), n_predictors]))
         for i in range(n_predictors):
-            distances[:, i] = self.compute_distances(examples, metric_matrix, predictors[i])
+            distances[:, i] = self._compute_distances(examples, metric_matrix, predictors[i])
 
         weights = self.distances_to_weights(distances)
         sum_of_weights = torch.sum(weights, dim=0)

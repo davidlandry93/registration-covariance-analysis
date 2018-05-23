@@ -26,6 +26,7 @@ def cli():
     parser.add_argument('-b', '--beta', type=float, default=1e3)
     parser.add_argument('-n', '--n_iterations', type=int, default=200)
     parser.add_argument('-w', '--convergence_window', type=int, default=20, help='N of iterations without improvement before ending training.')
+    parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -38,6 +39,17 @@ def cli():
 
     covariances = np.array(input_document['data']['ys'])
 
+    train_indices = []
+    validation_indices = []
+    if args.cross_validate:
+        for i, pair in enumerate(input_document['data']['pairs']):
+            if pair['dataset'] == args.cross_validate:
+                validation_indices.append(i)
+            else:
+                train_indices.append(i)
+
+        eprint('Training set size: {}. Validation set size: {}'.format(len(train_indices), len(validation_indices)))
+
     model = model_factory(args.algorithm)
 
     model.learning_rate = args.learning_rate
@@ -46,8 +58,15 @@ def cli():
     model.n_iterations = args.n_iterations
     model.convergence_window = args.convergence_window
 
-    learning_run = model.fit(predictors, covariances)
+    if train_indices and validation_indices:
+        learning_run = model.fit(predictors, covariances, train_set=train_indices, test_set=validation_indices)
+    else:
+        learning_run = model.fit(predictors, covariances)
+
     learning_run['metadata']['descriptor_config'] = input_document['metadata']['descriptor_config']
+
+    if args.cross_validate:
+        learning_run['metadata']['cross_validation'] = args.cross_validate
 
     json.dump(learning_run, sys.stdout)
 
