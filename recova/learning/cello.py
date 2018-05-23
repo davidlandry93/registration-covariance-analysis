@@ -136,9 +136,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             losses = Variable(torch.zeros(len(self.model_predictors)))
 
             for i in range(len(self.model_predictors)):
+                # eprint(self.theta)
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
+                # eprint(metric_matrix)
 
                 distances = self.compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
+
+                # eprint(self.distances_to_weights(distances))
+
                 prediction = self.prediction_from_distances(self.model_covariances, distances)
 
                 loss_A = torch.log(torch.norm(prediction))
@@ -151,6 +156,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
                 optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
                 losses[i] = optimization_loss
+
+                # eprint('A: {}, B: {}, C: {}'.format(loss_A, loss_B, regularization_term))
 
                 optimization_loss.backward()
                 optimizer.step()
@@ -166,6 +173,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             if self.queries_have_neighbor(self.model_predictors, metric_matrix, Variable(predictors_validation)):
                 validation_errors = self._validation_errors(Variable(predictors_validation), Variable(covariances_validation)).data
                 validation_score = torch.mean(validation_errors)
+
+                dists = self.compute_distances(self.model_predictors, metric_matrix, predictors_validation[0])
+                # eprint('Weights')
+                # eprint(self.distances_to_weights(dists))
+
 
                 eprint('-- Validation of epoch %d --' % epoch)
 
@@ -270,12 +282,13 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
+        
         return torch.sum(lhs * delta, 1).squeeze()
 
     def distances_to_weights(self, distances):
         # zero_distances = distances < 1e-10
         # distances.masked_fill(zero_distances, 1.)
-        # eprint(distances)
+        # # eprint(distances)
         # weights = torch.clamp(1. - distances, min=0.)
 
         weights = torch.exp(-distances)

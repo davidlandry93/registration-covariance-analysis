@@ -40,6 +40,9 @@ class RegistrationPair:
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
 
+    def __repr__(self):
+        return self.pair_id
+
     @property
     def pair_id(self):
         return '{}-{:02d}-{:02d}'.format(self.dataset, self.reading, self.reference)

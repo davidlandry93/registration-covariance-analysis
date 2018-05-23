@@ -1,5 +1,6 @@
 
 import argparse
+import csv
 import json
 import numpy as np
 import time
@@ -54,13 +55,26 @@ def cli():
     errors = frobenius(ys_validation - ys_predicted)
     print(np.mean(errors))
 
-    for i in range(len(ys_predicted)):
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_validation[i][0:3,0:3], args.output + '_translation_validation_' + str(i).zfill(4))
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][0:3,0:3], args.output + '_translation_predicted_' + str(i).zfill(4))
+    with open(args.output + '/summary.csv', 'w') as summary_file:
+        writer = csv.DictWriter(summary_file, ['location', 'reading', 'reference', 'loss'])
+        writer.writeheader()
+
+        for i in range(len(ys_predicted)):
+            distribution_to_vtk_ellipsoid(np.zeros(3), ys_validation[i][0:3,0:3], args.output + '/translation_validation_' + str(i).zfill(4))
+            distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][0:3,0:3], args.output + '/translation_predicted_' + str(i).zfill(4))
 
 
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_validation[i][3:6,3:6], args.output + '_rotation_validation_' + str(i).zfill(4))
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][3:6,3:6], args.output + '_rotation_predicted_' + str(i).zfill(4))
+            distribution_to_vtk_ellipsoid(np.zeros(3), ys_validation[i][3:6,3:6], args.output + '/rotation_validation_' + str(i).zfill(4))
+            distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][3:6,3:6], args.output + '/rotation_predicted_' + str(i).zfill(4))
+
+            eprint(learning_run['validation_set'][i])
+            index_of_example = learning_run['validation_set'][i]
+            writer.writerow({
+                'location': dataset['data']['pairs'][index_of_example]['dataset'],
+                'reading': dataset['data']['pairs'][index_of_example]['reading'],
+                'reference': dataset['data']['pairs'][index_of_example]['reference'],
+                'loss': errors[i]
+            })
 
 
 
