@@ -14,7 +14,7 @@ def model_loader(learning_run):
     load a model.
     """
     model = model_factory(learning_run['metadata']['algorithm'])
-    model.import_model(learning_run['model'])
+    model.load_model(learning_run['model'])
 
     return model
 
@@ -24,9 +24,11 @@ def cli():
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5)
     parser.add_argument('-a', '--alpha', type=float, default=1e-4)
     parser.add_argument('-b', '--beta', type=float, default=1e3)
-    parser.add_argument('-n', '--n_iterations', type=int, default=200)
+    parser.add_argument('-n', '--n_iterations', type=int, default=0, help='Maximum number of iterations. 0 means no maximum and wait for convergence.')
     parser.add_argument('-w', '--convergence_window', type=int, default=20, help='N of iterations without improvement before ending training.')
     parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
+    parser.add_argument('-o', '--output', type=str, help='Where to save the learning run')
+    parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -36,7 +38,6 @@ def cli():
     sys.stdin = open('/dev/tty')
 
     predictors = np.array(input_document['data']['xs'])
-
     covariances = np.array(input_document['data']['ys'])
 
     train_indices = []
@@ -57,6 +58,7 @@ def cli():
     model.beta = args.beta
     model.n_iterations = args.n_iterations
     model.convergence_window = args.convergence_window
+    model.weight_decay = args.weight_decay
 
     if train_indices and validation_indices:
         learning_run = model.fit(predictors, covariances, train_set=train_indices, test_set=validation_indices)
@@ -68,7 +70,13 @@ def cli():
     if args.cross_validate:
         learning_run['metadata']['cross_validation'] = args.cross_validate
 
-    json.dump(learning_run, sys.stdout)
+    model_path = args.output + '.model'
+    model.save_model(model_path)
+    learning_run['model'] = model_path
+
+    with open(args.output + '.json', 'w') as f:
+        json.dump(learning_run, f)
+
 
 
 if __name__ == '__main__':

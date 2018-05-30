@@ -31,3 +31,8 @@ class CovarianceEstimationModel:
         return losses
 
 
+    def save_model(self, path):
+        raise NotImplementedError('CovarianceEstimationModels must implement save_model method')
+
+    def load_Model(self, path):
+        raise NotImplementedError('CovarianceEstimationModels must implement load_model method')

@@ -84,7 +84,9 @@ def plot_loss_comparison(ax, learning_runs, std=False, labels=[]):
         validation_loss = np.array(learning_run['validation_loss'])
         validation_std = np.array(learning_run['validation_std'])
 
-        ax.plot(validation_loss, label=labels_to_use[i])
+        epochs = [x * learning_run['metadata']['logging_rate'] for x in range(len(validation_std))]
+
+        ax.plot(epochs, validation_loss, label=labels_to_use[i])
         if std:
             ax.fill_between(range(0, len(validation_loss)), validation_loss + validation_std, validation_loss - validation_std, alpha=0.5)
 
@@ -112,20 +114,23 @@ def plot_single_loss(ax, learning_run, median=False, std=False):
         validation_data[1] = validation_loss
         validation_data[2] = validation_loss + validation_std
 
+    epochs = [x * learning_run['metadata']['logging_rate'] for x in range(len(validation_loss))]
+
+    eprint(epochs)
 
     std_ax = ax.twinx()
 
     if std:
-        ax.fill_between(range(0, validation_data.shape[1]), validation_data[2], validation_data[0], alpha=0.5)
+        ax.fill_between(epochs, validation_data[2], validation_data[0], alpha=0.5)
 
-    ax.plot(validation_data[1], label='Validation loss')
-    std_ax.plot(validation_std, label='Validation standard deviation', linestyle='--', alpha=0.7)
+    ax.plot(epochs, validation_data[1], label='Validation loss')
+    # std_ax.plot(epochs, validation_std, label='Validation standard deviation', linestyle='--', alpha=0.7)
 
     if std:
-        ax.fill_between(range(0, validation_data.shape[1]), optimization_data[2], optimization_data[0], alpha=0.5)
+        ax.fill_between(epochs, optimization_data[2], optimization_data[0], alpha=0.5)
 
-    ax.plot(optimization_data[1], label='Optimization loss')
-    std_ax.plot(optimization_std, label='Optimization standard deviation', linestyle='--', alpha=0.7)
+    ax.plot(epochs, optimization_data[1], label='Optimization loss')
+    # std_ax.plot(epochs, optimization_std, label='Optimization standard deviation', linestyle='--', alpha=0.7)
 
 
 
@@ -143,8 +148,6 @@ def plot_loss_on_time(args):
     if isinstance(learning_run, dict):
         plot_single_loss(ax, learning_run, median=args.median, std=args.std, )
     elif isinstance(learning_run, list):
-        
-
         plot_loss_comparison(ax, learning_run, std=args.std, labels=args.labels.split(','))
 
     ax.legend()

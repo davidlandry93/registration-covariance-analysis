@@ -161,7 +161,7 @@ class RegistrationPair:
 
 
     def points_of_reference(self):
-        if self._points_of_reference is None:
+        if self._points_o
             reference_file = self.directory_of_pair / 'reference.xyz'
 
             with reference_file.open() as f:

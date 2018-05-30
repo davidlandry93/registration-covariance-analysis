@@ -133,7 +133,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         best_model = []
         n_epoch_without_improvement = 0
 
-        while epoch < self.n_iterations and keep_going and n_epoch_without_improvement < self.convergence_window:
+        while (epoch < self.n_iterations or self.n_iterations == 0) and keep_going and n_epoch_without_improvement < self.convergence_window:
             epoch_start = time.time()
             optimizer.zero_grad()
 
@@ -207,16 +207,16 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
         return {
-            'what': 'model learning',
+            'best_loss': float(best_loss),
             'metadata': self.metadata(),
-            'validation_loss': validation_losses,
-            'optimization_loss': optimization_losses,
-            'validation_errors': validation_errors_log,
-            'optimization_errors': optimization_errors_log,
             'model': best_model,
-            'validation_std': validation_stds,
+            'optimization_errors': optimization_errors_log,
+            'optimization_loss': optimization_losses,
             'optimization_std': optimization_stds,
-            'best_loss': float(best_loss)
+            'validation_errors': validation_errors_log,
+            'validation_loss': validation_losses,
+            'validation_std': validation_stds,
+            'what': 'model learning',
         }
 
     def create_metric_weights(self):
@@ -328,6 +328,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
            'covariances' : self.model_covariances.data.numpy().tolist(),
            'predictors': self.model_predictors.data.numpy().tolist()
        }
+
+    def save_model(self, location):
+       with open(location, 'w') as f:
+           json.dump(self.export_model, f)
+
+    def load_model(self, location):
+        with open(location) as f:
+            self.import_model(json.load(f))
 
     def import_model(self, model):
         self.theta = torch.Tensor(model['theta'])
