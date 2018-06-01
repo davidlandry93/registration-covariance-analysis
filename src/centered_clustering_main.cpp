@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   std::cin >> json_dataset;
 
   std::shared_ptr<Eigen::MatrixXd> eigen_dataset(new Eigen::MatrixXd);
-  *eigen_dataset = json_array_to_matrix(json_dataset);
+  *eigen_dataset = json_array_to_matrix(json_dataset).transpose();
 
   std::cerr << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
 

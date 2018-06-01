@@ -131,6 +131,7 @@ class MlpModel(CovarianceEstimationModel):
                 'learning_rate': self.learning_rate,
                 'logging_rate': self.logging_rate,
                 'n_iterations': self.n_iterations,
+                'convergence_window': self.convergence_window,
             },
             'optimization_errors': train_errors_log,
             'optimization_loss': train_losses,

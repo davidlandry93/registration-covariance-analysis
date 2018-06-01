@@ -10,8 +10,10 @@ import sys
 
 from io import StringIO
 
+from recov.censi import compute_icp
 from recov.datasets import create_registration_dataset
 from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz
+from recov.registration_algorithm import IcpAlgorithm
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
@@ -45,7 +47,7 @@ class RegistrationPair:
 
     @property
     def pair_id(self):
-        return '{}-{:02d}-{:02d}'.format(self.dataset, self.reading, self.reference)
+        return '{}-{:04d}-{:04d}'.format(self.dataset, self.reading, self.reference)
 
 
     @property
@@ -65,16 +67,30 @@ class RegistrationPair:
         os.rename(str(p), dest)
 
 
-    def import_pointclouds(self, pointcloud_dataset):
+    def import_pointclouds(self, pointcloud_dataset, use_odometry=False):
         """Import the reading and the reference that were used to generate the results from a pointcloud_dataset."""
         reading_file = self.directory_of_pair / 'reading.xyz'
         reference_file = self.directory_of_pair / 'reference.xyz'
 
         with reading_file.open('w') as f:
-            pointcloud_to_xyz(pointcloud_dataset.points_of_cloud(self.reading), f)
+            pointcloud_to_xyz(pointcloud_dataset.points_of_reading(self.reading), f)
 
         with reference_file.open('w') as f:
-            pointcloud_to_xyz(pointcloud_dataset.points_of_cloud(self.reference), f)
+            pointcloud_to_xyz(pointcloud_dataset.points_of_reference(self.reference), f)
+
+
+        if use_odometry:
+            algo = IcpAlgorithm()
+            initial_estimate = pointcloud_dataset.odometry_estimate(self.reading, self.reference)
+            transform, _ = compute_icp(self.path_to_reading_pcd(), self.path_to_reference_pcd(), initial_estimate, algo)
+        else:
+            transform = pointcloud_dataset.ground_truth(self.reading, self.reference)
+
+        np.save(self.directory_of_pair / 'transform.npy', transform)
+
+
+    def transform(self):
+        return np.load(self.directory_of_pair / 'transform.npy')
 
 
     def pair_exists(self):
@@ -126,11 +142,7 @@ class RegistrationPair:
         return np.array(initial_estimate)
 
     def ground_truth(self):
-        with self.registration_file.open() as f:
-            results = json.load(f)
-            ground_truth = results['metadata']['ground_truth']
-
-        return np.array(ground_truth)
+        return self.transform()
 
     def path_to_reading_pcd(self):
         path_to_pcd = self.directory_of_pair / 'reading.pcd'
@@ -161,7 +173,7 @@ class RegistrationPair:
 
 
     def points_of_reference(self):
-        if self._points_o
+        if self._points_of_reference is None:
             reference_file = self.directory_of_pair / 'reference.xyz'
 
             with reference_file.open() as f:
@@ -237,6 +249,7 @@ class RegistrationPair:
             # Cache them.
             with cache_file.open('w') as f:
                 pointcloud_to_xyz(normals, f)
+                f.flush()
 
             # Save them in memory.
             self._normals[label] = normals
@@ -276,6 +289,13 @@ class RegistrationPairDatabase:
 
         return (dataset, reading, reference)
 
+
+    def create_pair(self, location, reading, reference):
+        pair = RegistrationPair(self.root, location, reading, reference)
+
+        return pair
+
+
     def get_registration_pair(self, dataset, reading, reference):
         pair = RegistrationPair(self.root, dataset, reading, reference)
 
@@ -306,6 +326,33 @@ def import_pointclouds_of_one_pair(registration_pair, database, dataset_type, po
 
     dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
     registration_pair.import_pointclouds(dataset)
+
+
+def import_one_husky_pair(db, location, reading, reference, dataset):
+    eprint('{}: {} {}'.format(location, reading, reference))
+    registration_pair = db.create_pair(location, reading, reference)
+    registration_pair.import_pointclouds(dataset, use_odometry=True)
+
+
+def import_husky_pointclouds_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database_root', type=str, help='The root of the pair database.')
+    parser.add_argument('husky_dataset_root', type=str, help='Where to take the husky pointclouds')
+    parser.add_argument('location', type=str, help='The label of the husky dataset')
+    parser.add_argument('valid_scan_window_begin', type=float, help='For every map, take the scans that came valid_scan_window_begin seconds after the map was published.')
+    parser.add_argument('valid_scan_window_end', type=float, help='For every map, take the scans that came valid_scan_window_end seconds before the map was published.')
+    args = parser.parse_args()
+
+    db = RegistrationPairDatabase(args.database_root)
+    dataset = create_registration_dataset('husky', args.husky_dataset_root)
+
+    pairs_to_fetch = []
+    for reference in range(dataset.n_references()):
+        pairs_to_fetch.extend(dataset.find_pairs_by_delay(reference, args.valid_scan_window_begin, args.valid_scan_window_end))
+
+    with multiprocessing.Pool() as p:
+        p.starmap(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
+
 
 
 def import_files_cli():

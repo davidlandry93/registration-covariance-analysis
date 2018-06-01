@@ -1,5 +1,5 @@
-import time
 
+import json
 from math import ceil, sqrt
 import numpy as np
 import time
@@ -117,7 +117,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=10)
 
-        optimizer = optim.SGD([self.theta], lr=self.learning_rate)
+        # optimizer = optim.SGD([self.theta], lr=self.learning_rate)
+        optimizer = optim.Adam([self.theta], lr=self.learning_rate)
 
         validation_losses = []
         validation_stds = []
@@ -167,10 +168,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimizer.step()
 
             indiv_optimization_errors = self._validation_errors(self.model_predictors, self.model_covariances)
-            optimization_score = torch.mean(indiv_optimization_errors).data
+            optimization_score = torch.mean(indiv_optimization_errors).data.numpy().item()
             optimization_errors_log.append(indiv_optimization_errors.data.numpy().tolist())
-            optimization_losses.append(optimization_score[0])
-            optimization_stds.append(torch.std(indiv_optimization_errors).data[0])
+            optimization_losses.append(optimization_score)
+            optimization_stds.append(torch.std(indiv_optimization_errors).data.numpy().item())
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
@@ -189,15 +190,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score[0]))
+                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score))
                 eprint('Validation score: {:.8E}'.format(validation_score))
                 eprint('Validation std:   {:.8E}'.format(validation_errors.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
                 validation_errors_log.append(validation_errors.numpy().tolist())
-                validation_losses.append(validation_score)
-                validation_stds.append(torch.std(validation_errors))
+                validation_losses.append(validation_score.numpy().item())
+                validation_stds.append(torch.std(validation_errors).numpy().item())
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
@@ -248,7 +249,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return {
             'algorithm': 'cello',
             'learning_rate': self.learning_rate,
-            'alpha': self.alpha
+            'alpha': self.alpha,
+            'logging_rate': 1,
         }
 
 
@@ -331,7 +333,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def save_model(self, location):
        with open(location, 'w') as f:
-           json.dump(self.export_model, f)
+           json.dump(self.export_model(), f)
 
     def load_model(self, location):
         with open(location) as f:

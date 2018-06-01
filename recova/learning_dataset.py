@@ -37,13 +37,16 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, descriptor, covariance_algo):
-    print(registration_pair)
-
+def generate_one_example(registration_pair, descriptor, covariance_algo, descriptor_only=False):
     descriptor_start = time.time()
     descriptor = descriptor.compute(registration_pair)
     eprint('Descriptor took {} seconds'.format(time.time() - descriptor_start))
-    covariance = covariance_algo.compute(registration_pair)
+
+    if not descriptor_only:
+        covariance = covariance_algo.compute(registration_pair)
+    else:
+        covariance = None
+
     eprint('Example took {} seconds'.format(time.time() - descriptor_start))
 
     return (descriptor, covariance)
@@ -56,6 +59,7 @@ def generate_examples_cli():
     parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
     parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
     parser.add_argument('-c', '--config', type=str, help='Path to a json config for the descriptor.')
+    parser.add_argument('--descriptor-only', action='store_true', help='Generate only the descriptor.')
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -75,18 +79,18 @@ def generate_examples_cli():
     eprint('Using descriptor: {}'.format(repr(descriptor)))
 
     with multiprocessing.Pool(args.n_cores) as pool:
-        examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo) for x in registration_pairs])
+        examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs])
 
     xs = []
     ys = []
     for p in examples:
         x, y = p
         xs.append(x.tolist())
-        ys.append(y.tolist())
+        if not args.descriptor_only:
+            ys.append(y.tolist())
 
 
-    with open(args.output, 'w') as dataset_file:
-        json.dump({
+    output_dict = {
             'metadata': {
                 'what': 'learning_dataset',
                 'date': str(datetime.datetime.today()),
@@ -104,10 +108,14 @@ def generate_examples_cli():
                     'reading': x.reading,
                     'reference': x.reference} for x in registration_pairs],
                 'xs': xs,
-                'ys': ys,
             }
-        }, dataset_file)
+        }
 
+    if not args.descriptor_only:
+        output_dict['data']['ys'] = ys
+
+    with open(args.output, 'w') as dataset_file:
+        json.dump(output_dict, dataset_file)
 
 
 def compute_one_summary_line(registration_pair, covariance_algo):

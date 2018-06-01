@@ -206,3 +206,11 @@ def quat_to_rot_matrix(quat):
     m[2,2] = 1 - 2*x*x - 2*y*y
 
     return m
+
+def transform_points(points, t):
+    homo_points = np.ones((4, len(points)))
+    homo_points[0:3, :] = points.T
+
+    transformed_homo = np.dot(t, homo_points)
+
+    return transformed_homo[0:3].T

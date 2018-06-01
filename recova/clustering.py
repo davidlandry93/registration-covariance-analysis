@@ -11,9 +11,11 @@ import time
 
 import pyclustering.cluster.dbscan as dbscan
 
+from recov.pointcloud_io import pointcloud_to_vtk
+
 from recova.covariance_of_registrations import distribution_of_registrations
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
-from recova.registration_dataset import points_to_vtk, positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
+from recova.registration_dataset import positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster
 from recova.util import eprint, rescale_hypersphere, englobing_radius
 
@@ -204,8 +206,8 @@ def to_vtk(dataset, clustering, output, center_around_gt=False):
     data_dict = data_dict_of_registration_data(dataset)
     data_dict['clustering'] = np.ascontiguousarray(clustering_data)
 
-    points_to_vtk(points[:,0:3], '{}_translation'.format(output, radius), data=data_dict)
-    points_to_vtk(points[:,3:6], '{}_rotation'.format(output, radius), data=data_dict)
+    pointcloud_to_vtk(points[:,0:3], '{}_translation'.format(output, radius), data=data_dict)
+    pointcloud_to_vtk(points[:,3:6], '{}_rotation'.format(output, radius), data=data_dict)
 
     mean = np.array(clustering['mean_of_central'])
     mean = se3log(mean)

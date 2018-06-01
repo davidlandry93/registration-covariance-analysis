@@ -1,6 +1,7 @@
 
 import argparse
 import json
+import os
 import numpy as np
 import sys
 
@@ -72,7 +73,11 @@ def cli():
 
     model_path = args.output + '.model'
     model.save_model(model_path)
-    learning_run['model'] = model_path
+    learning_run['model'] = os.getcwd() + '/' + model_path
+
+    for k in learning_run:
+        eprint('{}: {}'.format(k, learning_run[k]))
+        eprint()
 
     with open(args.output + '.json', 'w') as f:
         json.dump(learning_run, f)

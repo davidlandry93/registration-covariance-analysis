@@ -5,8 +5,11 @@ import json
 import numpy as np
 import time
 
+from recov.pointcloud_io import pointcloud_to_vtk
+
 from recova.learning.learning import model_loader
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
+from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, kullback_leibler
 
 def frobenius(tensor):
@@ -21,6 +24,50 @@ def frobenius(tensor):
     
     print(tensor.shape)
     return np.sqrt(tensor)
+
+
+def prediction_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', help='Path to the dataset used to train the model', type=str)
+    parser.add_argument('model', help='Path to the trained model', type=str)
+    parser.add_argument('output', help='Where to output the vtk files', type=str)
+    parser.add_argument('--registration-database', help='Fetch the pointclouds to give some context to the generated covariances.')
+    args = parser.parse_args()
+
+    print('Loading dataset...')
+    with open(args.dataset) as f:
+        dataset = json.load(f)
+    print('Done')
+
+    print('Loading model...')
+    with open(args.model) as f:
+        learning_run = json.load(f)
+    print('Done')
+
+
+    model = model_loader(learning_run)
+
+    eprint(model)
+
+    xs = np.array(dataset['data']['xs'])
+
+    ys_predicted = model.predict(xs)
+
+    db = RegistrationPairDatabase(args.registration_database)
+
+    for i in range(len(ys_predicted)):
+        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][0:3,0:3], args.output + '/translation_predicted_' + str(i).zfill(4))
+
+        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][3:6,3:6], args.output + '/rotation_predicted_' + str(i).zfill(4))
+
+        pair_id = dataset['data']['pairs'][i]
+        registration_pair = db.get_registration_pair(pair_id['dataset'], pair_id['reading'], pair_id['reference'])
+
+        reading = registration_pair.points_of_reading()
+
+        pointcloud_to_vtk(reading, args.output + '/reading_{}'.format(str(i).zfill(4)))
+
+
 
 def cli():
     parser = argparse.ArgumentParser()

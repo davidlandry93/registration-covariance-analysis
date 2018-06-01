@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 
 
   unique_ptr<Eigen::MatrixXd> m(new Eigen::MatrixXd());
-  *m = json_array_to_matrix(input);
+  *m = json_array_to_matrix(input).transpose();
 
   GridPointcloudSeparator separator(FLAGS_spanx, FLAGS_spany, FLAGS_spanz, FLAGS_nx, FLAGS_ny, FLAGS_nz);
   separator.set_pointcloud(move(m));

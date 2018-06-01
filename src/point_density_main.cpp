@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
   json json_dataset;
   std::cin >> json_dataset;
 
-  auto eigen_dataset = std::make_shared<Eigen::MatrixXd>(json_array_to_matrix(json_dataset));
+  auto eigen_dataset = std::make_shared<Eigen::MatrixXd>(json_array_to_matrix(json_dataset).transpose());
   std::vector<double> density = size_of_neighborhood(eigen_dataset, FLAGS_k);
 
   std::transform(density.begin(), density.end(), density.begin(), [](double x){return 1.0 / x;});

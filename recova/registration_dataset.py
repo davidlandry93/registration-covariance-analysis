@@ -4,8 +4,9 @@ import json
 import numpy as np
 import sys
 
-from pyevtk.hl import pointsToVTK
 from lieroy.parallel import se3_log
+
+from recov.pointcloud_io import pointcloud_to_vtk
 
 from recova.density import density_of_points
 from recova.util import empty_to_none, eprint, dataset_to_registrations
@@ -15,7 +16,7 @@ def dataset_to_vtk(dataset, filename, dims=(0,1,2)):
     positions = positions_of_registration_data(dataset)
     data = empty_to_none(data_dict_of_registration_data(dataset))
 
-    points_to_vtk(positions[:,dims], filename, data=data)
+    pointcloud_to_vtk(positions[:,dims], filename, data=data)
 
 
 def registrations_of_dataset(dataset, key='result'):
@@ -108,21 +109,6 @@ def lie_tensor_of_trails(registration_dataset):
 
 
     return positions_of_iterations
-
-
-def points_to_vtk(points, filename, data=None, T=np.identity(4)):
-    if len(points) == 0:
-        raise RuntimeError('Cannot export empty pointcloud to vtk')
-
-    homo_points = np.ones((4, points.shape[0]))
-    homo_points[0:3, :] = points.T
-    transformed_points = np.dot(T, homo_points)
-
-    pointsToVTK(filename,
-                np.ascontiguousarray(transformed_points[0]),
-                np.ascontiguousarray(transformed_points[1]),
-                np.ascontiguousarray(transformed_points[2]),
-                data = data)
 
 
 def registration2lie_cli():

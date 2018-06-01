@@ -35,6 +35,19 @@ class IdentityMaskGenerator(MaskGenerator):
     def labels(self):
         return ['identity']
 
+
+class ReferenceOnlyMaskGenerator(MaskGenerator):
+    def __repr__(self):
+        return 'refonly'
+
+    def compute(self, pair):
+        return MaskPair(np.zeros((1, len(pair.points_of_reading())), dtype=bool),
+                        np.ones((1, len(pair.points_of_reference())), dtype=bool))
+
+    def labels(self):
+        return ['refonly']
+
+
 class ConcatMaskGenerator(MaskGenerator):
     def __init__(self, generators):
         self.generators = generators
@@ -57,8 +70,8 @@ class ConcatMaskGenerator(MaskGenerator):
             new_reference_masks = np.empty((n_masks, len_reference), dtype=bool)
             for i in range(len(reading_masks)):
                 for j in range(len(reading_masks_to_add)):
-                    new_reading_masks[i * n_masks + j] = np.logical_and(reading_masks_to_add[j], reading_masks[i])
-                    new_reference_masks[i * n_masks + j] = np.logical_and(reference_masks_to_add[j], reference_masks[i])
+                    new_reading_masks[i * len(reading_masks_to_add) + j] = np.logical_and(reading_masks_to_add[j], reading_masks[i])
+                    new_reference_masks[i * len(reference_masks_to_add) + j] = np.logical_and(reference_masks_to_add[j], reference_masks[i])
 
             reading_masks = new_reading_masks
             reference_masks = new_reference_masks
@@ -80,6 +93,81 @@ class ConcatMaskGenerator(MaskGenerator):
             label_list = new_label_list
 
         return label_list
+
+
+class OrMaskGenerator(MaskGenerator):
+    def __init__(self, generators):
+        self.generators = generators
+
+    def __repr__(self):
+        return '_or_'.join([repr(g) for g in self.generators])
+
+    def labels(self):
+        label_list = []
+        for g in self.generators:
+            new_label_list = []
+
+            if not label_list:
+                new_label_list = g.labels()
+            else:
+                for l in label_list:
+                    for gl in g.labels():
+                        new_label_list.append('{}_or_{}'.format(l, gl))
+
+            label_list = new_label_list
+
+        return label_list
+
+    def compute(self, pair):
+        len_reading = len(pair.points_of_reading())
+        len_reference = len(pair.points_of_reference())
+
+        reading_masks = np.zeros((1, len_reading), dtype=bool)
+        reference_masks = np.zeros((1, len_reference), dtype=bool)
+
+        for g in self.generators:
+            reading_masks_to_add, reference_masks_to_add = g.compute(pair)
+
+            n_masks = len(reading_masks_to_add) * len(reading_masks)
+            new_reading_masks = np.empty((n_masks, len_reading), dtype=bool)
+            new_reference_masks = np.empty((n_masks, len_reference), dtype=bool)
+            for i in range(len(reading_masks)):
+                for j in range(len(reading_masks_to_add)):
+                    new_reading_masks[i * len(reading_masks_to_add) + j] = np.logical_or(reading_masks_to_add[j], reading_masks[i])
+                    new_reference_masks[i * len(reference_masks_to_add) + j] = np.logical_or(reference_masks_to_add[j], reference_masks[i])
+
+            reading_masks = new_reading_masks
+            reference_masks = new_reference_masks
+
+        return MaskPair(reading_masks, reference_masks)
+
+
+class AngleMaskGenerator(MaskGenerator):
+    def __init__(self, angle_range=2*np.pi, angle_offset=0.0):
+        self.angle_range = angle_range
+        self.angle_offset = angle_offset
+
+    def __repr__(self):
+        return 'angle_{}_{}'.format(self.angle_range, self.angle_offset)
+
+    def labels(self):
+        return ['angle_{}_{}'.format(self.angle_range, self.angle_offset)]
+
+    def compute(self, pair):
+        reading_mask = self.angle_mask_of_cloud(pair.points_of_reading())
+        reference_mask = self.angle_mask_of_cloud(pair.points_of_reference())
+
+        return MaskPair([reading_mask], [reference_mask])
+
+    def angle_mask_of_cloud(self, cloud):
+        angles_around_z = np.arctan2(cloud[:,1], cloud[:,0]) + np.pi
+        eprint(angles_around_z)
+
+        mask = np.logical_and(0. < angles_around_z - self.angle_offset, angles_around_z - self.angle_offset < self.angle_range)
+
+        eprint('Angle: {} points in and {} points out'.format(len(cloud), np.sum(mask)))
+        
+        return mask
 
 
 
@@ -122,7 +210,7 @@ class OverlapMaskGenerator(MaskGenerator):
         input_dict = {
             'reading': reading.tolist(),
             'reference': reference.tolist(),
-            't': pair.ground_truth().tolist()
+            't': pair.transform().tolist()
         }
 
         response = run_subprocess(cmd_string, json.dumps(input_dict))

@@ -5,6 +5,8 @@ from recov.censi import censi_estimate_from_clouds
 from recov.registration_algorithm import IcpAlgorithm
 from recov.pointcloud_io import pointcloud_to_pcd
 
+from recova.util import eprint
+
 class DescriptorAlgo:
     def __init__(self):
         pass
@@ -109,8 +111,15 @@ class NormalsHistogramDescriptionAlgo(DescriptorAlgo):
         return 'norm_histogram'
 
     def compute(self, pair, reading_mask, reference_mask):
-        normals_reading = pair.normals_of_reading()[reading_mask]
+        normals_reading = pair.normals_of_reading()
         normals_reference = pair.normals_of_reference()[reference_mask]
+
+        normals_reading = pair.normals_of_reading()
+        normals_reading = normals_reading[reading_mask]
+
+
+        normals_reference = pair.normals_of_reference()
+        normals_reference = normals_reference[reference_mask]
 
         normals = np.vstack((normals_reading, normals_reference))
 

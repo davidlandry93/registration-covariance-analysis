@@ -82,8 +82,8 @@ int main(int argc, char** argv) {
 
     auto t = recova::json_array_to_matrix(input["t"]);
     Eigen::MatrixXd reference =
-        recova::json_array_to_matrix(input["reference"]);
-    Eigen::MatrixXd reading = recova::json_array_to_matrix(input["reading"]);
+            recova::json_array_to_matrix(input["reference"]).transpose();
+    Eigen::MatrixXd reading = recova::json_array_to_matrix(input["reading"]).transpose();
 
     Eigen::MatrixXd homogeneous_reading = Eigen::MatrixXd::Constant(4, reading.cols(), 1.0);
     homogeneous_reading.block(0,0, 3, reading.cols()) = reading;
@@ -91,15 +91,15 @@ int main(int argc, char** argv) {
     homogeneous_reading = t * homogeneous_reading;
     homogeneous_reading.conservativeResize(3, Eigen::NoChange);
 
+    std::cerr << input["t"] << std::endl;
+    std::cerr << t << std::endl;
+
     json output;
     if(FLAGS_mask) {
         std::vector<bool> overlapping_from_reading_mask = overlapping_points_mask(homogeneous_reading, reference);
         std::vector<bool> overlapping_from_reference_mask = overlapping_points_mask(reference, homogeneous_reading);
         json reading_mask = std::vector<int>(overlapping_from_reading_mask.size());
         json reference_mask = std::vector<int>(overlapping_from_reference_mask.size());
-
-        std::cerr << "Readin mask size: " << reading_mask.size() << '\n';
-        std::cerr << "Ref mask size: " << reference_mask.size() << '\n';
 
         int overlapping_in_reading = 0;
         for(auto i = 0; i < reading_mask.size(); ++i) {
