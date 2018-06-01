@@ -4,7 +4,7 @@ import json
 import numpy as np
 
 from recova.registration_result_database import RegistrationPairDatabase
-from recova.util import eprint, run_subprocess
+from recova.util import eprint, run_subprocess, transform_points
 
 
 MaskPair = collections.namedtuple('MaskPair', ['reading', 'reference'])
@@ -161,12 +161,9 @@ class AngleMaskGenerator(MaskGenerator):
 
     def angle_mask_of_cloud(self, cloud):
         angles_around_z = np.arctan2(cloud[:,1], cloud[:,0]) + np.pi
-        eprint(angles_around_z)
 
         mask = np.logical_and(0. < angles_around_z - self.angle_offset, angles_around_z - self.angle_offset < self.angle_range)
 
-        eprint('Angle: {} points in and {} points out'.format(len(cloud), np.sum(mask)))
-        
         return mask
 
 
@@ -282,8 +279,10 @@ class CylinderGridMask(MaskGenerator):
         return masks
 
     def compute(self, pair):
+        transformed_ref = transform_points(pair.points_of_reference(), np.linalg.inv(pair.transform()))
+        masks_reference = self.compute_for_cloud(transformed_ref)
+
         masks_reading = self.compute_for_cloud(pair.points_of_reading())
-        masks_reference = self.compute_for_cloud(pair.points_of_reference())
 
         return MaskPair(masks_reading, masks_reference)
 
@@ -319,6 +318,8 @@ class GridMaskGenerator(MaskGenerator):
 
         reference = pair.points_of_reference()
         reading = pair.points_of_reading()
+
+        reference = transform_points(reference, np.linalg.inv(pair.transform()))
 
         n_of_bins = self.n[0] * self.n[1] * self.n[2]
 

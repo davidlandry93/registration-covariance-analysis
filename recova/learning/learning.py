@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import numpy as np
+import re
 import sys
 
 import recova.util
@@ -30,6 +31,7 @@ def cli():
     parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
     parser.add_argument('-o', '--output', type=str, help='Where to save the learning run')
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
+    parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -40,6 +42,17 @@ def cli():
 
     predictors = np.array(input_document['data']['xs'])
     covariances = np.array(input_document['data']['ys'])
+
+    if args.filter:
+        compiled = re.compile(args.filter)
+
+        pairs_mask = np.zeros(len(predictors), dtype=bool)
+
+        for i, pair in enumerate(input_document['data']['pairs']):
+            pairs_mask[i] = not compiled.match(pair['dataset'])
+
+        predictors = predictors[pairs_mask]
+        covariances = covariances[pairs_mask]
 
     train_indices = []
     validation_indices = []

@@ -37,7 +37,7 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, descriptor, covariance_algo, descriptor_only=False):
+def generate_one_example(registration_pair, descriptor, covariance_algo,descriptor_only=False):
     descriptor_start = time.time()
     descriptor = descriptor.compute(registration_pair)
     eprint('Descriptor took {} seconds'.format(time.time() - descriptor_start))
