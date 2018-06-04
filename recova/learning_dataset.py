@@ -7,8 +7,9 @@ import json
 import multiprocessing
 import numpy as np
 import pathlib
-import time
 import sys
+import time
+import tqdm
 
 from lieroy import se3
 
@@ -18,7 +19,7 @@ from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlg
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
-from recova.util import eprint, nearestPD
+from recova.util import eprint, nearestPD, parallel_starmap_progressbar
 
 
 def vectorize_covariance(cov_matrix):
@@ -78,8 +79,10 @@ def generate_examples_cli():
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))
 
-    with multiprocessing.Pool(args.n_cores) as pool:
-        examples = pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs])
+    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs])
+
+    # with multiprocessing.Pool(args.n_cores) as pool:
+    #     examples = tqdm.tqdm(pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs]), total=len(registration_pairs), ascii=True, file=sys.stdout)
 
     xs = []
     ys = []

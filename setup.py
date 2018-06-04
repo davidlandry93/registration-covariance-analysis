@@ -14,7 +14,7 @@ setup(
     package_data={
         'recova': ['core.so']
     },
-    install_requires=['numpy', 'pyclustering', 'pyevtk', 'sklearn'],
+    install_requires=['numpy', 'pyclustering', 'pyevtk', 'sklearn', 'tqdm'],
     scripts = ['bin/all_registration_to_vtk_ellipsoid',
                'bin/meta_of_json'],
     entry_points = {

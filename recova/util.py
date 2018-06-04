@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+import functools
 from math import ceil, sqrt
+import multiprocessing
 import numpy as np
 import subprocess
 import sys
+import tqdm
 
 from lieroy.parallel import FunctionWrapper
 
@@ -214,3 +217,14 @@ def transform_points(points, t):
     transformed_homo = np.dot(t, homo_points)
 
     return transformed_homo[0:3].T
+
+def unpacker(function, tup):
+    return function(*tup)
+
+def parallel_starmap_progressbar(worker, data, n_cores=8):
+    with multiprocessing.Pool(n_cores) as pool:
+        results = []
+        for x in tqdm.tqdm(pool.imap_unordered(functools.partial(unpacker, worker), data), total=len(data), file=sys.stdout):
+            results.append(x)
+
+    return results

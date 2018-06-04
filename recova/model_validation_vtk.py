@@ -25,6 +25,8 @@ def frobenius(tensor):
     print(tensor.shape)
     return np.sqrt(tensor)
 
+def generate_one_prediction()
+
 
 def prediction_cli():
     parser = argparse.ArgumentParser()
