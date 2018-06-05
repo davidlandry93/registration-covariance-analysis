@@ -224,7 +224,7 @@ def unpacker(function, tup):
 def parallel_starmap_progressbar(worker, data, n_cores=8):
     with multiprocessing.Pool(n_cores) as pool:
         results = []
-        for x in tqdm.tqdm(pool.imap_unordered(functools.partial(unpacker, worker), data), total=len(data), file=sys.stdout):
+        for x in tqdm.tqdm(pool.imap_unordered(functools.partial(unpacker, worker), data), total=len(data), file=sys.stdout, smoothing=0.8):
             results.append(x)
 
     return results

@@ -57,7 +57,7 @@ def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
     parser.add_argument('--input', type=str, help='Where the registration results are stored', default='.', required=True)
-    parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='gazebo_winter|wood_summer')
+    parser.add_argument('--exclude', type=str, help='Regex of names of datasets to exclude', default='')
     parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
     parser.add_argument('-c', '--config', type=str, help='Path to a json config for the descriptor.')
     parser.add_argument('--descriptor-only', action='store_true', help='Generate only the descriptor.')
@@ -79,7 +79,7 @@ def generate_examples_cli():
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))
 
-    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs])
+    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
 
     # with multiprocessing.Pool(args.n_cores) as pool:
     #     examples = tqdm.tqdm(pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs]), total=len(registration_pairs), ascii=True, file=sys.stdout)
@@ -100,7 +100,8 @@ def generate_examples_cli():
                 'descriptor': str(descriptor),
                 'covariance_algo': str(covariance_algo),
                 'descriptor_labels': descriptor.labels(),
-                'descriptor_config': descriptor_config
+                'descriptor_config': descriptor_config,
+                'filter': args.exclude
             },
             'statistics': {
                 'n_examples': len(xs)
@@ -156,7 +157,6 @@ def dataset_summary_cli():
 
     with multiprocessing.Pool() as p:
         rows = p.starmap(compute_one_summary_line, [(x, covariance_algorithm) for x in db.registration_pairs()])
-
     writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
     writer.writeheader()
     for row in rows:

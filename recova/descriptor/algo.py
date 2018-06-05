@@ -1,11 +1,12 @@
+import json
 import numpy as np
 import tempfile
 
 from recov.censi import censi_estimate_from_clouds
 from recov.registration_algorithm import IcpAlgorithm
-from recov.pointcloud_io import pointcloud_to_pcd
+from recov.pointcloud_io import pointcloud_to_pcd, points_to_temporary_pcd
 
-from recova.util import eprint
+from recova.util import eprint, run_subprocess
 
 class DescriptorAlgo:
     def __init__(self):
@@ -224,4 +225,42 @@ class CensiDescriptor(DescriptorAlgo):
         censi_estimate = censi_estimate_from_clouds(reading_file_name, reference_file_name, pair.ground_truth(), IcpAlgorithm())
 
         return self.scale_factor * np.array(censi_estimate).flatten()
+
+
+class AveragePlanarityDescriptor(DescriptorAlgo):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return 'avg_planarity'
+
+    def labels(self):
+        return ['avg_planarity']
+
+    def compute(self, pair, reading_mask, reference_mask):
+        reading = pair.points_of_reading()[reading_mask]
+        reference = pair.points_of_reference()[reference_mask]
+
+        concat = np.vstack((reading, reference))
+
+        if len(concat) == 0:
+            planarity = 0.0
+        else:
+            concat_pcd = points_to_temporary_pcd(concat)
+            planarity = self.avg_planarity_of_cloud(concat_pcd)
+
+        return [planarity]
+
+    def avg_planarity_of_cloud(self, cloud_pcd):
+        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(cloud_pcd)
+        result = run_subprocess(cmd_string)
+
+        result_dict = json.loads(result)
+
+
+        cloud_eig_vals = np.array(result_dict)
+        cloud_eig_vals.sort(axis=0)
+
+        planarities = (cloud_eig_vals[1] - cloud_eig_vals[0]) / np.linalg.norm(cloud_eig_vals, axis=0)
+        return planarities.mean()
 

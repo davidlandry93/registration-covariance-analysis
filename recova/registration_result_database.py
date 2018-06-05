@@ -20,7 +20,7 @@ from recova.alignment import IdentityAlignmentAlgorithm
 from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
 from recova.covariance import covariance_algorithm_factory
 from recova.file_cache import FileCache
-from recova.util import eprint, run_subprocess
+from recova.util import eprint, run_subprocess, parallel_starmap_progressbar
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
@@ -350,8 +350,10 @@ def import_husky_pointclouds_cli():
     for reference in range(dataset.n_references()):
         pairs_to_fetch.extend(dataset.find_pairs_by_delay(reference, args.valid_scan_window_begin, args.valid_scan_window_end))
 
-    with multiprocessing.Pool() as p:
-        p.starmap(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
+    # with multiprocessing.Pool() as p:
+    #     p.starmap(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
+
+    parallel_starmap_progressbar(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
 
 
 

@@ -23,13 +23,13 @@ def model_loader(learning_run):
 def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('algorithm', type=str)
+    parser.add_argument('output', type=str, help='Where to save the learning run')
     parser.add_argument('-lr', '--learning_rate', type=float, default=1e-5)
     parser.add_argument('-a', '--alpha', type=float, default=1e-4)
     parser.add_argument('-b', '--beta', type=float, default=1e3)
     parser.add_argument('-n', '--n_iterations', type=int, default=0, help='Maximum number of iterations. 0 means no maximum and wait for convergence.')
     parser.add_argument('-w', '--convergence_window', type=int, default=20, help='N of iterations without improvement before ending training.')
     parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
-    parser.add_argument('-o', '--output', type=str, help='Where to save the learning run')
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
     args = parser.parse_args()
@@ -87,10 +87,6 @@ def cli():
     model_path = args.output + '.model'
     model.save_model(model_path)
     learning_run['model'] = os.getcwd() + '/' + model_path
-
-    for k in learning_run:
-        eprint('{}: {}'.format(k, learning_run[k]))
-        eprint()
 
     with open(args.output + '.json', 'w') as f:
         json.dump(learning_run, f)

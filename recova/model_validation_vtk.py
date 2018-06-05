@@ -10,7 +10,7 @@ from recov.pointcloud_io import pointcloud_to_vtk
 from recova.learning.learning import model_loader
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_result_database import RegistrationPairDatabase
-from recova.util import eprint, kullback_leibler
+from recova.util import eprint, kullback_leibler, parallel_starmap_progressbar
 
 def frobenius(tensor):
     print(tensor.shape)
@@ -25,7 +25,16 @@ def frobenius(tensor):
     print(tensor.shape)
     return np.sqrt(tensor)
 
-def generate_one_prediction()
+def generate_one_prediction(i, y_predicted, pair_id, registration_pair_database, output):
+    distribution_to_vtk_ellipsoid(np.zeros(3), y_predicted[0:3,0:3], output + '/translation_predicted_' + str(i).zfill(4))
+
+    distribution_to_vtk_ellipsoid(np.zeros(3), y_predicted[3:6,3:6], output + '/rotation_predicted_' + str(i).zfill(4))
+
+    registration_pair = registration_pair_database.get_registration_pair(pair_id['dataset'], pair_id['reading'], pair_id['reference'])
+
+    reading = registration_pair.points_of_reading()
+
+    pointcloud_to_vtk(reading, output + '/reading_{}'.format(str(i).zfill(4)))
 
 
 def prediction_cli():
@@ -57,17 +66,20 @@ def prediction_cli():
 
     db = RegistrationPairDatabase(args.registration_database)
 
-    for i in range(len(ys_predicted)):
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][0:3,0:3], args.output + '/translation_predicted_' + str(i).zfill(4))
+    parallel_starmap_progressbar(generate_one_prediction, [(i, ys_predicted[i], dataset['data']['pairs'][i], db, args.output) for i in range(len(ys_predicted))])
 
-        distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][3:6,3:6], args.output + '/rotation_predicted_' + str(i).zfill(4))
 
-        pair_id = dataset['data']['pairs'][i]
-        registration_pair = db.get_registration_pair(pair_id['dataset'], pair_id['reading'], pair_id['reference'])
+    # for i in range(len(ys_predicted)):
+    #     distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][0:3,0:3], args.output + '/translation_predicted_' + str(i).zfill(4))
 
-        reading = registration_pair.points_of_reading()
+    #     distribution_to_vtk_ellipsoid(np.zeros(3), ys_predicted[i][3:6,3:6], args.output + '/rotation_predicted_' + str(i).zfill(4))
 
-        pointcloud_to_vtk(reading, args.output + '/reading_{}'.format(str(i).zfill(4)))
+    #     pair_id = dataset['data']['pairs'][i]
+    #     registration_pair = db.get_registration_pair(pair_id['dataset'], pair_id['reading'], pair_id['reference'])
+
+    #     reading = registration_pair.points_of_reading()
+
+    #     pointcloud_to_vtk(reading, args.output + '/reading_{}'.format(str(i).zfill(4)))
 
 
 

@@ -4,7 +4,7 @@ import json
 import time
 
 from recov.pointcloud_io import pointcloud_to_vtk
-from recova.descriptor.algo import CensiDescriptor, ConcatDescriptorAlgo, MomentsDescriptorAlgo, NormalsHistogramDescriptionAlgo, OccupancyDescriptorAlgo
+from recova.descriptor.algo import CensiDescriptor, ConcatDescriptorAlgo, MomentsDescriptorAlgo, NormalsHistogramDescriptionAlgo, OccupancyDescriptorAlgo, AveragePlanarityDescriptor
 from recova.descriptor.descriptor import Descriptor, DescriptorConcat 
 from recova.descriptor.mask import AngleMaskGenerator, ConcatMaskGenerator, IdentityMaskGenerator, CylinderGridMask, GridMaskGenerator, OverlapMaskGenerator, OrMaskGenerator, ReferenceOnlyMaskGenerator
 from recova.registration_result_database import RegistrationPairDatabase
@@ -27,6 +27,8 @@ def single_description_algo_factory(config):
         instance = OccupancyDescriptorAlgo()
     elif config['name'] == 'censi':
         instance = CensiDescriptor()
+    elif config['name'] == 'planarity_avg':
+        instance = AveragePlanarityDescriptor()
     else:
         raise ValueError('No description algo named {}'.format(config['name']))
 
