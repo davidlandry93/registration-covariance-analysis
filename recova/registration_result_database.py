@@ -33,6 +33,7 @@ class RegistrationPair:
         self.reading = reading
         self.reference = reference
         self.cache = FileCache(self.directory_of_pair / 'cache')
+        self.memory_cache = {}
 
         self._points_of_reading = None
         self._points_of_reference = None
@@ -262,6 +263,32 @@ class RegistrationPair:
 
     def normals_of_reference(self):
         return self.normals_of_cloud('reference_normals')
+
+    def eigenvalues_of_reading(self):
+        return self.eigenvalues_of_cloud('reading_eigenvalues')
+
+    def eigenvalues_of_reference(self):
+        return self.eigenvalues_of_cloud('reference_eigenvalues')
+
+    def eigenvalues_of_cloud(self, label):
+        pcd_of_label = {
+            'reading_eigenvalues': self.path_to_reading_pcd(),
+            'reference_eigenvalues': self.path_to_reference_pcd()
+        }
+
+        return self.cache.get_or_generate(
+            label,
+            lambda: self._eigenvalues_of_cloud(pcd_of_label[label])
+        )
+
+    def _eigenvalues_of_cloud(self, pcd):
+        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(pcd)
+        result = run_subprocess(cmd_string)
+        result_dict = json.loads(result)
+
+        cloud_eig_vals = np.array(result_dict)
+
+        return cloud_eig_vals.T
 
 
 

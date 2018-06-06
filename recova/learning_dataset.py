@@ -39,6 +39,7 @@ def vectorize_covariance(cov_matrix):
 
 
 def generate_one_example(registration_pair, descriptor, covariance_algo,descriptor_only=False):
+    eprint(registration_pair)
     descriptor_start = time.time()
     descriptor = descriptor.compute(registration_pair)
     eprint('Descriptor took {} seconds'.format(time.time() - descriptor_start))
@@ -79,10 +80,15 @@ def generate_examples_cli():
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))
 
-    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
+    # examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
 
     # with multiprocessing.Pool(args.n_cores) as pool:
     #     examples = tqdm.tqdm(pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs]), total=len(registration_pairs), ascii=True, file=sys.stdout)
+
+    examples = []
+    for x in registration_pairs:
+        examples.append(generate_one_example(x, descriptor, covariance_algo, args.descriptor_only))
+
 
     xs = []
     ys = []
@@ -91,7 +97,6 @@ def generate_examples_cli():
         xs.append(x.tolist())
         if not args.descriptor_only:
             ys.append(y.tolist())
-
 
     output_dict = {
             'metadata': {

@@ -241,26 +241,17 @@ class AveragePlanarityDescriptor(DescriptorAlgo):
         reading = pair.points_of_reading()[reading_mask]
         reference = pair.points_of_reference()[reference_mask]
 
-        concat = np.vstack((reading, reference))
+        eigvals_reading = pair.eigenvalues_of_reading()[reading_mask]
+        eigvals_reference = pair.eigenvalues_of_reference()[reference_mask]
+
+        concat = np.vstack((eigvals_reading, eigvals_reference))
+
+        eprint('Sums of masks: {} {}'.format(reading_mask.sum(), reference_mask.sum()))
+        eprint('Shape of eigvals: {} {}'.format(eigvals_reading.shape, eigvals_reference.shape))
+        eprint('Shape of concat: {}'.format(concat.shape))
 
         if len(concat) == 0:
-            planarity = 0.0
+            return [0.0]
         else:
-            concat_pcd = points_to_temporary_pcd(concat)
-            planarity = self.avg_planarity_of_cloud(concat_pcd)
-
-        return [planarity]
-
-    def avg_planarity_of_cloud(self, cloud_pcd):
-        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(cloud_pcd)
-        result = run_subprocess(cmd_string)
-
-        result_dict = json.loads(result)
-
-
-        cloud_eig_vals = np.array(result_dict)
-        cloud_eig_vals.sort(axis=0)
-
-        planarities = (cloud_eig_vals[1] - cloud_eig_vals[0]) / np.linalg.norm(cloud_eig_vals, axis=0)
-        return planarities.mean()
-
+            planarities = (concat[:,1] - concat[:,0]) / np.linalg.norm(concat, axis=1)
+            return [planarities.mean()]
