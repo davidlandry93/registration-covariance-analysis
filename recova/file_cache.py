@@ -26,7 +26,7 @@ class FileCache:
         elif demanded_file.exists():
             value = self.load_from_file(key)
         else:
-            value = None
+            raise ValueError('Key {} not found in this filecache instance at {}'.format(key, self.root))
 
         return value
 

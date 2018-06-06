@@ -10,10 +10,8 @@ import sys
 
 from io import StringIO
 
-from recov.censi import compute_icp
 from recov.datasets import create_registration_dataset
 from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz
-from recov.registration_algorithm import IcpAlgorithm
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
@@ -24,279 +22,27 @@ from recova.util import eprint, run_subprocess, parallel_starmap_progressbar
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
-
-
-class RegistrationPair:
-    def __init__(self, database_root, dataset, reading, reference):
-        self.root = database_root
-        self.dataset = dataset
-        self.reading = reading
-        self.reference = reference
-        self.cache = FileCache(self.directory_of_pair / 'cache')
-        self.memory_cache = {}
-
-        self._points_of_reading = None
-        self._points_of_reference = None
-
-        self._normals = {}
-
-    def __str__(self):
-        return 'Registration Pair: {}'.format(self.pair_id)
-
-    def __repr__(self):
-        return self.pair_id
-
-    @property
-    def pair_id(self):
-        return '{}-{:04d}-{:04d}'.format(self.dataset, self.reading, self.reference)
-
-
-    @property
-    def directory_of_pair(self):
-        pair_folder = self.pair_id
-
-        if not (self.root / pair_folder).exists() or not (self.root / pair_folder / 'raw').exists():
-            os.makedirs(str(self.root / pair_folder / 'raw'))
-
-        return self.root / pair_folder
-
-
-    def accept_raw_file(self, filename):
-        p = pathlib.Path(filename)
-        dest = str(self.directory_of_pair / 'raw' / p.name)
-        eprint('{} to {}'.format(p, dest))
-        os.rename(str(p), dest)
-
-
-    def import_pointclouds(self, pointcloud_dataset, use_odometry=False):
-        """Import the reading and the reference that were used to generate the results from a pointcloud_dataset."""
-        reading_file = self.directory_of_pair / 'reading.xyz'
-        reference_file = self.directory_of_pair / 'reference.xyz'
-
-        with reading_file.open('w') as f:
-            pointcloud_to_xyz(pointcloud_dataset.points_of_reading(self.reading), f)
-
-        with reference_file.open('w') as f:
-            pointcloud_to_xyz(pointcloud_dataset.points_of_reference(self.reference), f)
-
-
-        if use_odometry:
-            algo = IcpAlgorithm()
-            initial_estimate = pointcloud_dataset.odometry_estimate(self.reading, self.reference)
-            transform, _ = compute_icp(self.path_to_reading_pcd(), self.path_to_reference_pcd(), initial_estimate, algo)
-        else:
-            transform = pointcloud_dataset.ground_truth(self.reading, self.reference)
-
-        np.save(self.directory_of_pair / 'transform.npy', transform)
-
-
-    def transform(self):
-        return np.load(self.directory_of_pair / 'transform.npy')
-
-
-    def pair_exists(self):
-        return self.directory_of_pair.exists()
-
-
-    def merge_raw_results(self):
-        list_of_files = []
-
-        for f in (self.directory_of_pair / 'raw').iterdir():
-            if f.suffix == '.json':
-                list_of_files.append(str(f))
-
-        with (self.directory_of_pair / 'registrations.json').open('w') as registration_file:
-            merge_result_files(list_of_files, registration_file)
-
-
-    def lie_matrix_of_results(self):
-        if not self.pair_exists():
-            raise RuntimeError('No results available for demanded registration pair')
-
-        reg_dict = self.registration_dict()
-
-        return positions_of_registration_data(reg_dict)
-
-    @property
-    def registration_file(self):
-        return self.directory_of_pair / 'registrations.json'
-
-
-    def registration_dict(self):
-        if not self.registration_file.exists():
-            self.merge_raw_results()
-
-        with self.registration_file.open() as f:
-            registration_dict = json.load(f)
-
-        return registration_dict
-
-
-    def initial_estimate(self):
-        if not self.registration_file.exists():
-            self.merge_raw_results()
-
-        with self.registration_file.open() as f:
-            results = json.load(f)
-            initial_estimate = results['metadata']['initial_estimate_mean']
-
-        return np.array(initial_estimate)
-
-    def ground_truth(self):
-        return self.transform()
-
-    def path_to_reading_pcd(self):
-        path_to_pcd = self.directory_of_pair / 'reading.pcd'
-
-        if not path_to_pcd.exists():
-            pointcloud_to_pcd(self.points_of_reading(), str(path_to_pcd))
-
-        return path_to_pcd
-
-
-    def path_to_reference_pcd(self):
-        path_to_pcd = self.directory_of_pair / 'reference.pcd'
-
-        if not path_to_pcd.exists():
-            pointcloud_to_pcd(self.points_of_reference(), str(path_to_pcd))
-
-        return path_to_pcd
-
-
-    def points_of_reading(self):
-        if self._points_of_reading is None:
-            reading_file = self.directory_of_pair / 'reading.xyz'
-            with reading_file.open() as f:
-                reading_points = read_xyz_stream(f)
-                self._points_of_reading = reading_points
-
-        return self._points_of_reading
-
-
-    def points_of_reference(self):
-        if self._points_of_reference is None:
-            reference_file = self.directory_of_pair / 'reference.xyz'
-
-            with reference_file.open() as f:
-                reference_points = read_xyz_stream(f)
-                self._points_of_reference = reference_points
-
-        return self._points_of_reference
-
-
-    def clustering_of_results(self, clustering_algorithm):
-        cached_clustering = self.cache[clustering_algorithm.__repr__()]
-
-        if not cached_clustering:
-            clustering = self.compute_clustering(clustering_algorithm)
-            self.cache[clustering_algorithm.__repr__()] = clustering
-            return clustering
-        else:
-            return cached_clustering
-
-
-    def covariance(self, clustering_algorithm=CenteredClusteringAlgorithm()):
-        raise NotImplementedError('use of covariance() is deprecated. Use the CovarianceComputationAlgorithms instead.')
-
-
-    def compute_clustering(self, clustering_algorithm):
-        ground_truth = self.registration_dict()['metadata']['ground_truth']
-
-        lie = self.lie_matrix_of_results()
-
-        clustering_row = clustering_algorithm.cluster(lie, seed=ln_se3(np.array(ground_truth)))
-        distribution = compute_distribution(self.registration_dict(), clustering_row)
-
-        return distribution
-
-
-    def _normals_of_pcd(self, pcd, k=18):
-        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'
-        cmd_string = cmd_template.format(pcd, k)
-
-        eprint(cmd_string)
-        response = run_subprocess(cmd_string)
-        stream = StringIO(response)
-        normals = read_xyz_stream(stream)
-
-        return normals
-
-
-    def normals_of_cloud(self, label):
-        """
-        Computes the normal of the pointcloud designated by label.
-        label can be reading_normals or reference_normals.
-        """
-        cache_file = self.directory_of_pair / (label + '.xyz')
-        pcd_of_label = {
-            'reading_normals': self.path_to_reading_pcd(),
-            'reference_normals': self.path_to_reference_pcd()
-        }
-
-        if label in self._normals:
-            # We have the normals in memory.
-            return self._normals[label]
-        elif cache_file.exists():
-            # We have the normals in cache.
-            with cache_file.open() as f:
-                normals = read_xyz_stream(f)
-
-            self._normals[label] = normals
-            return normals
-        else:
-            # We need to compute the normals.
-            normals = self._normals_of_pcd(pcd_of_label[label])
-
-            # Cache them.
-            with cache_file.open('w') as f:
-                pointcloud_to_xyz(normals, f)
-                f.flush()
-
-            # Save them in memory.
-            self._normals[label] = normals
-            return normals
-
-
-    def normals_of_reading(self):
-        return self.normals_of_cloud('reading_normals')
-
-
-    def normals_of_reference(self):
-        return self.normals_of_cloud('reference_normals')
-
-    def eigenvalues_of_reading(self):
-        return self.eigenvalues_of_cloud('reading_eigenvalues')
-
-    def eigenvalues_of_reference(self):
-        return self.eigenvalues_of_cloud('reference_eigenvalues')
-
-    def eigenvalues_of_cloud(self, label):
-        pcd_of_label = {
-            'reading_eigenvalues': self.path_to_reading_pcd(),
-            'reference_eigenvalues': self.path_to_reference_pcd()
-        }
-
-        return self.cache.get_or_generate(
-            label,
-            lambda: self._eigenvalues_of_cloud(pcd_of_label[label])
-        )
-
-    def _eigenvalues_of_cloud(self, pcd):
-        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(pcd)
-        result = run_subprocess(cmd_string)
-        result_dict = json.loads(result)
-
-        cloud_eig_vals = np.array(result_dict)
-
-        return cloud_eig_vals.T
-
+from recova.registration_pair import RegistrationPair
 
 
 
 class RegistrationPairDatabase:
     def __init__(self, database_root, exclude=None):
         self.root = pathlib.Path(database_root)
+
+        cache_dir = self.root / 'cache'
+        pointcloud_dir = self.root / 'pointclouds'
+        if self.root.exists():
+            cache_dir.mkdir(exist_ok=True)
+            pointcloud_dir.mkdir(exist_ok=True)
+        else:
+            raise RuntimeError('Path {} does not exist'.format(self.root))
+
         self.exclude = (re.compile(exclude) if exclude else None)
+        self.cache = FileCache(cache_dir)
+
+    def pointcloud_dir(self):
+        return self.root / 'pointclouds'
 
     def import_file(self, path_to_file):
         try:
@@ -318,13 +64,13 @@ class RegistrationPairDatabase:
 
 
     def create_pair(self, location, reading, reference):
-        pair = RegistrationPair(self.root, location, reading, reference)
+        pair = RegistrationPair(self.root, location, reading, reference, self)
 
         return pair
 
 
     def get_registration_pair(self, dataset, reading, reference):
-        pair = RegistrationPair(self.root, dataset, reading, reference)
+        pair = RegistrationPair(self.root, dataset, reading, reference, self)
 
         if not pair.pair_exists():
             raise RuntimeError('Registration pair {} does not exist'.format(str(pair)))
@@ -348,17 +94,81 @@ class RegistrationPairDatabase:
 
         return pairs
 
+    def import_reading(self, location, index, dataset):
+        points = dataset.points_of_reading(index)
+        self.import_pointcloud(points, '{}_{}_{}'.format(location, 'reading', index))
+
+    def import_reference(self, location, index, dataset):
+        points = dataset.points_of_reference(index)
+        self.import_pointcloud(points, '{}_{}_{}'.format(location, 'reference', index))
+
+    def import_pointcloud(self, points, label):
+        _ = self.cache.get_or_generate(label, lambda: points)
+
+    def get_reading(self, location, index):
+        label = '{}_{}_{}'.format(location, 'reading', index)
+        return self.cache[label]
+
+    def get_reference(self, location, index):
+        label = '{}_{}_{}'.format(location, 'reference', index)
+        return self.cache[label]
+
+    def reference_pcd(self, location, index):
+        path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reference', index)
+
+        if not path_to_pcd.exists():
+            pointcloud_to_pcd(self.get_reference(location, index), str(path_to_pcd))
+
+        return path_to_pcd
+
+    def reading_pcd(self, location, index):
+        path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reading', index)
+
+        if not path_to_pcd.exists():
+            pointcloud_to_pcd(self.get_reading(location, index), str(path_to_pcd))
+
+        return path_to_pcd
+
+    def normals_of_reading(self, location, index):
+        label = '{}_{}_{}_{}'.format(location, 'reading', index, 'normals')
+        self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reading_pcd()))
+
+    def normals_of_reference(self, location, index):
+        label = '{}_{}_{}_{}'.format(location, 'reference', index, 'normals')
+        self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reference_pcd()))
+
+    def normals_of_pcd(self, pcd, k=18):
+        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'
+        cmd_string = cmd_template.format(pcd, k)
+
+        eprint(cmd_string)
+        response = run_subprocess(cmd_string)
+        stream = StringIO(response)
+        normals = read_xyz_stream(stream)
+
+        return normals
+
+
+
 def import_pointclouds_of_one_pair(registration_pair, database, dataset_type, pointcloud_root):
     print(registration_pair)
+
+    db.import_reading(registration_pair.dataset, registration_pair.reading, dataset)
+    db.import_reference(registration_pair.dataset, registration_pair.reference, dataset)
 
     dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
     registration_pair.import_pointclouds(dataset)
 
 
+
 def import_one_husky_pair(db, location, reading, reference, dataset):
+    db.import_reading(location, reading, dataset)
+    db.import_reference(location, reference, dataset)
+
     eprint('{}: {} {}'.format(location, reading, reference))
     registration_pair = db.create_pair(location, reading, reference)
     registration_pair.import_pointclouds(dataset, use_odometry=True)
+
 
 
 def import_husky_pointclouds_cli():
@@ -368,20 +178,25 @@ def import_husky_pointclouds_cli():
     parser.add_argument('location', type=str, help='The label of the husky dataset')
     parser.add_argument('valid_scan_window_begin', type=float, help='For every map, take the scans that came valid_scan_window_begin seconds after the map was published.')
     parser.add_argument('valid_scan_window_end', type=float, help='For every map, take the scans that came valid_scan_window_end seconds before the map was published.')
+    parser.add_argument('-j', '--n-cores', help='Number of parallel processes to spawn', type=int)
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.database_root)
     dataset = create_registration_dataset('husky', args.husky_dataset_root)
 
+
     pairs_to_fetch = []
     for reference in range(dataset.n_references()):
         pairs_to_fetch.extend(dataset.find_pairs_by_delay(reference, args.valid_scan_window_begin, args.valid_scan_window_end))
 
+    all_tuples = [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch]
     # with multiprocessing.Pool() as p:
     #     p.starmap(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
 
-    parallel_starmap_progressbar(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
+    parallel_starmap_progressbar(import_one_husky_pair, all_tuples, n_cores=args.n_cores)
 
+    # for tup in all_tuples:
+    #     import_one_husky_pair(*tup)
 
 
 def import_files_cli():
@@ -437,4 +252,4 @@ def distribution_cli():
 
 
 if __name__ == '__main__':
-    import_files_cli()
+    import_husky_pointclouds_cli()

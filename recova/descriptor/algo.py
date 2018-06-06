@@ -246,10 +246,6 @@ class AveragePlanarityDescriptor(DescriptorAlgo):
 
         concat = np.vstack((eigvals_reading, eigvals_reference))
 
-        eprint('Sums of masks: {} {}'.format(reading_mask.sum(), reference_mask.sum()))
-        eprint('Shape of eigvals: {} {}'.format(eigvals_reading.shape, eigvals_reference.shape))
-        eprint('Shape of concat: {}'.format(concat.shape))
-
         if len(concat) == 0:
             return [0.0]
         else:
