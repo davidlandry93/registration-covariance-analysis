@@ -63,6 +63,7 @@ def prediction_cli():
     xs = np.array(dataset['data']['xs'])
 
     ys_predicted = model.predict(xs)
+    np.save(args.output + '/predictions.npy')
 
     db = RegistrationPairDatabase(args.registration_database)
 

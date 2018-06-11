@@ -9,9 +9,9 @@ function learning {
     # Arg 2 is the output dir
     # Arg 3 is the name of the dataset to cross validate on
 
+    echo "Doing $3"
     OUTPUT_NAME=$2/cv-$3
-    echo learn_recov -a 1e-5 -lr 1e-6 -cv $2 cello $OUTPUT_NAME
-    cat $1 | learn_recov -a 1e-5 -lr 1e-6 -cv $3 cello $OUTPUT_NAME > ${OUTPUT_NAME}_stdout 2> ${OUTPUT_NAME}_stderr
+    cat $1 | learn_recov -a 1e-5 -lr 1e-7 -cv $3 cello $OUTPUT_NAME > ${OUTPUT_NAME}_stdout 2> ${OUTPUT_NAME}_stderr
     echo "Done with $3"
 }
 

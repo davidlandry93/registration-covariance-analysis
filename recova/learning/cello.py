@@ -127,6 +127,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         validation_errors_log = []
         optimization_errors_log = []
 
+        kll_errors_log = []
+        kll_validation_losses = []
+        kll_validation_stds = []
+
         epoch = 0
         keep_going = True
 
@@ -167,7 +171,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimization_loss.backward()
                 optimizer.step()
 
-            indiv_optimization_errors = self._validation_errors(self.model_predictors, self.model_covariances)
+            predictions = self._predict(self.model_predictors)
+            indiv_optimization_errors = self._validation_errors(predictions, self.model_covariances)
             optimization_score = torch.mean(indiv_optimization_errors).data.numpy().item()
             optimization_errors_log.append(indiv_optimization_errors.data.numpy().tolist())
             optimization_losses.append(optimization_score)
@@ -176,8 +181,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
             if self.queries_have_neighbor(self.model_predictors, metric_matrix, Variable(predictors_validation)):
-                validation_errors = self._validation_errors(Variable(predictors_validation), Variable(covariances_validation)).data
+                predictions = Variable(self._predict(predictors_validation))
+                validation_errors = self._validation_errors(predictions, Variable(covariances_validation)).data
                 validation_score = torch.mean(validation_errors)
+
+                klls = self._kll(predictions, covariances_validation)
+                kll_errors_log.append(klls.data.numpy().tolist())
+                kll_validation_losses.append(torch.mean(klls).data.numpy().item())
+                kll_validation_stds.append(torch.std(klls).data.numpy().item())
 
 
                 eprint('-- Validation of epoch %d --' % epoch)
@@ -190,9 +201,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:   {:.8E}'.format(optimization_score))
-                eprint('Validation score: {:.8E}'.format(validation_score))
-                eprint('Validation std:   {:.8E}'.format(validation_errors.std()))
+                eprint('Avg Optim Loss:     {:.8E}'.format(optimization_score))
+                eprint('Validation score:   {:.8E}'.format(validation_score))
+                eprint('Validation std:     {:.8E}'.format(validation_errors.std()))
+                eprint('Validation kll:     {:.8E}'.format(klls.mean()))
+                eprint('Validation kll std: {:.8E}'.format(klls.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
@@ -217,6 +230,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'validation_errors': validation_errors_log,
             'validation_loss': validation_losses,
             'validation_std': validation_stds,
+            'kll_validation': kll_validation_losses,
+            'kll_std': kll_validation_stds,
+            'kll_errors': kll_errors_log,
             'what': 'model learning',
         }
 
@@ -225,14 +241,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return Variable(torch.randn(size_of_vector) / self.beta, requires_grad=True)
 
     def validation_errors(self, xs, ys):
-        return self._validation_errors(torch.Tensor(xs), torch.Tensor(ys))
+        predictions = self._predict(torch.Tensor(xs))
+        return self._validation_errors(predictions, torch.Tensor(ys))
 
-    def _validation_errors(self, xs, ys):
-        predictions = self._predict(xs)
-
-        losses = (predictions - ys).pow(2.0)
+    def _validation_errors(self, ys_predicted, ys_validation):
+        losses = (ys_predicted - ys_validation).pow(2.0)
         losses = torch.sqrt(losses.sum(dim=2).sum(dim=1))
-
 
         return losses
 
@@ -243,6 +257,13 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         validation_errors = self._validation_errors(xs,ys)
         return torch.mean(validation_errors)
 
+    def _kll(self, ys_predicted, ys_validation):
+        kll_errors = torch.zeros(len(ys_predicted))
+
+        for i in range(len(ys_predicted)):
+            kll_errors[i] = kullback_leibler_pytorch(ys_predicted[i], ys_validation[i]) + kullback_leibler_pytorch(ys_validation[i], ys_predicted[i]) / 2.
+
+        return kll_errors
 
 
     def metadata(self):

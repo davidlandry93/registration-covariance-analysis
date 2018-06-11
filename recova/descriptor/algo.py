@@ -242,6 +242,7 @@ class AveragePlanarityDescriptor(DescriptorAlgo):
         reference = pair.points_of_reference()[reference_mask]
 
         eigvals_reading = pair.eigenvalues_of_reading()[reading_mask]
+        eigvals_reference = pair.eigenvalues_of_reference()[reference_mask]
 
 
         concat = np.vstack((eigvals_reading, eigvals_reference))
