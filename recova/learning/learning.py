@@ -38,8 +38,6 @@ def cli():
     input_document = json.load(sys.stdin)
     eprint('Done loading document')
 
-    sys.stdin = open('/dev/tty')
-
     predictors = np.array(input_document['data']['xs'])
     covariances = np.array(input_document['data']['ys'])
 
