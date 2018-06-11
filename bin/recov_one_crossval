@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+#SBATCH --account=def=philg
+#SBATCH --time=00:40:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem-per-cpu=1024M
+#SBATCH --n-tasks-per-node 1
+
+DEFAULT_ALPHA=1e-5
+DEFAULT_BETA=1e4
+DEFAULT_LR=1e-7
+
+DEFAULT_ALGORITHM=cello
+
+
+cat $DATASET_FILE | learn_recov -a ${ALPHA:-$DEFAULT_ALPHA} -b ${BETA:-$DEFAULT_BETA} -lr ${LR:-$DEFAULT_LR} \
+                                -cv $LOCATION ${ALGORITHM:-$DEFAULT_ALGORITHM} cv_${LOCATION} > cv_${LOCATION}_stdout  2> cv_${LOCATION}_stderr
+
