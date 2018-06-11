@@ -9,7 +9,7 @@ from torch.autograd import Variable
 import sklearn.model_selection
 
 from recova.learning.model import CovarianceEstimationModel
-from recova.util import eprint
+from recova.util import eprint, kullback_leibler
 
 
 def to_upper_triangular(v):
@@ -48,18 +48,13 @@ def size_of_triangular_vector(n):
 def kullback_leibler_pytorch(cov1, cov2):
     """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
     cov1 and cov2 must be numpy matrices.
-    See http://bit.ly/2FAYCgu."""
+    See http://bit.ly/2FAYCgu. """
 
-    det1 = torch.det(cov1)
-    det2 = torch.det(cov2)
+    # In pytorch 0.4.0 det will allow us to compute the kll directly in torch,
+    # in the meantime we transfer the computation to numpy.
 
-    A = torch.trace(torch.mm(torch.inverse(cov1), cov2))
-    B = 6.
-    C = float(torch.log(det1) - torch.log(det2))
-
-    kll = 0.5 * (A - B + C)
-
-    return kll
+    cov1_np, cov2_np = cov1.data.numpy(), cov2.data.numpy()
+    return kullback_leibler(cov1_np, cov2_np)
 
 
 def pytorch_norm_distance(cov1, cov2):
@@ -97,8 +92,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.model_predictors = Variable(torch.Tensor(predictors_train))
         self.model_covariances = Variable(torch.Tensor(covariances_train))
 
-        predictors_validation = torch.Tensor(predictors_test)
-        covariances_validation = torch.Tensor(covariances_test)
+        predictors_validation = Variable(torch.Tensor(predictors_test))
+        covariances_validation = Variable(torch.Tensor(covariances_test))
 
         result = self._fit(predictors_validation, covariances_validation)
 
@@ -180,15 +175,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-            if self.queries_have_neighbor(self.model_predictors, metric_matrix, Variable(predictors_validation)):
-                predictions = Variable(self._predict(predictors_validation))
-                validation_errors = self._validation_errors(predictions, Variable(covariances_validation)).data
+            if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
+                predictions = self._predict(predictors_validation)
+                validation_errors = self._validation_errors(predictions, covariances_validation).data
                 validation_score = torch.mean(validation_errors)
 
                 klls = self._kll(predictions, covariances_validation)
-                kll_errors_log.append(klls.data.numpy().tolist())
-                kll_validation_losses.append(torch.mean(klls).data.numpy().item())
-                kll_validation_stds.append(torch.std(klls).data.numpy().item())
+                kll_errors_log.append(klls.numpy().tolist())
+                kll_validation_losses.append(torch.mean(klls))
+                kll_validation_stds.append(torch.std(klls))
 
 
                 eprint('-- Validation of epoch %d --' % epoch)
@@ -210,8 +205,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 eprint()
 
                 validation_errors_log.append(validation_errors.numpy().tolist())
-                validation_losses.append(validation_score.numpy().item())
-                validation_stds.append(torch.std(validation_errors).numpy().item())
+                validation_losses.append(validation_score)
+                validation_stds.append(torch.std(validation_errors))
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
