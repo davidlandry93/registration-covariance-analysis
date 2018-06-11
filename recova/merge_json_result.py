@@ -46,6 +46,7 @@ def merge_result_files(result_files, output):
         output_dict['what'] = what
 
     json.dump(output_dict, output)
+    output.flush()
 
 
 

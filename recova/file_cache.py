@@ -6,9 +6,10 @@ import pathlib
 from recova.util import eprint
 
 class FileCache:
-    def __init__(self, root):
+    def __init__(self, root, max_size=100):
         self.root = pathlib.Path(root)
         self.memory_cache = {}
+        self.max_size = max_size
 
         if not self.root.exists():
             self.root.mkdir(parents=True, exist_ok=False)
@@ -27,6 +28,7 @@ class FileCache:
             value = self.load_from_file(key)
         else:
             raise ValueError('Key {} not found in this filecache instance at {}'.format(key, self.root))
+
 
         return value
 
@@ -47,6 +49,12 @@ class FileCache:
             self.save_json(key, value)
 
         self.memory_cache[key] = value
+        self.check_cache_size()
+
+
+    def check_cache_size(self):
+        if len(self.memory_cache) > self.max_size:
+            _, _ = self.memory_cache.popitem()
 
     def save_json(self, key, value):
         demanded_file = self.root / (key + '.json')
@@ -89,6 +97,7 @@ class FileCache:
     def load_numpy(self, key):
         ndarray = np.load(self.np_file_of_key(key))
         self.memory_cache[key] = ndarray
+        self.check_cache_size()
         return ndarray
 
     def save_numpy(self, key, ndarray):

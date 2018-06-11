@@ -185,16 +185,20 @@ class OverlapMaskGenerator(MaskGenerator):
 
 
     def compute(self, pair):
-        cached_reading_entry = pair.cache['{}_reading'.format(repr(self))]
-        cached_reference_entry = pair.cache['{}_reference'.format(repr(self))]
+        reading_mask_label = '{}_reading'.format(repr(self))
+        reference_mask_label = '{}_reference'.format(repr(self))
 
-        if cached_reading_entry  is not None and cached_reference_entry is not None:
-            return MaskPair(np.array(cached_reading_entry, dtype=bool), np.array(cached_reference_entry, dtype=bool))
+        if reading_mask_label in pair.cache and reference_mask_label in pair.cache:
+            return MaskPair(pair.cache[reading_mask_label], pair.cache[reference_mask_label])
         else:
             reading_array, reference_array = self._compute(pair)
-            pair.cache['{}_reading'.format(repr(self))] = reading_array
-            pair.cache['{}_reference'.format(repr(self))] = reference_array
-            return MaskPair(np.array(reading_array, dtype=bool), np.array(reference_array, dtype=bool))
+            reading_array = np.array(reading_array, dtype=bool)
+            reference_array = np.array(reference_array, dtype=bool)
+
+            pair.cache[reading_mask_label] = reading_array
+            pair.cache[reference_mask_label] = reference_array
+
+            return MaskPair(reading_array, reference_array)
 
 
     def _compute(self, pair):

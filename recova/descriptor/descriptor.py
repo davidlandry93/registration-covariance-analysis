@@ -39,18 +39,15 @@ class Descriptor:
             for element in l:
                 flattened_descriptor.append(element)
 
-        return flattened_descriptor
+        return np.array(flattened_descriptor)
 
     def compute(self, pair):
-        cached_descriptor = pair.cache[repr(self)]
-
-        if cached_descriptor is None:
+        if repr(self) in pair.cache:
+            return pair.cache[repr(self)]
+        else:
             descriptor = self._compute(pair)
             pair.cache[repr(self)] = descriptor
-            return np.array(descriptor)
-
-        else:
-            return np.array(cached_descriptor)
+            return descriptor
 
 
     def labels(self):

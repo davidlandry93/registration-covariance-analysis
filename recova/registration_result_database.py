@@ -1,12 +1,18 @@
 import argparse
+import concurrent.futures
+import functools
 import json
 import multiprocessing
 import numpy as np
 import os
 import pathlib
+import random
 import re
 import subprocess
 import sys
+import tqdm
+
+from threading import Lock
 
 from io import StringIO
 
@@ -21,9 +27,8 @@ from recova.file_cache import FileCache
 from recova.util import eprint, run_subprocess, parallel_starmap_progressbar
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
-from recova.registration_dataset import lie_vectors_of_registrations, positions_of_registration_data
+from recova.registration_dataset import lie_vectors_of_registrations
 from recova.registration_pair import RegistrationPair
-
 
 
 class RegistrationPairDatabase:
@@ -40,6 +45,7 @@ class RegistrationPairDatabase:
 
         self.exclude = (re.compile(exclude) if exclude else None)
         self.cache = FileCache(cache_dir)
+        self.pointcloud_cache = FileCache(pointcloud_dir)
 
     def pointcloud_dir(self):
         return self.root / 'pointclouds'
@@ -53,7 +59,7 @@ class RegistrationPairDatabase:
                 reading = registration_results['metadata']['reading']
                 reference = registration_results['metadata']['reference']
 
-                r = RegistrationPair(self.root, dataset, reading, reference)
+                r = RegistrationPair(self.root, dataset, reading, reference, self)
                 r.accept_raw_file(path_to_file)
 
         except OSError as e:
@@ -80,44 +86,47 @@ class RegistrationPairDatabase:
     def registration_pairs(self):
         pairs = []
         for d in self.root.iterdir():
-            if d.is_dir():
+            if d.is_dir() and d.stem != 'pointclouds' and d.stem != 'cache':
                 components = d.stem.split('-')
 
                 dataset = components[0]
-                reading = int(components[1])
+                reading  = int(components[1])
                 reference = int(components[2])
 
                 if not self.exclude or not self.exclude.match(dataset):
-                    pairs.append(RegistrationPair(self.root, dataset, reading, reference))
+                    pairs.append(RegistrationPair(self.root, dataset, reading, reference, self))
 
         pairs = sorted(pairs, key=lambda x: x.pair_id)
 
         return pairs
 
     def import_reading(self, location, index, dataset):
-        points = dataset.points_of_reading(index)
-        self.import_pointcloud(points, '{}_{}_{}'.format(location, 'reading', index))
+        label = '{}_{}_{}'.format(location, 'reading', index)
+        _ = self.pointcloud_cache.get_or_generate(label, lambda: dataset.points_of_reading(index))
 
     def import_reference(self, location, index, dataset):
-        points = dataset.points_of_reference(index)
-        self.import_pointcloud(points, '{}_{}_{}'.format(location, 'reference', index))
+        label = '{}_{}_{}'.format(location, 'reference', index)
+        _ = self.pointcloud_cache.get_or_generate(label, lambda: dataset.points_of_reference(index))
 
-    def import_pointcloud(self, points, label):
-        _ = self.cache.get_or_generate(label, lambda: points)
 
     def get_reading(self, location, index):
         label = '{}_{}_{}'.format(location, 'reading', index)
-        return self.cache[label]
+        return self.pointcloud_cache[label]
 
     def get_reference(self, location, index):
         label = '{}_{}_{}'.format(location, 'reference', index)
-        return self.cache[label]
+        return self.pointcloud_cache[label]
 
     def reference_pcd(self, location, index):
         path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reference', index)
 
         if not path_to_pcd.exists():
-            pointcloud_to_pcd(self.get_reference(location, index), str(path_to_pcd))
+            # database_mutex.acquire()
+            try:
+                pointcloud_to_pcd(self.get_reference(location, index), str(path_to_pcd))
+            finally:
+                pass
+                # database_mutex.release()
 
         return path_to_pcd
 
@@ -125,51 +134,85 @@ class RegistrationPairDatabase:
         path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reading', index)
 
         if not path_to_pcd.exists():
-            pointcloud_to_pcd(self.get_reading(location, index), str(path_to_pcd))
+            # database_mutex.acquire()
+            try:
+                pointcloud_to_pcd(self.get_reading(location, index), str(path_to_pcd))
+            finally:
+                pass
+                # database_mutex.release()
 
         return path_to_pcd
 
     def normals_of_reading(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reading', index, 'normals')
-        self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reading_pcd()))
+        normals = self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reading_pcd(location, index)))
+
+        return normals
 
     def normals_of_reference(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reference', index, 'normals')
-        self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reference_pcd()))
+        normals = self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reference_pcd(location, index)))
+        return normals
 
     def normals_of_pcd(self, pcd, k=18):
         cmd_template = 'normals_of_cloud -pointcloud {} -k {}'
         cmd_string = cmd_template.format(pcd, k)
+
 
         eprint(cmd_string)
         response = run_subprocess(cmd_string)
         stream = StringIO(response)
         normals = read_xyz_stream(stream)
 
+
+
         return normals
 
+    def eigenvalues_of_reading(self, location, index):
+        label = '{}_{}_{}_{}'.format(location, 'reading', index, 'eigvals')
+        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_pcd(self.reading_pcd(location, index)))
+
+    def eigenvalues_of_reference(self, location, index):
+        label = '{}_{}_{}_{}'.format(location, 'reference', index, 'eigvals')
+        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_pcd(self.reference_pcd(location, index)))
+
+    def eigenvalues_of_pcd(self, pcd):
+        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(pcd)
+        result = run_subprocess(cmd_string)
+        result_dict = json.loads(result)
+
+        cloud_eig_vals = np.array(result_dict)
+
+        return cloud_eig_vals.T
 
 
-def import_pointclouds_of_one_pair(registration_pair, database, dataset_type, pointcloud_root):
-    print(registration_pair)
-
-    db.import_reading(registration_pair.dataset, registration_pair.reading, dataset)
-    db.import_reference(registration_pair.dataset, registration_pair.reference, dataset)
-
-    dataset = create_registration_dataset(dataset_type, pointcloud_root / registration_pair.dataset)
-    registration_pair.import_pointclouds(dataset)
-
+database_mutex = Lock()
 
 
 def import_one_husky_pair(db, location, reading, reference, dataset):
-    db.import_reading(location, reading, dataset)
-    db.import_reference(location, reference, dataset)
-
     eprint('{}: {} {}'.format(location, reading, reference))
     registration_pair = db.create_pair(location, reading, reference)
     registration_pair.import_pointclouds(dataset, use_odometry=True)
 
 
+def starmap_wrapper(f, tup):
+    return f(*tup)
+
+def import_reading(location, x, dataset, db):
+    db.import_reading(location, x, dataset)
+    _ = db.reading_pcd(location, x)
+
+def import_reference(location, x, dataset, db):
+    db.import_reference(location, x, dataset)
+    _ = db.reference_pcd(location, x)
+
+def compute_data_reading(location, x, db):
+    _ = db.normals_of_reading(location, x)
+    _ = db.eigenvalues_of_reading(location, x)
+
+def compute_data_reference(location, x, db):
+    _ = db.normals_of_reference(location, x)
+    _ = db.eigenvalues_of_reference(location, x)
 
 def import_husky_pointclouds_cli():
     parser = argparse.ArgumentParser()
@@ -184,28 +227,49 @@ def import_husky_pointclouds_cli():
     db = RegistrationPairDatabase(args.database_root)
     dataset = create_registration_dataset('husky', args.husky_dataset_root)
 
+    all_readings = [(args.location, x, dataset, db) for x in range(dataset.n_readings())]
+    all_references = [(args.location, x, dataset, db) for x in range(dataset.n_references())]
 
     pairs_to_fetch = []
     for reference in range(dataset.n_references()):
         pairs_to_fetch.extend(dataset.find_pairs_by_delay(reference, args.valid_scan_window_begin, args.valid_scan_window_end))
 
-    all_tuples = [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch]
-    # with multiprocessing.Pool() as p:
-    #     p.starmap(import_one_husky_pair, [(db, args.location, x[0], x[1], dataset) for x in pairs_to_fetch])
 
-    parallel_starmap_progressbar(import_one_husky_pair, all_tuples, n_cores=args.n_cores)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_cores) as executor:
+        futures = []
+        for cloud in all_readings:
+            futures.append(executor.submit(import_reading, *cloud))
+        for cloud in all_references:
+            futures.append(executor.submit(import_reference, *cloud))
 
-    # for tup in all_tuples:
-    #     import_one_husky_pair(*tup)
+        concurrent.futures.wait(futures)
+
+        for cloud in all_readings:
+            futures.append(executor.submit(compute_data_reading, args.location, cloud[1], db))
+
+        for cloud in all_references:
+            futures.append(executor.submit(compute_data_reference, args.location, cloud[1], db))
+
+        concurrent.futures.wait(futures)
+
+        for pair in pairs_to_fetch:
+            futures.append(executor.submit(import_one_husky_pair, db, args.location, pair[0], pair[1], dataset))
+
+        concurrent.futures.wait(futures)
+
+def import_pointclouds_of_one_pair(registration_pair, dataset):
+    registration_pair.import_pointclouds(dataset)
+    _ = registration_pair.registration_dict()
 
 
 def import_files_cli():
     parser = argparse.ArgumentParser()
-    parser.add_argument('files', nargs='*', type=str, help='The files to import')
+    parser.add_argument('--files', nargs='*', type=str, help='The files to import')
     parser.add_argument('--root', help='Location of the registration result database', type=str)
     parser.add_argument('--pointcloud_root', help='Location of the point clouds designated by the pairs', type=str)
     parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str, default='ethz')
     parser.add_argument('--pointcloud_only', help='Only do the pointcloud importation', action='store_true')
+    parser.add_argument('-j', '--n-cores', default=8, type=int)
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.root)
@@ -220,8 +284,64 @@ def import_files_cli():
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 
-    with multiprocessing.Pool() as pool:
-        pool.starmap(import_pointclouds_of_one_pair, [(x, db, args.pointcloud_dataset_type, pointcloud_root) for x in db.registration_pairs()])
+    readings = {}
+    references = {}
+    for pair in db.registration_pairs():
+        if pair.dataset not in readings:
+            readings[pair.dataset] = set([pair.reading])
+        else:
+            readings[pair.dataset].add(pair.reading)
+
+        if pair.dataset not in references:
+            references[pair.dataset] = set([pair.reference])
+        else:
+            references[pair.dataset].add(pair.reference)
+
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_cores) as executor:
+        fs = []
+        progress_bar = tqdm.tqdm(total=5*len(db.registration_pairs()), file=sys.stdout)
+        for dataset_name in readings:
+            dataset = create_registration_dataset(args.pointcloud_dataset_type, pointcloud_root / dataset_name)
+
+            for reading in readings[dataset_name]:
+                future = executor.submit(import_reading, dataset_name, reading, dataset, db)
+                future.add_done_callback(lambda _: progress_bar.update())
+                fs.append(future)
+
+            for reference in references[dataset_name]:
+                future = executor.submit(import_reference, dataset_name, reference, dataset, db)
+                future.add_done_callback(lambda _: progress_bar.update())
+                fs.append(future)
+
+        concurrent.futures.wait(fs)
+
+        fs = []
+        for dataset_name in readings:
+            for reading in readings[dataset_name]:
+                eprint('{}: {}'.format(dataset_name, reading))
+                future = executor.submit(compute_data_reading, dataset_name, reading, db)
+                future.add_done_callback(lambda _: progress_bar.update())
+                fs.append(future)
+
+            for reference in references[dataset_name]:
+                eprint('{}: {}'.format(dataset_name, reference))
+                future = executor.submit(compute_data_reference, dataset_name, reference, db)
+                future.add_done_callback(lambda _: progress_bar.update())
+                fs.append(future)
+
+        concurrent.futures.wait(fs)
+
+        fs = []
+        for pair in db.registration_pairs():
+            pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, pointcloud_root / pair.dataset)
+
+            future = executor.submit(import_pointclouds_of_one_pair, pair, pointcloud_dataset)
+            future.add_done_callback(lambda _: progress_bar.update())
+            fs.append(future)
+
+        concurrent.futures.wait(fs)
+
 
 
 def distribution_cli():

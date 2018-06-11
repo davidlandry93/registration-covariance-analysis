@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+    echo "usage: $0 <learning_set.json> <output_dir>"
+fi
+
+function learning {
+    # Arg 1 is the location of the learning set
+    # Arg 2 is the output dir
+    # Arg 3 is the name of the dataset to cross validate on
+
+    OUTPUT_NAME=$2/cv-$3
+    echo learn_recov -a 1e-5 -lr 1e-6 -cv $2 cello $OUTPUT_NAME
+    cat $1 | learn_recov -a 1e-5 -lr 1e-6 -cv $3 cello $OUTPUT_NAME > ${OUTPUT_NAME}_stdout 2> ${OUTPUT_NAME}_stderr
+    echo "Done with $3"
+}
+
+DATASETS=(apartment gazebo_summer gazebo_winter plain stairs wood_autumn wood_summer)
+for dataset in "${DATASETS[@]}"; do
+    learning $1 $2 $dataset
+done

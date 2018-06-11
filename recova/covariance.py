@@ -23,29 +23,22 @@ class SamplingCovarianceComputationAlgorithm:
 
 
     def compute(self, registration_pair):
-        covariance = registration_pair.cache[self.__repr__()]
-
-        if not covariance:
+        def generate_covariance():
             results = registration_pair.lie_matrix_of_results()
             clustering = self.clustering_of_pair(registration_pair)
             distribution = compute_distribution(registration_pair.registration_dict(), clustering)
+            return np.array(distribution['covariance_of_central'])
 
-            covariance = np.array(distribution['covariance_of_central'])
+        return registration_pair.cache.get_or_generate(repr(self), generate_covariance)
 
-            registration_pair.cache[self.__repr__()] = covariance.tolist()
-
-        return np.array(covariance)
 
 
     def clustering_of_pair(self, registration_pair):
-        clustering = registration_pair.cache[self.clustering_algorithm.__repr__()]
-
-        if not clustering:
+        def generate_clustering():
             results = registration_pair.lie_matrix_of_results()
-            clustering = self.clustering_algorithm.cluster(results, seed=se3_log(registration_pair.ground_truth()))
-            registration_pair.cache[self.clustering_algorithm.__repr__()] = clustering
+            return self.clustering_algorithm.cluster(results, seed=se3_log(registration_pair.ground_truth()))
 
-        return clustering
+        return registration_pair.cache.get_or_generate(repr(self), generate_clustering)
 
 
 

@@ -51,7 +51,7 @@ def generate_one_example(registration_pair, descriptor, covariance_algo,descript
 
     eprint('Example took {} seconds'.format(time.time() - descriptor_start))
 
-    return (descriptor, covariance)
+    return (descriptor, np.array(covariance))
 
 
 def generate_examples_cli():
@@ -80,14 +80,14 @@ def generate_examples_cli():
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))
 
-    # examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
+    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
 
     # with multiprocessing.Pool(args.n_cores) as pool:
     #     examples = tqdm.tqdm(pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs]), total=len(registration_pairs), ascii=True, file=sys.stdout)
 
-    examples = []
-    for x in registration_pairs:
-        examples.append(generate_one_example(x, descriptor, covariance_algo, args.descriptor_only))
+    # examples = []
+    # for x in registration_pairs:
+    #     examples.append(generate_one_example(x, descriptor, covariance_algo, args.descriptor_only))
 
 
     xs = []
