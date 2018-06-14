@@ -12,7 +12,7 @@ from recova.util import eprint
 class MlpModel(CovarianceEstimationModel):
     def __init__(self, device='cuda', learning_rate = 1e2, n_iterations=0, logging_rate=1000, alpha=0.0, convergence_window=50000, decay=1e-10):
         self.device = torch.device(device)
-        self.hidden_sizes = [500, 250, 200, 400]
+        self.hidden_sizes = [500, 300, 250, 300]
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.logging_rate = logging_rate
@@ -45,22 +45,22 @@ class MlpModel(CovarianceEstimationModel):
     def _fit(self, xs_train, ys_train, xs_test, ys_test):
         self.model = torch.nn.Sequential(
             torch.nn.Linear(len(xs_train[0]), self.hidden_sizes[0]),
-            torch.nn.ReLU(),
+            torch.nn.Hardtanh(),
             torch.nn.Dropout(0.1),
             torch.nn.BatchNorm1d(self.hidden_sizes[0]),
             torch.nn.Linear(self.hidden_sizes[0], self.hidden_sizes[1]),
-            torch.nn.ReLU(),
+            torch.nn.Hardtanh(),
             torch.nn.Dropout(0.1),
             torch.nn.BatchNorm1d(self.hidden_sizes[1]),
-            # torch.nn.Linear(self.hidden_sizes[1], self.hidden_sizes[2]),
-            # torch.nn.ReLU(),
-            # torch.nn.Dropout(0.1),
-            # torch.nn.BatchNorm1d(self.hidden_sizes[2]),
-            # torch.nn.Linear(self.hidden_sizes[2], self.hidden_sizes[3]),
-            # torch.nn.ReLU(),
-            # torch.nn.Dropout(0.1),
-            # torch.nn.BatchNorm1d(self.hidden_sizes[3]),
-            torch.nn.Linear(self.hidden_sizes[1], 6*6)
+            torch.nn.Linear(self.hidden_sizes[1], self.hidden_sizes[2]),
+            torch.nn.Hardtanh(),
+            torch.nn.Dropout(0.1),
+            torch.nn.BatchNorm1d(self.hidden_sizes[2]),
+            torch.nn.Linear(self.hidden_sizes[2], self.hidden_sizes[3]),
+            torch.nn.Hardtanh(),
+            torch.nn.Dropout(0.1),
+            torch.nn.BatchNorm1d(self.hidden_sizes[3]),
+            torch.nn.Linear(self.hidden_sizes[3], 6*6)
         ).to(self.device)
 
         self.best_loss = float('inf')
@@ -102,13 +102,11 @@ class MlpModel(CovarianceEstimationModel):
             if epoch % self.logging_rate == 0:
                 test_errors = self._validation_errors(xs_test, ys_test)
 
-                eprint(test_errors)
 
                 test_errors_log.append(test_errors.data.cpu().numpy().tolist())
 
                 train_errors = self._validation_errors(xs_train, ys_train)
 
-                eprint(train_errors)
                 train_errors_log.append(train_errors.data.cpu().numpy().tolist())
 
                 train_losses.append(loss.data.cpu().numpy().item())
@@ -159,10 +157,7 @@ class MlpModel(CovarianceEstimationModel):
         return self._validation_errors(xs,ys).mean()
 
     def _validation_errors(self, xs, ys):
-        model_output = self.model(xs)
-        reshaped_model_output = model_output.view(len(model_output), 6, 6)
-        covariances_predicted = torch.bmm(reshaped_model_output, reshaped_model_output.transpose(1,2))
-
+        covariances_predicted = self._predict(xs)
         errors = torch.sqrt((covariances_predicted - ys).pow(2.0).sum(dim=2).sum(dim=1))
 
         return errors
@@ -185,4 +180,7 @@ class MlpModel(CovarianceEstimationModel):
         return predicted.detach().view(len(predicted),6,6).cpu().numpy()
 
     def _predict(self, xs):
-        return self.model(xs)
+        model_output = self.model(xs)
+        reshaped_output = model_output.view(len(model_output), 6, 6)
+        covariances = torch.bmm(reshaped_output, reshaped_output.transpose(1,2))
+        return covariances

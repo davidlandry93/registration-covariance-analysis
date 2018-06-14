@@ -139,6 +139,7 @@ def plot_loss_on_time(args):
     parser.add_argument('-m', '--median', action='store_true', help='Wether we should use medians or averages to plot the loss.')
     parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
     parser.add_argument('--labels', '-l', type=str, default='', help='Comma separated list of labels for the different plots.')
+    parser.add_argument('-t', '--title', type=str, default='Evolution of validation loss during learning')
     args = parser.parse_args(args)
 
     learning_run = json.load(sys.stdin)
@@ -153,7 +154,7 @@ def plot_loss_on_time(args):
     ax.legend()
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Frobenius norm  error')
-    ax.set_title('Evolution of validation loss during learning')
+    ax.set_title(args.title)
     plt.show()
 
 

@@ -10,15 +10,18 @@ import recova.util
 from recova.util import eprint, bat_distance, to_upper_triangular
 from recova.learning import model_factory
 
+def model_from_file(path, algorithm):
+    model = model_factory(algorithm)
+    model.load_model(path)
+
+    return model
+
 def model_loader(learning_run):
     """
     From the dictionary output by a learning run,
     load a model.
     """
-    model = model_factory(learning_run['metadata']['algorithm'])
-    model.load_model(learning_run['model'])
-
-    return model
+    return model_from_file(learning_run['model'], learning_run['metadata']['algorithm'])
 
 def cli():
     parser = argparse.ArgumentParser()

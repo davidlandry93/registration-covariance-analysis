@@ -8,9 +8,9 @@ import sys
 
 from recova.registration_dataset import lie_vectors_of_registrations
 from pyevtk.hl import pointsToVTK
-from pylie import se3_log
-from recova.registration_dataset import points_to_vtk, data_dict_of_registration_data, positions_of_registration_data
+from recova.registration_dataset import data_dict_of_registration_data, positions_of_registration_data
 from recova.util import POSITIVE_STRINGS, empty_to_none
+from recov.pointcloud_io import pointcloud_to_vtk
 
 
 def cli():
@@ -39,7 +39,7 @@ def cli():
     points = positions_of_registration_data(json_data, (args.initial_estimate in POSITIVE_STRINGS), prealignment=prealignment)
 
     data_dict = empty_to_none(data_dict_of_registration_data(json_data))
-    points_to_vtk(points[:, dims], args.output, data_dict)
+    pointcloud_to_vtk(points[:, dims], args.output, data_dict)
 
 
 if __name__ == '__main__':

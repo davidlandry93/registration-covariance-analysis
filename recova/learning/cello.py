@@ -271,7 +271,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def predict(self, queries):
-        return self._predict(torch.Tensor(queries)).numpy()
+        return self._predict(Variable(torch.Tensor(queries))).data.numpy()
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -356,8 +356,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             self.import_model(json.load(f))
 
     def import_model(self, model):
-        self.theta = torch.Tensor(model['theta'])
-        self.model_covariances = torch.Tensor(model['covariances'])
-        self.model_predictors = torch.Tensor(model['predictors'])
+        self.theta = Variable(torch.Tensor(model['theta']))
+        self.model_covariances = Variable(torch.Tensor(model['covariances']))
+        self.model_predictors = Variable(torch.Tensor(model['predictors']))
 
 

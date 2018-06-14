@@ -3,6 +3,7 @@ import argparse
 import csv
 import json
 import numpy as np
+import re
 import time
 
 from recov.pointcloud_io import pointcloud_to_vtk
@@ -43,6 +44,7 @@ def prediction_cli():
     parser.add_argument('model', help='Path to the trained model', type=str)
     parser.add_argument('output', help='Where to output the vtk files', type=str)
     parser.add_argument('--registration-database', help='Fetch the pointclouds to give some context to the generated covariances.')
+    parser.add_argument('--filter', help='Locations to filter during the query', type=str, default='')
     args = parser.parse_args()
 
     print('Loading dataset...')
@@ -55,6 +57,8 @@ def prediction_cli():
         learning_run = json.load(f)
     print('Done')
 
+    filtering_re = re.compile(args.filter)
+
 
     model = model_loader(learning_run)
 
@@ -62,8 +66,19 @@ def prediction_cli():
 
     xs = np.array(dataset['data']['xs'])
 
+    pairs = dataset['data']['pairs']
+    selection = np.ones(len(pairs), dtype=np.bool)
+    for i, pair in enumerate(pairs):
+        if filtering_re.match(pair['dataset']) and args.filter:
+            selection[i] = 0
+
+    eprint(len(selection))
+    eprint(selection.sum())
+
+    xs = xs[selection]
+
     ys_predicted = model.predict(xs)
-    np.save(args.output + '/predictions.npy')
+    np.save(args.output + '/predictions.npy', ys_predicted)
 
     db = RegistrationPairDatabase(args.registration_database)
 
