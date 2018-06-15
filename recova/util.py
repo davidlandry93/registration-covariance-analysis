@@ -48,6 +48,7 @@ def nearestPD(A):
 
     [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
 
+
     [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
     matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
     """
@@ -187,6 +188,19 @@ def to_upper_triangular(v):
 
     return matrix
 
+
+def upper_triangular_to_vector(up):
+    return up[upper_triangular_mask(up.shape[-1])]
+
+
+def upper_triangular_mask(n):
+    v = np.arange(n)
+    return v >= v.reshape((n,1))
+
+
+def size_of_triangular_vector(n):
+    """The size of a vector representing an nxn upper triangular matrix."""
+    return int((n * n + n) / 2.)
 def quat_to_rot_matrix(quat):
     """
     Build a rotation matrix from a quaternion according to the formula at

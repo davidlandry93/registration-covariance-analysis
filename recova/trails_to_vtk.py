@@ -5,7 +5,8 @@ import numpy as np
 import pyevtk
 import sys
 
-from recova.registration_dataset import points_to_vtk, lie_tensor_of_trails, data_dict_of_registration_data
+from recov.pointcloud_io import pointcloud_to_vtk
+from recova.registration_dataset import lie_tensor_of_trails, data_dict_of_registration_data
 from recova.util import parse_dims, empty_to_none
 
 def save_one_frame(points, output, data_dict, i, pre_transform):
@@ -13,7 +14,7 @@ def save_one_frame(points, output, data_dict, i, pre_transform):
     print(filename)
     data = empty_to_none(data_dict)
 
-    points_to_vtk(points[i], filename, data)
+    pointcloud_to_vtk(points[i], filename, data)
 
 def cli():
     parser = argparse.ArgumentParser()

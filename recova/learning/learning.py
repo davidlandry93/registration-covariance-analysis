@@ -9,6 +9,7 @@ import sys
 import recova.util
 from recova.util import eprint, bat_distance, to_upper_triangular
 from recova.learning import model_factory
+from recova.learning.preprocessing import preprocessing_factory
 
 def model_from_file(path, algorithm):
     model = model_factory(algorithm)
@@ -35,6 +36,7 @@ def cli():
     parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
+    parser.add_argument('--preprocessing', '-p', type=str, help='Name of the preprocessing algorithm to use.', default='identity')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -74,6 +76,9 @@ def cli():
     model.n_iterations = args.n_iterations
     model.convergence_window = args.convergence_window
     model.weight_decay = args.weight_decay
+
+    preprocessing_algo = preprocessing_factory(args.preprocessing)
+    model.preprocessing = preprocessing_algo
 
     if train_indices and validation_indices:
         learning_run = model.fit(predictors, covariances, train_set=train_indices, test_set=validation_indices)

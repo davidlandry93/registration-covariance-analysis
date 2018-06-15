@@ -2,6 +2,7 @@
 import numpy as np
 import torch
 
+from recova.learning.preprocessing import preprocessing_factory
 from recova.util import eprint, kullback_leibler
 
 

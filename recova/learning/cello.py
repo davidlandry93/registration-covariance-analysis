@@ -9,6 +9,7 @@ from torch.autograd import Variable
 import sklearn.model_selection
 
 from recova.learning.model import CovarianceEstimationModel
+from recova.learning.preprocessing import preprocessing_factory
 from recova.util import eprint, kullback_leibler
 
 
@@ -67,16 +68,22 @@ def bat_distance_pytorch(cov1, cov2):
     C = torch.det(cov2)
     return 0.5 * torch.log(A / torch.sqrt(B + C))
 
+def identity_preprocessing(ys):
+    return (ys)
+
+def identity_postprocessing(ys):
+    return (ys)
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20, preprocessing='identity'):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.beta = beta
         self.train_set_size = train_set_size
         self.convergence_window = convergence_window
+        self.preprocessing = preprocessing
 
     def fit(self, predictors, covariances, train_set=None, test_set=None):
         eprint('Training with descriptors of size {}'.format(predictors.shape[1]))
@@ -87,7 +94,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         else:
             training_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
 
-        predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], covariances[training_indices], covariances[test_indices]
+        preprocessed_covariances = self.preprocessing.process(covariances)
+
+        predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], preprocessed_covariances[training_indices], preprocessed_covariances[test_indices]
 
         self.model_predictors = Variable(torch.Tensor(predictors_train))
         self.model_covariances = Variable(torch.Tensor(covariances_train))
@@ -267,15 +276,19 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'learning_rate': self.learning_rate,
             'alpha': self.alpha,
             'logging_rate': 1,
+            'preprocessing': repr(self.preprocessing)
         }
 
 
     def predict(self, queries):
-        return self._predict(Variable(torch.Tensor(queries))).data.numpy()
+        predictions = self._predict(Variable(torch.Tensor(queries))).data.numpy()
+        post_processed = self.preprocessing.unprocess(predictions)
+
+        return post_processed
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
-        predictions = Variable(torch.zeros(len(predictors),6,6))
+        predictions = Variable(torch.zeros(len(predictors),self.model_covariances.shape[1], self.model_covariances.shape[2]))
 
         for i in range(len(predictors)):
             distances = self._compute_distances(self.model_predictors, metric_matrix, predictors[i])
@@ -342,6 +355,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def export_model(self):
        return {
+           'preprocessing': self.preprocessing.export(),
            'theta': self.theta.data.numpy().tolist(),
            'covariances' : self.model_covariances.data.numpy().tolist(),
            'predictors': self.model_predictors.data.numpy().tolist()
@@ -360,4 +374,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.model_covariances = Variable(torch.Tensor(model['covariances']))
         self.model_predictors = Variable(torch.Tensor(model['predictors']))
 
+        preprocessing_algo = preprocessing_factory(model['preprocessing']['name'])
+        preprocessing_algo.import_model(model['preprocessing'])
+        self.preprocessing = preprocessing_algo
 

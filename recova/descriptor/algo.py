@@ -209,21 +209,17 @@ class CensiDescriptor(DescriptorAlgo):
 
 
     def compute(self, pair, reading_mask, reference_mask):
-        reading = pair.points_of_reading()[reading_mask]
-        reference = pair.points_of_reference()[reference_mask]
+        if reading_mask.all() and reference_mask.all():
+            reading_path = pair.path_to_reading_pcd()
+            reference_path = pair.path_to_reference_pcd()
+        else:
+            reading = pair.points_of_reading()[reading_mask]
+            reference = pair.points_of_reference()[reference_mask]
 
+            reading_path = points_to_temporary_pcd(reading)
+            reference_path = points_to_temporary_pcd(reference)
 
-        with tempfile.NamedTemporaryFile(prefix=(repr(pair) + 'reading'), suffix='.pcd') as reading_file:
-            reading_file_name = reading_file.name
-
-        with tempfile.NamedTemporaryFile(prefix=(repr(pair) + 'reference'), suffix='.pcd') as reference_file:
-            reference_file_name = reference_file.name
-
-        pointcloud_to_pcd(reading, reading_file_name)
-        pointcloud_to_pcd(reference, reference_file_name)
-
-        censi_estimate = censi_estimate_from_clouds(reading_file_name, reference_file_name, pair.ground_truth(), IcpAlgorithm())
-
+        censi_estimate = censi_estimate_from_clouds(reading_path, reference_path, pair.ground_truth(), IcpAlgorithm())
         return self.scale_factor * np.array(censi_estimate).flatten()
 
 

@@ -127,11 +127,10 @@ class RegistrationPair:
         return self.transform()
 
     def path_to_reading_pcd(self):
-        self.database.reading_pcd(self.dataset, self.reading)
+        return self.database.reading_pcd(self.dataset, self.reading)
 
     def path_to_reference_pcd(self):
-        self.database.reference_pcd(self.dataset, self.reference)
-
+        return self.database.reference_pcd(self.dataset, self.reference)
 
     def points_of_reading(self):
         return self.database.get_reading(self.dataset, self.reading)
