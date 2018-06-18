@@ -15,7 +15,7 @@ from lieroy import se3
 
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
-from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm
+from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
@@ -71,7 +71,9 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
-    covariance_algo = SamplingCovarianceComputationAlgorithm()
+
+    clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
+    covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     with open(args.config) as f:
         descriptor_config = json.load(f)
@@ -83,7 +85,7 @@ def generate_examples_cli():
     examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
 
     # with multiprocessing.Pool(args.n_cores) as pool:
-    #     examples = tqdm.tqdm(pool.starmap(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs]), total=len(registration_pairs), ascii=True, file=sys.stdout)
+    #     examples = tqdm.tqdm(
 
     # examples = []
     # for x in registration_pairs:

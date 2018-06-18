@@ -6,7 +6,10 @@ import multiprocessing
 import numpy as np
 import sys
 
+from recova.clustering import DensityThresholdClusteringAlgorithm
+from recova.covariance import SamplingCovarianceComputationAlgorithm
 from recova.registration_dataset import registrations_of_dataset
+from recova.registration_result_database import RegistrationPairDatabase
 from lieroy.parallel import se3_log, se3_exp, se3_gaussian_distribution_of_sample
 
 
@@ -28,10 +31,20 @@ def distribution_of_registrations(registrations):
 
 
 def cli():
-    dataset = json.load(sys.stdin)
-    registrations = registrations_of_dataset(dataset)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database', type=str)
+    parser.add_argument('location', type=str)
+    parser.add_argument('reading', type=int)
+    parser.add_argument('reference', type=int)
+    args = parser.parse_args()
 
-    mean, covariance = distribution_of_registrations(registrations)
+    clustering = DensityThresholdClusteringAlgorithm(1e3, k=100)
+    covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
+
+    db = RegistrationPairDatabase(args.database)
+    registration_pair = db.get_registration_pair(args.location, args.reading, args.reference)
+    covariance = covariance_algo.compute(registration_pair)
+    mean = registration_pair.ground_truth()
 
     json.dump({'mean': mean.tolist(), 'covariance': covariance.tolist()}, sys.stdout)
 

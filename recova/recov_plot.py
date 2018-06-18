@@ -10,11 +10,10 @@ import multiprocessing
 import numpy as np
 import sys
 
-from recova.covariance_of_registrations import distribution_of_registrations
-from recova.find_center_cluster import find_central_cluster 
 from recova.registration_dataset import registrations_of_dataset
 from recova.util import eprint
 
+from lieroy.parallel import se3_gaussian_distribution_of_sample
 
 def covariance_of_central_cluster(dataset, clustering):
     """
@@ -27,7 +26,7 @@ def covariance_of_central_cluster(dataset, clustering):
     registrations = registration[central_cluster]
 
     if len(registrations) != 0:
-        mean, covariance = distribution_of_registrations(registrations)
+        mean, covariance = se3_gaussian_distribution_of_sample(registrations)
     else:
         return np.zeros((6,6))
 

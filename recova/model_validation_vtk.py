@@ -98,6 +98,17 @@ def prediction_cli():
     #     pointcloud_to_vtk(reading, args.output + '/reading_{}'.format(str(i).zfill(4)))
 
 
+def dataset_to_vtk_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', help='Path to learning set', type=str)
+    parser.add_argument('output', help='Output path for vtk files', type=str)
+    args = parser.parse_args()
+
+    with open(args.dataset) as f:
+
+
+
+
 
 def cli():
     parser = argparse.ArgumentParser()
@@ -161,8 +172,6 @@ def cli():
                 'loss': errors[i],
                 'kullback_leibler': klls[i]
             })
-
-
 
 
 if __name__ == '__main__':

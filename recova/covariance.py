@@ -27,9 +27,13 @@ class SamplingCovarianceComputationAlgorithm:
             results = registration_pair.lie_matrix_of_results()
             clustering = self.clustering_of_pair(registration_pair)
             distribution = compute_distribution(registration_pair.registration_dict(), clustering)
+
+            if clustering['outlier_ratio'] >= 1.0:
+                raise RuntimeError('Empty clustering when running SamplingCovarianceComputationAlgorithm')
+
             return np.array(distribution['covariance_of_central'])
 
-        return registration_pair.cache.get_or_generate(repr(self), generate_covariance)
+        return registration_pair.cache.get_or_generate(repr(self) + '_covariance', generate_covariance)
 
 
 

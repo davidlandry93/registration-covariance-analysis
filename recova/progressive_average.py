@@ -21,7 +21,7 @@ def cli():
 
 
     lie = lie_vectors_of_registrations(data_dict)
-    density = np.array(density_of_points(lie))
+    density = density_of_points(lie)
 
     group = np.zeros((len(lie), 4, 4))
     for i, l in enumerate(lie):

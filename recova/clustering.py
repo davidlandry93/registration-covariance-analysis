@@ -13,18 +13,25 @@ import pyclustering.cluster.dbscan as dbscan
 
 from recov.pointcloud_io import pointcloud_to_vtk
 
-from recova.covariance_of_registrations import distribution_of_registrations
+from recova.density import density_of_points
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_dataset import positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster
 from recova.util import eprint, rescale_hypersphere, englobing_radius
 
-from lieroy.parallel import FunctionWrapper
+from lieroy.parallel import FunctionWrapper, se3_gaussian_distribution_of_sample
 
 import recova_core
 
 se3log = FunctionWrapper('log', 'lieroy.se3')
 se3exp = FunctionWrapper('exp', 'lieroy.se3')
+
+def distribution_of_registrations(registrations):
+    """
+    :arg registrations: A ndarray of 4x4 SE(3) transformations.
+    :returns: mean, covariance. The mean and covariance of the distribution of registrations.
+    """
+    return se3_gaussian_distribution_of_sample(registrations)
 
 class ClusteringAlgorithm:
     def __init__(self):
@@ -36,6 +43,28 @@ class ClusteringAlgorithm:
     def cluster(dataset):
         raise NotImplementedError('Clustering Algorithms must implement the cluster method')
 
+
+class DensityThresholdClusteringAlgorithm:
+    def __init__(self, threshold=1e6, k=18):
+        self.threshold = threshold
+        self.k = k
+
+    def __repr__(self):
+        return 'density_{:.4E}'.format(self.threshold)
+
+    def cluster(self, dataset, seed=None):
+        densities = density_of_points(dataset, k=self.k)
+        cluster = np.where(densities > self.threshold)[0]
+
+        clustering_row = {
+            'clustering': [cluster.tolist()],
+            'n_clusters': 1,
+            'n': self.k,
+            'outliers': inverse_of_cluster(cluster, len(dataset)).tolist(),
+            'outlier_ratio': 1.0 - (len(cluster) / len(dataset)),
+        }
+
+        return clustering_row
 
 class CenteredClusteringAlgorithm(ClusteringAlgorithm):
     def __init__(self, radius=0.2, k=12, n_seed_init=100):
@@ -65,11 +94,11 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init, seed_selector=self.seed_selector, logging=self.logging)
 
         clustering_row = {
-            'clustering': [center_cluster],
+            'clustering': [center_cluster.tolist()],
             'n_clusters': 1,
             'radius': self.radius,
             'n': self.k,
-            'outliers': inverse_of_cluster(center_cluster, len(dataset)),
+            'outliers': inverse_of_cluster(center_cluster, len(dataset)).tolist(),
             'outlier_ratio': 1.0 - (len(center_cluster) / len(dataset)),
         }
 
@@ -126,17 +155,24 @@ class IdentityClusteringAlgorithm(ClusteringAlgorithm):
 
 def inverse_of_cluster(cluster, size_of_dataset):
     """Returns a list of points not in cluster."""
-    sorted_cluster = sorted(cluster)
-    inverse = []
-    for i in range(size_of_dataset-1, -1, -1):
-        if sorted_cluster and sorted_cluster[-1] != i:
-            inverse.append(i)
-        elif sorted_cluster:
-            sorted_cluster.pop()
-        else:
-            inverse.append(i)
+    # sorted_cluster = np.sort(cluster)
+    # eprint(sorted_cluster)
+    # eprint(sorted_cluster[-1])
+    # inverse = []
+    # for i in range(size_of_dataset-1, -1, -1):
+    #     eprint(sorted_cluster)
+    #     if sorted_cluster and sorted_cluster[-1] != i:
+    #         inverse.append(i)
+    #     elif sorted_cluster:
+    #         sorted_cluster.pop()
+    #     else:
+    #         inverse.append(i)
 
-    return inverse
+    mask = np.zeros(size_of_dataset, dtype=np.bool)
+    mask[cluster] = 1
+    inverse = np.logical_not(mask)
+
+    return np.where(inverse)[0]
 
 
 def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init=100, seed_selector='greedy', logging=False):
@@ -174,7 +210,8 @@ def clustering_algorithm_factory(algo_name):
     algo_dict = {
         'centered': CenteredClusteringAlgorithm,
         'dbscan':  DBSCANClusteringAlgorithm,
-        'identity': IdentityClusteringAlgorithm
+        'identity': IdentityClusteringAlgorithm,
+        'density': DensityThresholdClusteringAlgorithm,
     }
     return algo_dict[algo_name]()
 
@@ -200,14 +237,13 @@ def to_vtk(dataset, clustering, output, center_around_gt=False):
     if center_around_gt:
         points = center_lie_around_t(points, np.array(dataset['metadata']['ground_truth']))
 
-    radius = float(clustering['radius'])
     clustering_data = clusters_of_points(clustering['clustering'], len(points))
 
     data_dict = data_dict_of_registration_data(dataset)
     data_dict['clustering'] = np.ascontiguousarray(clustering_data)
 
-    pointcloud_to_vtk(points[:,0:3], '{}_translation'.format(output, radius), data=data_dict)
-    pointcloud_to_vtk(points[:,3:6], '{}_rotation'.format(output, radius), data=data_dict)
+    pointcloud_to_vtk(points[:,0:3], '{}_translation'.format(output), data=data_dict)
+    pointcloud_to_vtk(points[:,3:6], '{}_rotation'.format(output), data=data_dict)
 
     mean = np.array(clustering['mean_of_central'])
     mean = se3log(mean)
@@ -246,7 +282,7 @@ def distribution_of_cluster(dataset, cluster):
 
 
     if len(registrations) != 0:
-        mean, covariance = distribution_of_registrations(registrations)
+        mean, covariance = se3_gaussian_distribution_of_sample(registrations)
     else:
         mean = np.identity(4)
         covariance = np.zeros((6,6))
@@ -259,8 +295,8 @@ def compute_distribution(dataset, clustering):
     :arg cluster: The data row on which we want to compute the distribution of the central cluster.
     :returns: A new data row, this time with a distribution attached.
     """
-
     central_cluster, cluster_distance = find_central_cluster(dataset, clustering['clustering'])
+
     mean, covariance = distribution_of_cluster(dataset, central_cluster)
 
     new_clustering = clustering.copy()
@@ -344,7 +380,7 @@ def cli():
     parser.add_argument('algo', type=str, default='centered', help='The name of the clustering algorithm to use. {centered,dbscan}')
     parser.add_argument('--radius', type=float, default=0.005,
                         help='Radius that must contain enough neighbors for a point to be a core point.')
-    parser.add_argument('--n', type=int, default=12,
+    parser.add_argument('-n', '--n_neighbors', type=int, default=12,
                         help='Number of neighbours that must be contained within the radius for a point to be a core point.')
     parser.add_argument('--rescale_data', action='store_true', help='Scale rotations and translations so that the rotations live within a 1.0 radius sphere and the translations live within a 1.0 radius sphere.')
     parser.add_argument('--seed_selector', type=str, help='The seed selection strategy to use. <greedy|centered>', default='greedy')
@@ -358,7 +394,7 @@ def cli():
     ground_truth = np.array(json_dataset['metadata']['ground_truth'])
 
     algo.radius = args.radius
-    algo.k = args.n
+    algo.k = args.n_neighbors
     algo.rescale = args.rescale_data
     algo.seed_selector = args.seed_selector
     algo.logging = True

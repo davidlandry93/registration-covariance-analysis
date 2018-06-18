@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import numpy as np
 import subprocess
 
 
@@ -13,4 +14,4 @@ def density_of_points(points, k=12):
                               shell=True,
                               universal_newlines=True)
 
-    return json.loads(response.stdout)
+    return np.array(json.loads(response.stdout))

@@ -6,7 +6,6 @@ import numpy as np
 import sys
 
 from lieroy.parallel import FunctionWrapper, se3_log
-from recova.covariance_of_registrations import distribution_of_registrations
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint, dataset_to_registrations
 
@@ -51,6 +50,9 @@ def find_central_cluster(dataset, clustering):
     """
 
     if len(clustering) == 1:
+        if len(clustering[0]) == 0:
+            raise RuntimeError('Empty central cluster')
+
         return clustering[0], distance_of_cluster(dataset, clustering[0])
 
     closest_point = index_of_closest_to_ground_truth(dataset)
