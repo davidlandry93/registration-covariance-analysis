@@ -97,20 +97,26 @@ def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('output', type=str, help='The name of the file where to export the plot')
     parser.add_argument('--dims', type=str, default='0,1,2', help='Comma separated list of the dimensions to extract from the covariance matrix')
-    parsed_args = parser.parse_args()
+    parser.add_argument('--center-around-gt', action='store_true')
+    args = parser.parse_args()
 
     input_dict = json.load(sys.stdin)
-    mean = np.array(input_dict['mean'])
+
+    if args.center_around_gt:
+        mean = np.identity(4)
+    else:
+        mean = np.array(input_dict['mean'])
+
     covariance = np.array(input_dict['covariance'])
 
     mean_lie = se3_log(mean)
 
-    dims = parse_dims(parsed_args.dims)
+    dims = parse_dims(args.dims)
 
     # Extract the appropriate dims from the covariance matrix.
     covariance = covariance[dims][:,dims]
 
-    distribution_to_vtk_ellipsoid(mean_lie[dims], covariance, parsed_args.output)
+    distribution_to_vtk_ellipsoid(mean_lie[dims], covariance, args.output)
 
 
 if __name__ == '__main__':

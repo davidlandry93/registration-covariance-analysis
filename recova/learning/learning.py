@@ -94,6 +94,11 @@ def cli():
     model.save_model(model_path)
     learning_run['model'] = os.getcwd() + '/' + model_path
 
+    for key in learning_run:
+        eprint(key)
+        eprint(learning_run[key])
+        eprint()
+
     with open(args.output + '.json', 'w') as f:
         json.dump(learning_run, f)
 

@@ -8,8 +8,11 @@ import json
 import matplotlib.pyplot as plt
 import multiprocessing
 import numpy as np
+import seaborn as sb
 import sys
+import torch
 
+from recova.learning.learning import model_from_file
 from recova.registration_dataset import registrations_of_dataset
 from recova.util import eprint
 
@@ -157,10 +160,94 @@ def plot_loss_on_time(args):
     plt.show()
 
 
+def generate_axis_configuration(dataset, indices_of_axis):
+    location_count = dict()
+    for i in indices_of_axis:
+        location = dataset['data']['pairs'][i]['dataset']
+
+        if location in location_count:
+            location_count[location] += 1
+        else:
+            location_count[location] = 1
+
+    major_ticks = [0]
+    for location in sorted(location_count):
+        major_ticks.append(major_ticks[-1] + location_count[location])
+
+    minor_ticks = []
+    minor_ticks_labels = []
+    for i in range(len(major_ticks) - 1):
+        minor_ticks.append(float(major_ticks[i+1] - major_ticks[i]) / 2. + major_ticks[i])
+        minor_ticks_labels.append(sorted(location_count.keys())[i])
+
+    return major_ticks, minor_ticks, minor_ticks_labels
+
+
+
+def plot_activation_matrix(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', help='The learning dataset used to generate the model')
+    parser.add_argument('learningrun', help='The learning run to plot')
+    parser.add_argument('model', help='The CELLO model to plot')
+    args = parser.parse_args(args)
+
+    model = model_from_file(args.model, 'cello')
+
+    with open(args.dataset) as f:
+        dataset = json.load(f)
+
+    with open(args.learningrun) as f:
+        learning_run = json.load(f)
+
+    xs = np.array(dataset['data']['xs'])
+    ys = np.array(dataset['data']['ys'])
+
+    learning_indices = np.array(learning_run['train_set'])
+    validation_indices = np.array(sorted(learning_run['validation_set']))
+    sort_of_learning_examples = np.argsort(learning_indices)
+
+    # Generate the activation data
+    activation_matrix = np.zeros((len(learning_indices), len(validation_indices)))
+    for i, q in enumerate(validation_indices):
+        distances = model.compute_distances(xs[q])
+        weights = model.distances_to_weights(torch.Tensor(distances))
+        activation_matrix[:, i] = weights[sort_of_learning_examples]
+
+
+    fig, ax = plt.subplots()
+    sb.heatmap(activation_matrix, ax=ax, square=True)
+
+
+    # Compute the data to configure the x axis labels
+    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, validation_indices)
+    ax.set_xticks(major_ticks)
+    ax.set_xticklabels('')
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticklabels(labels, minor=True, rotation=90)
+
+    # Compute the data to configure the y axis labels
+    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
+    ax.set_yticks(major_ticks)
+    ax.set_yticklabels('')
+    ax.set_yticks(minor_ticks, minor=True)
+    ax.set_yticklabels(labels, minor=True)
+
+    ax.tick_params(axis='both', which='minor', length=0)
+
+    ax.set_xlabel('Validation pairs')
+    ax.set_ylabel('Training pairs')
+    ax.set_title('Weight of learning examples when predicting validation examples')
+
+    fig.set_size_inches(10, 20)
+
+    # plt.tight_layout()
+    plt.show()
+
 
 functions_of_plots = {
     'cov_on_density': plot_cov_against_density,
-    'loss_on_time': plot_loss_on_time
+    'loss_on_time': plot_loss_on_time,
+    'activation_matrix': plot_activation_matrix,
 }
 
 

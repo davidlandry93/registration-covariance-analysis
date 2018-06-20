@@ -8,7 +8,7 @@ import time
 
 from recov.pointcloud_io import pointcloud_to_vtk
 
-from recova.learning.learning import model_loader
+from recova.learning.learning import model_from_file
 from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, kullback_leibler, parallel_starmap_progressbar
@@ -52,15 +52,10 @@ def prediction_cli():
         dataset = json.load(f)
     print('Done')
 
-    print('Loading model...')
-    with open(args.model) as f:
-        learning_run = json.load(f)
-    print('Done')
-
     filtering_re = re.compile(args.filter)
 
 
-    model = model_loader(learning_run)
+    model = model_from_file(args.model, 'cello')
 
     eprint(model)
 
@@ -105,7 +100,7 @@ def dataset_to_vtk_cli():
     args = parser.parse_args()
 
     with open(args.dataset) as f:
-
+        pass
 
 
 
@@ -113,6 +108,7 @@ def dataset_to_vtk_cli():
 def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='Path to the dataset used to train the model', type=str)
+    parser.add_argument('learningrun', help='Path to the learning run', type=str)
     parser.add_argument('model', help='Path to the trained model', type=str)
     parser.add_argument('output', help='Where to output the vtk files', type=str)
     args = parser.parse_args()
@@ -123,12 +119,12 @@ def cli():
     print('Done')
 
     print('Loading model...')
-    with open(args.model) as f:
+    with open(args.learningrun) as f:
         learning_run = json.load(f)
     print('Done')
 
 
-    model = model_loader(learning_run)
+    model = model_from_file(args.model, learning_run['metadata']['algorithm'])
 
     xs = np.array(dataset['data']['xs'])
     ys = np.array(dataset['data']['ys'])
