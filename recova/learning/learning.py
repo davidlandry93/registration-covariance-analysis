@@ -37,7 +37,7 @@ def cli():
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
     parser.add_argument('--preprocessing', '-p', type=str, help='Name of the preprocessing algorithm to use.', default='identity')
-    parser.add_argument('-md', '--min-delta', type=float, help='Minimum gain on the validation loss before the learning stops.')
+    parser.add_argument('-md', '--min-delta', type=float, help='Minimum gain on the validation loss before the learning stops.', default=1e-4)
     args = parser.parse_args()
 
     eprint('Loading document')

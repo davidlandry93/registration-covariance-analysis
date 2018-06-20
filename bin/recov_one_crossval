@@ -10,11 +10,13 @@ DEFAULT_ALPHA=1e-5
 DEFAULT_BETA=1e4
 DEFAULT_LR=1e-7
 DEFAULT_W=5
+DEFAULT_MIN_DELTA=1e-4
 
 DEFAULT_ALGORITHM=cello
 
 
+
 cat $DATASET_FILE | learn_recov -a ${ALPHA:-$DEFAULT_ALPHA} -b ${BETA:-$DEFAULT_BETA} -lr ${LR:-$DEFAULT_LR} \
-                                -cv $LOCATION -w ${W:-$DEFAULT_W} \
+                                -cv $LOCATION -w ${W:-$DEFAULT_W} -md ${MIN_DELTA:-$DEFAULT_MIN_DELTA} \
                                 ${ALGORITHM:-$DEFAULT_ALGORITHM} cv_${LOCATION}
 
