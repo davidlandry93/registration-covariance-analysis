@@ -37,6 +37,7 @@ def cli():
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
     parser.add_argument('--preprocessing', '-p', type=str, help='Name of the preprocessing algorithm to use.', default='identity')
+    parser.add_argument('-md', '--min-delta', type=float, help='Minimum gain on the validation loss before the learning stops.')
     args = parser.parse_args()
 
     eprint('Loading document')
@@ -76,6 +77,7 @@ def cli():
     model.n_iterations = args.n_iterations
     model.convergence_window = args.convergence_window
     model.weight_decay = args.weight_decay
+    model.min_delta = args.min_delta
 
     preprocessing_algo = preprocessing_factory(args.preprocessing)
     model.preprocessing = preprocessing_algo

@@ -76,7 +76,7 @@ def identity_postprocessing(ys):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20, preprocessing='identity'):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20, preprocessing='identity', min_delta = 1e-4):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
@@ -84,6 +84,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.train_set_size = train_set_size
         self.convergence_window = convergence_window
         self.preprocessing = preprocessing
+        self.min_delta = 1e-4
 
     def fit(self, predictors, covariances, train_set=None, test_set=None):
         eprint('Training with descriptors of size {}'.format(predictors.shape[1]))
@@ -205,11 +206,16 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 else:
                     n_epoch_without_improvement += 1
 
-                eprint('Avg Optim Loss:     {:.8E}'.format(optimization_score))
-                eprint('Validation score:   {:.8E}'.format(validation_score))
-                eprint('Validation std:     {:.8E}'.format(validation_errors.std()))
-                eprint('Validation kll:     {:.8E}'.format(klls.mean()))
-                eprint('Validation kll std: {:.8E}'.format(klls.std()))
+                eprint('Avg Optim Loss:     {:.5E}'.format(optimization_score))
+                eprint('Validation score:   {:.5E}'.format(validation_score))
+                eprint()
+                if epoch > 0:
+                    eprint('Optim. delta:       {:.5E}'.format(optimization_losses[-2] - optimization_losses[-1]))
+                    eprint('Validation delta:   {:.5E}'.format(validation_losses[-1] - validation_score))
+                    eprint()
+                eprint('Validation std:     {:.5E}'.format(validation_errors.std()))
+                eprint('Validation kll:     {:.5E}'.format(klls.mean()))
+                eprint('Validation kll std: {:.5E}'.format(klls.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
                 eprint()
 
@@ -219,6 +225,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
+
+            if (epoch > 0) and (validation_losses[-1] - validation_losses[-2] > -1.0 * self.min_delta):
+                keep_going = False
+                eprint('Stopping because gain is not significant enough on the validation loss loss.')
 
             eprint('Epoch took {} seconds'.format(time.time() - epoch_start))
             epoch = epoch + 1
@@ -276,6 +286,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'learning_rate': self.learning_rate,
             'alpha': self.alpha,
             'logging_rate': 1,
+            'min_delta': self.min_delta,
             'preprocessing': repr(self.preprocessing)
         }
 
