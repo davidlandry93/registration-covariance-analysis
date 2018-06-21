@@ -9,14 +9,14 @@
 DEFAULT_ALPHA=1e-5
 DEFAULT_BETA=1e4
 DEFAULT_LR=1e-7
-DEFAULT_W=5
 DEFAULT_MIN_DELTA=1e-4
+DEFAULT_PATIENCE=10
 
 DEFAULT_ALGORITHM=cello
 
 
 source activate torch
 cat $DATASET_FILE | learn_recov -a ${ALPHA:-$DEFAULT_ALPHA} -b ${BETA:-$DEFAULT_BETA} -lr ${LR:-$DEFAULT_LR} \
-                                -cv $LOCATION -w ${W:-$DEFAULT_W} -md ${MIN_DELTA:-$DEFAULT_MIN_DELTA} \
+                                -cv $LOCATION -pa ${PATIENCE:-$DEFAULT_PATIENCE} -md ${MIN_DELTA:-$DEFAULT_MIN_DELTA} \
                                 ${ALGORITHM:-$DEFAULT_ALGORITHM} cv_${LOCATION}
 

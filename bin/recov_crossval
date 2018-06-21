@@ -11,7 +11,7 @@ function learning {
 
     echo "Doing $3"
     OUTPUT_NAME=$2/cv-$3
-    cat $1 | learn_recov -a 1e-5 -lr 1e-7 -cv $3 cello $OUTPUT_NAME > ${OUTPUT_NAME}_stdout 2> ${OUTPUT_NAME}_stderr
+    cat $1 | learn_recov -a 1e-5 -lr 1e-7 -cv $3 -pa 5 -md 1e-4 cello $OUTPUT_NAME > ${OUTPUT_NAME}_stdout 2> ${OUTPUT_NAME}_stderr
     echo "Done with $3"
 }
 
