@@ -1,7 +1,8 @@
+#!/bin/bash
 
 DATASET_FILE=$1
 
 LOCATIONS=(apartment gazebo_summer gazebo_winter plain stairs wood_autumn wood_summer)
-for location in "${DATASETS[@]}"; do
-    DATASET_FILE=$DATASET_FILE LOCATION=$location sbatch recov_one_crossval
+for location in "${LOCATIONS[@]}"; do
+    DATASET_FILE=$DATASET_FILE LOCATION=$location sbatch ~/repos/recova/bin/recov_one_crossval
 done
