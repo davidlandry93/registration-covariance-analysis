@@ -76,13 +76,13 @@ def identity_postprocessing(ys):
 
 
 class CelloCovarianceEstimationModel(CovarianceEstimationModel):
-    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, convergence_window=20, preprocessing='identity', min_delta = 1e-4):
+    def __init__(self, alpha=1e-4, learning_rate=1e-5, n_iterations=100, beta=1000., train_set_size=0.3, patience=20, preprocessing='identity', min_delta = 1e-4):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.beta = beta
         self.train_set_size = train_set_size
-        self.convergence_window = convergence_window
+        self.patience = patience
         self.preprocessing = preprocessing
         self.min_delta = 1e-4
 
@@ -142,8 +142,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         best_loss = np.inf
         best_model = []
         n_epoch_without_improvement = 0
+        n_epoch_without_min_delta = 0
 
-        while (epoch < self.n_iterations or self.n_iterations == 0) and keep_going and n_epoch_without_improvement < self.convergence_window:
+        while (epoch < self.n_iterations or self.n_iterations == 0) and keep_going and n_epoch_without_improvement < self.patience and n_epoch_without_min_delta < self.patience:
             epoch_start = time.time()
             optimizer.zero_grad()
 
@@ -155,6 +156,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 # eprint(metric_matrix)
 
                 distances = self._compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
+
 
                 # eprint(self.distances_to_weights(distances))
 
@@ -217,6 +219,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 eprint('Validation kll:     {:.5E}'.format(klls.mean()))
                 eprint('Validation kll std: {:.5E}'.format(klls.std()))
                 eprint('N epoch without improvement: %d' % n_epoch_without_improvement)
+                eprint('N epoch without min delta:   %d' % n_epoch_without_min_delta)
                 eprint()
 
                 validation_errors_log.append(validation_errors.numpy().tolist())
@@ -227,8 +230,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
 
             if (epoch > 0) and (validation_losses[-1] - validation_losses[-2] > -1.0 * self.min_delta):
-                keep_going = False
-                eprint('Stopping because gain is not significant enough on the validation loss loss.')
+                n_epoch_without_min_delta += 1
+            else:
+                n_epoch_without_min_delta = 0
+
 
             eprint('Epoch took {} seconds'.format(time.time() - epoch_start))
             epoch = epoch + 1
