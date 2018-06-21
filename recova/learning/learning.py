@@ -32,7 +32,7 @@ def cli():
     parser.add_argument('-a', '--alpha', type=float, default=1e-4)
     parser.add_argument('-b', '--beta', type=float, default=1e3)
     parser.add_argument('-n', '--n_iterations', type=int, default=0, help='Maximum number of iterations. 0 means no maximum and wait for convergence.')
-    parser.add_argument('-w', '--convergence_window', type=int, default=20, help='N of iterations without improvement before ending training.')
+    parser.add_argument('-pa', '--patience', type=int, default=20, help='N of iterations without improvement before ending training.')
     parser.add_argument('-cv', '--cross-validate', type=str, help='Name of the dataset to use as a validation set', default='')
     parser.add_argument('-wd', '--weight-decay', type=float, default=1e-10, help='For the MLP, set the weight decay parameter.')
     parser.add_argument('--filter', type=str, help='Filter out datasets from the learning.', default='')
@@ -75,9 +75,9 @@ def cli():
     model.alpha = args.alpha
     model.beta = args.beta
     model.n_iterations = args.n_iterations
-    model.convergence_window = args.convergence_window
     model.weight_decay = args.weight_decay
     model.min_delta = args.min_delta
+    model.patience = args.patience
 
     preprocessing_algo = preprocessing_factory(args.preprocessing)
     model.preprocessing = preprocessing_algo
@@ -95,11 +95,6 @@ def cli():
     model_path = args.output + '.model'
     model.save_model(model_path)
     learning_run['model'] = os.getcwd() + '/' + model_path
-
-    for key in learning_run:
-        eprint(key)
-        eprint(learning_run[key])
-        eprint()
 
     with open(args.output + '.json', 'w') as f:
         json.dump(learning_run, f)
