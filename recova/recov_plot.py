@@ -11,6 +11,7 @@ import numpy as np
 import seaborn as sb
 import sys
 import torch
+from torch.autograd import Variable
 
 from recova.learning.learning import model_from_file
 from recova.registration_dataset import registrations_of_dataset
@@ -199,8 +200,8 @@ def plot_activation_matrix(args):
     with open(args.learningrun) as f:
         learning_run = json.load(f)
 
-    xs = np.array(dataset['data']['xs'])
-    ys = np.array(dataset['data']['ys'])
+    xs = torch.Tensor(np.array(dataset['data']['xs']))
+    ys = torch.Tensor(np.array(dataset['data']['ys']))
 
     learning_indices = np.array(learning_run['train_set'])
     validation_indices = np.array(sorted(learning_run['validation_set']))
@@ -215,32 +216,32 @@ def plot_activation_matrix(args):
 
 
     fig, ax = plt.subplots()
-    sb.heatmap(activation_matrix, ax=ax, square=True)
+    sb.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5})
 
 
     # Compute the data to configure the x axis labels
     major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, validation_indices)
-    ax.set_xticks(major_ticks)
-    ax.set_xticklabels('')
-    ax.set_xticks(minor_ticks, minor=True)
-    ax.set_xticklabels(labels, minor=True, rotation=90)
-
-    # Compute the data to configure the y axis labels
-    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
     ax.set_yticks(major_ticks)
     ax.set_yticklabels('')
     ax.set_yticks(minor_ticks, minor=True)
     ax.set_yticklabels(labels, minor=True)
 
+    # Compute the data to configure the y axis labels
+    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
+    ax.set_xticks(major_ticks)
+    ax.set_xticklabels('')
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticklabels(labels, minor=True, rotation=90)
+
     ax.tick_params(axis='both', which='minor', length=0)
 
-    ax.set_xlabel('Validation pairs')
-    ax.set_ylabel('Training pairs')
+    ax.grid(color='white', linestyle='--')
+
+    ax.set_ylabel('Validation pairs')
+    ax.set_xlabel('Training pairs')
     ax.set_title('Weight of learning examples when predicting validation examples')
 
-    fig.set_size_inches(10, 20)
-
-    # plt.tight_layout()
+    plt.tight_layout()
     plt.show()
 
 

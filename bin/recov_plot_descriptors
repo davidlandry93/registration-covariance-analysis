@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import argparse
+import hypertools as hyp
+import matplotlib.pyplot as plt
+import numpy as np
+import json
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_dataset', type=str, help='Path to the dataset of descriptors to plot')
+    parser.add_argument('-n', '--n-clusters', type=int, help='Number of clusters in the dataset')
+    parser.add_argument('-q', '--query-dataset', type=str, help='Path to a supplementary dataset to plot')
+    args = parser.parse_args()
+
+    with open(args.input_dataset) as f:
+        dataset = json.load(f)
+
+    xs = np.array(dataset['data']['xs'])
+    ys = np.array(dataset['data']['ys'])
+
+    ys_flattened = ys[:,3:6,3:6].reshape((len(ys), 9))
+
+    print(ys[0])
+    print(ys_flattened[0])
+
+    locations_of_points = [pair['dataset'] for pair in dataset['data']['pairs']]
+    cov_11_of_points = [np.linalg.norm(cov) for cov in ys]
+
+    if args.query_dataset:
+        with open(args.query_dataset) as f:
+            query_dataset = json.load(f)
+
+        query_descriptors = np.array(query_dataset['data']['xs'])
+
+        xs = np.concatenate([xs, query_descriptors])
+
+        locations_of_query = [pair['dataset'] for pair in query_dataset['data']['pairs']]
+        locations_of_points.extend(locations_of_query)
+
+
+    list_of_locations = []
+    for location in locations_of_points:
+        if location not in list_of_locations:
+            list_of_locations.append(location)
+
+    # hyp.plot(xs, fmt='.', hue=locations_of_points, legend=list_of_locations, palette='Paired')
+    # hyp.plot(xs, fmt='.', hue=cov_11_of_points, legend=list_of_locations, palette='viridis')
+
+    hyp.plot(ys_flattened, fmt='.', hue=locations_of_points, legend=list_of_locations, palette='Paired', title='Dimensionality reduced covariance for different locations')
+
+

@@ -36,9 +36,10 @@ def cli():
     parser.add_argument('location', type=str)
     parser.add_argument('reading', type=int)
     parser.add_argument('reference', type=int)
+    parser.add_argument('--density-filter', type=float, default=1e3)
     args = parser.parse_args()
 
-    clustering = DensityThresholdClusteringAlgorithm(1e3, k=100)
+    clustering = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     db = RegistrationPairDatabase(args.database)

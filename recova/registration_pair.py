@@ -10,22 +10,17 @@ from recov.registration_algorithm import IcpAlgorithm
 from recova.file_cache import FileCache
 from recova.merge_json_result import merge_result_files
 from recova.registration_dataset import positions_of_registration_data
-from recova.util import eprint
+from recova.util import eprint, run_subprocess, rotation_around_z_matrix, transform_points
 
 class RegistrationPair:
-    def __init__(self, database_root, dataset, reading, reference, database):
+    def __init__(self, database_root, dataset, reading, reference, database, rotation_around_z = 0.0):
         self.root = database_root
         self.dataset = dataset
         self.reading = reading
         self.reference = reference
         self.cache = FileCache(self.directory_of_pair / 'cache')
-        self.memory_cache = {}
         self.database = database
-
-        self._points_of_reading = None
-        self._points_of_reference = None
-
-        self._normals = {}
+        self.rotation_around_z = rotation_around_z
 
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
@@ -35,21 +30,27 @@ class RegistrationPair:
 
     @property
     def pair_id(self):
-        return '{}-{:04d}-{:04d}'.format(self.dataset, self.reading, self.reference)
-
+        return '{}-{:04d}-{:04d}'.format(
+            self.dataset,
+            self.reading,
+            self.reference)
 
     @property
     def directory_of_pair(self):
-        pair_folder = self.pair_id
+        pair_folder = self.root / self.pair_id
+        raw_data_folder = self.root / self.pair_id / 'raw'
 
-        if not (self.root / pair_folder).exists() or not (self.root / pair_folder / 'raw').exists():
-            os.makedirs(str(self.root / pair_folder / 'raw'))
+        if not pair_folder.exists():
+            raise RuntimeError('Folder not found for registration pair {}'.format(str(self)))
+        elif not raw_data_folder.exists():
+            os.mkdir(str(raw_data_folder))
 
-        return self.root / pair_folder
+        return pair_folder
 
 
     def accept_raw_file(self, filename):
         p = pathlib.Path(filename)
+        eprint(self.directory_of_pair)
         dest = str(self.directory_of_pair / 'raw' / p.name)
         eprint('{} to {}'.format(p, dest))
         os.rename(str(p), dest)
@@ -72,7 +73,8 @@ class RegistrationPair:
 
 
     def transform(self):
-        return self.cache['transform']
+        R = rotation_around_z_matrix(self.rotation_around_z)
+        return np.dot(rotation_around_z_matrix(self.rotation_around_z), np.dot(self.cache['transform'], np.linalg.inv(R)))
 
 
     def pair_exists(self):
@@ -127,17 +129,59 @@ class RegistrationPair:
         return self.transform()
 
     def path_to_reading_pcd(self):
-        return self.database.reading_pcd(self.dataset, self.reading)
+        if self.rotation_around_z == 0.0:
+            path = self.database.reading_pcd(self.dataset, self.reading)
+        else:
+            path = self.path_to_rotated_reading_pcd(self.rotation_around_z)
+
+        return path
+
 
     def path_to_reference_pcd(self):
-        return self.database.reference_pcd(self.dataset, self.reference)
+        if self.rotation_around_z == 0.0:
+            path = self.database.reference_pcd(self.dataset, self.reference)
+        else:
+            path = self.path_to_rotated_reference_pcd(self.rotation_around_z)
+        return path
+
+
+    def path_to_rotated_reading_pcd(self, rotation_around_z):
+        rotated_points = self.points_of_reading()
+
+        pcd_name = 'reading_rotated_{}.pcd'.format(self.rotation_around_z)
+        path = self.directory_of_pair / pcd_name
+
+        if not path.exists():
+            pointcloud_to_pcd(rotated_points, str(path))
+
+        return path
+
+    def path_to_rotated_reference_pcd(self, rotation_around_z):
+        rotated_points = self.points_of_reference()
+
+        pcd_name = 'reference_rotated_{}.pcd'.format(self.rotation_around_z)
+        path = self.directory_of_pair / pcd_name
+
+        if not path.exists():
+            pointcloud_to_pcd(rotated_points, str(path))
+
+        return path
+
 
     def points_of_reading(self):
-        return self.database.get_reading(self.dataset, self.reading)
+        points = self.database.get_reading(self.dataset, self.reading)
+
+        R = rotation_around_z_matrix(self.rotation_around_z)
+
+        points = transform_points(points, R)
+
+        return points
 
 
     def points_of_reference(self):
-        return self.database.get_reference(self.dataset, self.reference)
+        points = self.database.get_reference(self.dataset, self.reference)
+        points = transform_points(points, rotation_around_z_matrix(self.rotation_around_z))
+        return points
 
 
     def clustering_of_results(self, clustering_algorithm):
@@ -172,3 +216,35 @@ class RegistrationPair:
 
     def eigenvalues_of_reference(self):
         return self.database.eigenvalues_of_reference(self.dataset, self.reference)
+
+    def overlap(self):
+        mask_reading, mask_reference = self.overlapping_region()
+
+        return (np.sum(mask_reading) + np.sum(mask_reference)) / (len(mask_reading) + len(mask_reference))
+
+
+    def overlapping_region(self, radius=0.1):
+        key = 'overlapping_region_{}'.format(radius)
+
+        def compute_overlapping_region(radius):
+            reading = self.points_of_reading()
+            reference = self.points_of_reference()
+            t = self.transform()
+
+            input_dict = {
+                'reading': reading.tolist(),
+                'reference': reference.tolist(),
+                't': t.tolist()
+            }
+
+            cmd_string = 'overlapping_region -radius {} -mask'.format(radius)
+            eprint(cmd_string)
+            response = run_subprocess(cmd_string, json.dumps(input_dict))
+
+            return json.loads(response)
+
+        response = self.cache.get_or_generate(key, lambda: compute_overlapping_region(radius))
+        reading_mask = np.array(response['reading'], dtype=bool)
+        reference_mask = np.array(response['reference'], dtype=bool)
+
+        return reading_mask, reference_mask

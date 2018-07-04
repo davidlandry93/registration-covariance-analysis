@@ -1,10 +1,13 @@
 
 #include <memory>
 #include <iostream>
+#include <string>
 
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <Eigen/Core>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
 
 #include "centered_clustering.h"
 #include "greedy_seed_selection_algorithm.h"
@@ -109,10 +112,16 @@ p::list grid_pointcloud_separator(const np::ndarray& m,
   return list_of_bins;
 }
 
+np::ndarray load_pcd(const std::string& path) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+    return np::array(p::list());
+}
+
 
 BOOST_PYTHON_MODULE(recova_core) {
   np::initialize();
 
-  p:def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
+  p::def("centered_clustering", centered_clustering, "Compute a clustering centered around zero of an ndarray.");
   p::def("grid_pointcloud_separator", grid_pointcloud_separator, "Separate a ndarray of points in a grid.");
 }

@@ -269,6 +269,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         return losses
 
+    # def _validation_errors(self, ys_predicted, ys_validation):
+    #     losses = torch.abs(ys_predicted - ys_validation)
+    #     losses = losses.sum(dim=2).sum(dim=1)
+
+    #     return losses
+
     def validate(self, xs, ys):
         return self._validate(torch.Tensor(xs), torch.Tensor(xs))
 
@@ -292,7 +298,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             'alpha': self.alpha,
             'logging_rate': 1,
             'min_delta': self.min_delta,
-            'preprocessing': repr(self.preprocessing)
+            'preprocessing': repr(self.preprocessing),
+            'patience': self.patience
         }
 
 
@@ -332,7 +339,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def compute_distances(self, predictor):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
-        return self._compute_distances(self.model_predictors, metric_matrix, torch.Tensor(predictor)).detach().numpy()
+        return self._compute_distances(self.model_predictors, metric_matrix, Variable(torch.Tensor(predictor))).data.numpy()
 
     def distances_to_weights(self, distances):
         # zero_distances = distances < 1e-10

@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import numpy as np
 import pathlib
+import re
 import sys
 import time
 import tqdm
@@ -130,6 +131,7 @@ def generate_examples_cli():
 
 
 def compute_one_summary_line(registration_pair, covariance_algo):
+    eprint(registration_pair)
     covariance = covariance_algo.compute(registration_pair)
 
     d = {
@@ -145,9 +147,28 @@ def compute_one_summary_line(registration_pair, covariance_algo):
     return d
 
 
+def filter_dataset(learning_dataset, filter_regex, keep=False):
+    """
+    Arguments
+    learning_dataset: A full json learning dataset (with a data.pairs, data.xs and data.ys)
+    filter_regex: A compiled regex that matches the dataset names we want to filter out
+    keep: If true the regex matches what we want to keep. Otherwise it matches what we want to filter out.
+    """
+    mask = np.zeros(len(learning_dataset['data']['pairs']), dtype=bool)
+
+    for i in range(len(learning_dataset['data']['pairs'])):
+        ma = filter_regex.match(learning_dataset['data']['pairs'][i]['dataset'])
+        mask[i] = (ma is not None) == keep
+
+    return mask
+
+
+
+
 def dataset_summary_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('input', type=str, help='Path to the managed registration result database')
+    parser.add_argument('--density-filter', type=float, default=0.0)
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.input)
@@ -156,18 +177,17 @@ def dataset_summary_cli():
     # clustering_algorithm.seed_selector = 'localized'
     # clustering_algorithm.rescale = True
 
-    clustering_algorithm = IdentityClusteringAlgorithm()
-
+    clustering_algorithm = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
     covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
 
     # covariance_algorithm = CensiCovarianceComputationAlgorithm()
 
-    with multiprocessing.Pool() as p:
+    with multiprocessing.Pool(1) as p:
         rows = p.starmap(compute_one_summary_line, [(x, covariance_algorithm) for x in db.registration_pairs()])
-    writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
-    writer.writeheader()
-    for row in rows:
-        writer.writerow(row)
+        writer = csv.DictWriter(sys.stdout, ['dataset', 'reading', 'reference', 'cluster_distance', 'outlier_ratio', 'condition_number', 'trace'])
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
 
 
 if __name__ == '__main__':

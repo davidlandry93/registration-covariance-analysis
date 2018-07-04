@@ -1,6 +1,6 @@
 import numpy as np
 
-from recova.util import to_upper_triangular, upper_triangular_to_vector
+from recova.util import eprint, nearestPD, to_upper_triangular, upper_triangular_to_vector
 
 class PreprocessingAlgorithm:
     def __init__(self):
@@ -49,7 +49,8 @@ class TranslationOnlyPreprocessing(PreprocessingAlgorithm):
         pass
 
     def process(self, m):
-        return m[:, 0:3, 0:3]
+        return m[:, 0:3,
+                 0:3]
 
     def unprocess(self, m):
         covariances = np.zeros((len(m), 6, 6))
@@ -75,7 +76,11 @@ class CholeskyPreprocessing(PreprocessingAlgorithm):
     def process(self, covariances):
         vectors = np.empty((len(covariances), 21))
         for i, cov in enumerate(covariances):
-            L = np.linalg.cholesky(cov)
+            try:
+                L = np.linalg.cholesky(cov)
+            except np.linalg.LinAlgError:
+                m = nearestPD(cov)
+                L = np.linalg.cholesky(m)
             vectors[i] = upper_triangular_to_vector(L.T)
             eprint(vectors[i])
 
@@ -91,6 +96,7 @@ class CholeskyPreprocessing(PreprocessingAlgorithm):
             eprint(covariances[i])
 
         return covariances
+
 
     def export(self):
         return {
@@ -113,6 +119,8 @@ def preprocessing_factory(algo):
         return IdentityPreprocessing()
     elif algo == 'translation_only':
         return TranslationOnlyPreprocessing()
+    elif algo == 'cholesky':
+        return CholeskyPreprocessing()
     else:
         raise RuntimeError('Unrecognized preprocessing algorithm {}'.format(algo))
 

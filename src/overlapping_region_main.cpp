@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
     }
 
     std::cerr << output["overlap_ratio"] << '\n';
-    std::cout << output << '\n';
+    std::cout << output << std::endl;
 
     return 0;
 }

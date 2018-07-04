@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+import argparse
+
+from math import pi
+
+from recova.registration_result_database import RegistrationPairDatabase
+from recov.pointcloud_io import points_of_pcd, pointcloud_to_vtk
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database', type=str)
+    parser.add_argument('location', type=str)
+    parser.add_argument('reading', type=int)
+    parser.add_argument('reference', type=int)
+    parser.add_argument('--rotation', type=float, default=pi / 2.)
+    args = parser.parse_args()
+
+    db = RegistrationPairDatabase(args.database)
+    pair = db.get_registration_pair(args.location, args.reading, args.reference)
+
+    reading = pair.points_of_reading()
+    reference = pair.points_of_reference()
+    t = pair.transform()
+
+    pointcloud_to_vtk(reading, 'reading_untouched')
+    pointcloud_to_vtk(reference, 'reference_untouched')
+    pointcloud_to_vtk(reading, 'reading_untouched_aligned', T=t)
+
+    pair.rotation_around_z = args.rotation
+
+    reading = pair.points_of_reading()
+    reference = pair.points_of_reference()
+    t = pair.transform()
+
+    pointcloud_to_vtk(reading, 'reading_rotated')
+    pointcloud_to_vtk(reference, 'reference_rotated')
+    pointcloud_to_vtk(reading, 'reading_rotated_aligned', T=t)
+
+    reading_pcd = pair.path_to_reading_pcd()
+    reference_pcd = pair.path_to_reference_pcd()
+    t = pair.transform()
+
+    reading_pcd_points = points_of_pcd(reading_pcd)
+    reference_pcd_points = points_of_pcd(reference_pcd)
+
+    pointcloud_to_vtk(reading_pcd_points, 'reading_rotated_pcd')
+    pointcloud_to_vtk(reference_pcd_points, 'reference_rotated_pcd')
+    pointcloud_to_vtk(reading_pcd_points, 'reading_rotated_pcd_aligned', T=t)
+

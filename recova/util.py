@@ -242,3 +242,9 @@ def parallel_starmap_progressbar(worker, data, n_cores=8):
             results.append(x)
 
     return results
+
+def rotation_around_z_matrix(theta):
+    return np.array([[np.cos(theta), -np.sin(theta), 0.0, 0.0],
+                     [np.sin(theta), np.cos(theta), 0.0, 0.0],
+                     [0.0, 0.0, 1.0, 0.0],
+                     [0.0, 0.0, 0.0, 1.0]])

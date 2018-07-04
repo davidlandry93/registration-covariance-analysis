@@ -125,10 +125,13 @@ def apply_mask_cli():
     parser.add_argument('--range', type=float, help='For the angle mask generator, the range of angles accepted.', default=0.0)
     parser.add_argument('--offset', type=float, help='For the angle mask generator, the offset of angles accepted.', default=0.0)
     parser.add_argument('-c', '--config', type=str, help='Path to a json config for the mask')
+    parser.add_argument('-r', '--rotation', type=float, help='Rotation around the z axis to apply to the cloud pair before computing the descriptor, in radians.')
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.database)
     pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
+
+    pair.rotation_around_z = args.rotation
 
     reading = pair.points_of_reading()
     reference = pair.points_of_reference()

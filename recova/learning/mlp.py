@@ -4,21 +4,25 @@ import torch
 from torch.autograd import Variable
 import torch.nn
 
+
 from recova.learning.cello import kullback_leibler_pytorch
 from recova.learning.model import CovarianceEstimationModel
+from recova.learning.preprocessing import IdentityPreprocessing
 from recova.util import eprint
 
 
 class MlpModel(CovarianceEstimationModel):
-    def __init__(self, device='cuda', learning_rate = 1e2, n_iterations=0, logging_rate=1000, alpha=0.0, convergence_window=50000, decay=1e-10):
+    def __init__(self, device='cuda', learning_rate = 1e2, n_iterations=0, logging_rate=1000, alpha=0.0, patience=50000, decay=1e-10, preprocessing=IdentityPreprocessing()):
         self.device = torch.device(device)
-        self.hidden_sizes = [500, 300, 250, 300]
+        self.hidden_sizes = [600, 500, 500, 300, 400, 500, 600]
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
         self.logging_rate = logging_rate
         self.alpha = alpha
-        self.convergence_window = convergence_window
+        self.patience = patience
         self.weight_decay = decay
+        self.preprocessing = preprocessing
+
 
 
     def fit(self, predictors, covariances, train_set=None, test_set=None):
@@ -29,11 +33,13 @@ class MlpModel(CovarianceEstimationModel):
         else:
             train_indices, test_indices = sklearn.model_selection.train_test_split(list(range(len(predictors))), test_size=0.3)
 
+        preprocessed_covariances = self.preprocessing.process(covariances)
+
         xs_train = Variable(torch.Tensor(predictors[train_indices])).to(self.device)
-        ys_train = Variable(torch.Tensor(covariances[train_indices])).to(self.device)
+        ys_train = Variable(torch.Tensor(preprocessed_covariances[train_indices])).to(self.device)
 
         xs_test = Variable(torch.Tensor(predictors[test_indices])).to(self.device)
-        ys_test = Variable(torch.Tensor(covariances[test_indices])).to(self.device)
+        ys_test = Variable(torch.Tensor(preprocessed_covariances[test_indices])).to(self.device)
 
         learning_run = self._fit(xs_train, ys_train, xs_test, ys_test)
         learning_run['train_set'] = train_indices
@@ -60,7 +66,21 @@ class MlpModel(CovarianceEstimationModel):
             torch.nn.Hardtanh(),
             torch.nn.Dropout(0.1),
             torch.nn.BatchNorm1d(self.hidden_sizes[3]),
-            torch.nn.Linear(self.hidden_sizes[3], 6*6)
+
+            torch.nn.Linear(self.hidden_sizes[3], self.hidden_sizes[4]),
+            torch.nn.Hardtanh(),
+            torch.nn.Dropout(0.1),
+            torch.nn.BatchNorm1d(self.hidden_sizes[4]),
+            torch.nn.Linear(self.hidden_sizes[4], self.hidden_sizes[5]),
+            torch.nn.Hardtanh(),
+            torch.nn.Dropout(0.1),
+            torch.nn.BatchNorm1d(self.hidden_sizes[5]),
+
+            torch.nn.Linear(self.hidden_sizes[5], self.hidden_sizes[6]),
+            torch.nn.Hardtanh(),
+            torch.nn.Dropout(0.1),
+            torch.nn.BatchNorm1d(self.hidden_sizes[6]),
+            torch.nn.Linear(self.hidden_sizes[6], 36)
         ).to(self.device)
 
         self.best_loss = float('inf')
@@ -77,7 +97,7 @@ class MlpModel(CovarianceEstimationModel):
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
 
-        while n_iter_without_improvement < self.convergence_window and (epoch < self.n_iterations or self.n_iterations == 0):
+        while n_iter_without_improvement < self.patience and (epoch < self.n_iterations or self.n_iterations == 0):
 
             loss = self._validate(xs_train, ys_train)
 
@@ -117,7 +137,7 @@ class MlpModel(CovarianceEstimationModel):
                 eprint('Train Loss: {:.8E}'.format(loss.data))
                 eprint('Test loss:  {:.8E}'.format(test_loss.data))
                 # self._dets(xs_test, ys_test)
-                eprint('{} iterations without improvement (out of {})'.format(n_iter_without_improvement, self.convergence_window))
+                eprint('{} iterations without improvement (out of {})'.format(n_iter_without_improvement, self.patience))
                 eprint()
 
             epoch += 1
@@ -129,7 +149,7 @@ class MlpModel(CovarianceEstimationModel):
                 'learning_rate': self.learning_rate,
                 'logging_rate': self.logging_rate,
                 'n_iterations': self.n_iterations,
-                'convergence_window': self.convergence_window,
+                'patience': self.patience,
             },
             'optimization_errors': train_errors_log,
             'optimization_loss': train_losses,
@@ -158,7 +178,9 @@ class MlpModel(CovarianceEstimationModel):
 
     def _validation_errors(self, xs, ys):
         covariances_predicted = self._predict(xs)
-        errors = torch.sqrt((covariances_predicted - ys).pow(2.0).sum(dim=2).sum(dim=1))
+
+        # errors = torch.sqrt(((covariances_predicted - ys)**2).sum(dim=2).sum(dim=1))
+        errors = torch.abs((covariances_predicted - ys)).sum(dim=2).sum(dim=1)
 
         return errors
 
@@ -177,7 +199,8 @@ class MlpModel(CovarianceEstimationModel):
 
     def predict(self, predictors):
         predicted = self._predict(torch.Tensor(predictors).to(self.device))
-        return predicted.detach().view(len(predicted),6,6).cpu().numpy()
+        unprocessed_predicted = self.preprocessing.unprocess(predicted.detach().view(len(predicted),6,6).cpu().numpy())
+        return unprocessed_predicted
 
     def _predict(self, xs):
         model_output = self.model(xs)

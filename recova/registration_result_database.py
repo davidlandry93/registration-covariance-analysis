@@ -12,9 +12,9 @@ import subprocess
 import sys
 import tqdm
 
-from threading import Lock
-
 from io import StringIO
+
+import lieroy
 
 from recov.datasets import create_registration_dataset
 from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz
@@ -24,7 +24,7 @@ from recova.alignment import IdentityAlignmentAlgorithm
 from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
 from recova.covariance import covariance_algorithm_factory
 from recova.file_cache import FileCache
-from recova.util import eprint, run_subprocess, parallel_starmap_progressbar
+from recova.util import eprint, run_subprocess, parallel_starmap_progressbar, rotation_around_z_matrix, transform_points
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations
@@ -59,8 +59,12 @@ class RegistrationPairDatabase:
                 reading = registration_results['metadata']['reading']
                 reference = registration_results['metadata']['reference']
 
-                r = RegistrationPair(self.root, dataset, reading, reference, self)
-                r.accept_raw_file(path_to_file)
+                if not self.pair_exists(dataset, reading, reference):
+                    pair = self.create_pair(dataset, reading, reference)
+                else:
+                    pair = self.get_registration_pair(dataset, reading, reference)
+
+                pair.accept_raw_file(path_to_file)
 
         except OSError as e:
             print(e)
@@ -68,8 +72,13 @@ class RegistrationPairDatabase:
 
         return (dataset, reading, reference)
 
+    def pair_exists(self, location, reading, reference):
+        pair_path = self.root / '{}-{:04d}-{:04d}'.format(location, reading, reference)
+        return pair_path.exists()
+
 
     def create_pair(self, location, reading, reference):
+        os.makedirs(str(self.root / '{}-{:04d}-{:04d}'.format(location, reading, reference) / 'raw'))
         pair = RegistrationPair(self.root, location, reading, reference, self)
 
         return pair
@@ -117,31 +126,26 @@ class RegistrationPairDatabase:
         label = '{}_{}_{}'.format(location, 'reference', index)
         return self.pointcloud_cache[label]
 
+
     def reference_pcd(self, location, index):
-        path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reference', index)
+        pointcloud_label = '{}_{}_{}'.format(location, 'reference', index)
+        return self.pointcloud_pcd(pointcloud_label, self.get_reference, rotation_around_z)
 
-        if not path_to_pcd.exists():
-            # database_mutex.acquire()
-            try:
-                pointcloud_to_pcd(self.get_reference(location, index), str(path_to_pcd))
-            finally:
-                pass
-                # database_mutex.release()
-
-        return path_to_pcd
 
     def reading_pcd(self, location, index):
-        path_to_pcd = self.pointcloud_dir() / '{}_{}_{}.pcd'.format(location, 'reading', index)
+        pointcloud_label = '{}_{}_{}'.format(location, 'reading', index)
+        return self.pointcloud_pcd(pointcloud_label, self.get_reading, rotation_around_z)
+
+    def pointcloud_pcd(self, pointcloud_label, pointcloud_lambda):
+        label = pointcloud_label
+        path_to_pcd = self.pointcloud_dir() / label + '.pcd'
 
         if not path_to_pcd.exists():
-            # database_mutex.acquire()
-            try:
-                pointcloud_to_pcd(self.get_reading(location, index), str(path_to_pcd))
-            finally:
-                pass
-                # database_mutex.release()
+            points = pointcloud_lambda()
+            pointcloud_to_pcd(transformed, path_to_pcd)
 
         return path_to_pcd
+
 
     def normals_of_reading(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reading', index, 'normals')
@@ -164,8 +168,6 @@ class RegistrationPairDatabase:
         stream = StringIO(response)
         normals = read_xyz_stream(stream)
 
-
-
         return normals
 
     def eigenvalues_of_reading(self, location, index):
@@ -184,9 +186,6 @@ class RegistrationPairDatabase:
         cloud_eig_vals = np.array(result_dict)
 
         return cloud_eig_vals.T
-
-
-database_mutex = Lock()
 
 
 def import_one_husky_pair(db, location, reading, reference, dataset):

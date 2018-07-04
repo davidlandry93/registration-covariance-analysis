@@ -49,7 +49,7 @@ class ReferenceOnlyMaskGenerator(MaskGenerator):
 
 
 class ConcatMaskGenerator(MaskGenerator):
-    def __init__(self, generators):
+    def __init__(self, generators, rotation_around_z = 0.0):
         self.generators = generators
 
     def __repr__(self):
@@ -191,36 +191,13 @@ class OverlapMaskGenerator(MaskGenerator):
         if reading_mask_label in pair.cache and reference_mask_label in pair.cache:
             return MaskPair(pair.cache[reading_mask_label], pair.cache[reference_mask_label])
         else:
-            reading_array, reference_array = self._compute(pair)
-            reading_array = np.array(reading_array, dtype=bool)
-            reference_array = np.array(reference_array, dtype=bool)
+            reading_array, reference_array = pair.overlapping_region(self.radius)
 
-            pair.cache[reading_mask_label] = reading_array
-            pair.cache[reference_mask_label] = reference_array
+            pair.cache[reading_mask_label] = np.expand_dims(reading_array, axis=0)
+            pair.cache[reference_mask_label] = np.expand_dims(reference_array, axis=0)
 
-            return MaskPair(reading_array, reference_array)
+            return MaskPair([reading_array], [reference_array])
 
-
-    def _compute(self, pair):
-        cmd_template = 'overlapping_region -radius {} -mask'
-        cmd_string = cmd_template.format(self.radius)
-
-        reading = pair.points_of_reading()
-        reference = pair.points_of_reference()
-
-        input_dict = {
-            'reading': reading.tolist(),
-            'reference': reference.tolist(),
-            't': pair.transform().tolist()
-        }
-
-        response = run_subprocess(cmd_string, json.dumps(input_dict))
-        response = json.loads(response)
-
-        reading_mask = [response['reading']]
-        reference_mask = [response['reference']]
-
-        return reading_mask, reference_mask
 
 class CylinderGridMask(MaskGenerator):
     def __init__(self, spanr=20., spantheta=2 * np.pi, spanz=5., nr=3, ntheta=3, nz=3):

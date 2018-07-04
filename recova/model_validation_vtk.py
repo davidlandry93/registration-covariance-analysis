@@ -22,7 +22,7 @@ def frobenius(tensor):
 
     print(tensor.shape)
     tensor = np.sum(tensor, axis=1)
-    
+
     print(tensor.shape)
     return np.sqrt(tensor)
 
@@ -168,6 +168,18 @@ def cli():
                 'loss': errors[i],
                 'kullback_leibler': klls[i]
             })
+
+
+            eprint('MATRICES')
+            eprint('predictions')
+            eprint(ys_predicted[i])
+            eprint('validation')
+            eprint(ys_validation[i])
+            diff = ys_predicted[i] - ys_validation[i]
+            eprint(diff)
+
+            eprint(np.sqrt(np.sum(np.power(diff, 2.0))))
+            eprint()
 
 
 if __name__ == '__main__':
