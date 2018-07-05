@@ -5,7 +5,7 @@ import numpy as np
 
 from lieroy.parallel import se3_log
 from recov.registration_algorithm import IcpAlgorithm
-from recov.censi import censi_estimate_from_clouds
+from recov.censi import censi_estimate_from_points
 from recova.clustering import compute_distribution, IdentityClusteringAlgorithm
 
 
@@ -56,17 +56,14 @@ class CensiCovarianceComputationAlgorithm:
 
 
     def compute(self, registration_pair):
-        covariance = registration_pair.cache[repr(self)]
+        def generate_covariance():
+            reading = registration_pair.points_of_reading()
+            reference = registration_pair.points_of_reference()
 
-        if not covariance:
-            path_to_reading = registration_pair.path_to_reading_pcd()
-            path_to_reference = registration_pair.path_to_reference_pcd()
+            covariance = censi_estimate_from_points(reading, reference, registration_pair.ground_truth(), self.algo)
+            return covariance
 
-            covariance = censi_estimate_from_clouds(path_to_reading, path_to_reference, registration_pair.ground_truth(), self.algo)
-
-            registration_pair.cache[repr(self)] = covariance
-
-        return np.array(covariance)
+        return self.cache.get_or_generate(repr(self), generate_covariance)
 
 
 def covariance_algorithm_factory(algo):

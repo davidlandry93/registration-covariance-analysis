@@ -1,10 +1,14 @@
 import json
 import numpy as np
+import os
+import shlex
+import subprocess
 import tempfile
+import uuid
 
-from recov.censi import censi_estimate_from_clouds
+from recov.censi import censi_estimate_from_points
 from recov.registration_algorithm import IcpAlgorithm
-from recov.pointcloud_io import pointcloud_to_pcd, points_to_temporary_pcd
+from recov.pointcloud_io import pointcloud_to_pcd, points_to_temporary_pcd, pointcloud_to_qpc_file
 
 from recova.util import eprint, run_subprocess
 
@@ -207,20 +211,17 @@ class CensiDescriptor(DescriptorAlgo):
 
         return labels
 
-
     def compute(self, pair, reading_mask, reference_mask):
-        if reading_mask.all() and reference_mask.all():
-            reading_path = pair.path_to_reading_pcd()
-            reference_path = pair.path_to_reference_pcd()
-        else:
-            reading = pair.points_of_reading()[reading_mask]
-            reference = pair.points_of_reference()[reference_mask]
+        points_reading = pair.points_of_reading()[reading_mask]
+        points_reference = pair.points_of_reference()[reference_mask]
 
-            reading_path = points_to_temporary_pcd(reading)
-            reference_path = points_to_temporary_pcd(reference)
+        icp_algo = IcpAlgorithm()
+        icp_algo.use_vtk_inspector()
+        icp_algo.max_point_density = 0
 
-        censi_estimate = censi_estimate_from_clouds(reading_path, reference_path, pair.ground_truth(), IcpAlgorithm())
-        return self.scale_factor * np.array(censi_estimate).flatten()
+        censi_estimate = censi_estimate_from_points(points_reading, points_reference, pair.transform(), icp_algo)
+
+        return self.scale_factor * censi_estimate.flatten()
 
 
 class AveragePlanarityDescriptor(DescriptorAlgo):
@@ -239,7 +240,6 @@ class AveragePlanarityDescriptor(DescriptorAlgo):
 
         eigvals_reading = pair.eigenvalues_of_reading()[reading_mask]
         eigvals_reference = pair.eigenvalues_of_reference()[reference_mask]
-
 
         concat = np.vstack((eigvals_reading, eigvals_reference))
 

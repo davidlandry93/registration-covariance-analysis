@@ -9,6 +9,7 @@ find_package(lieroy REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(PCL 1.3 REQUIRED COMPONENTS common io features)
+find_package(recov)
 
 add_definitions(${PCL_DEFINITIONS})
 
@@ -52,13 +53,6 @@ target_include_directories(overlapping_region PRIVATE include)
 add_executable(json2xyz src/json2xyz_main.cpp)
 target_include_directories(json2xyz PRIVATE include)
 
-add_executable(recov_qpc2pcd src/qpc2pcd_main.cpp src/qpc_io.cpp)
-target_link_libraries(recov_qpc2pcd gflags ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES})
-target_include_directories(recov_qpc2pcd PRIVATE include)
-
-add_executable(recov_pcd2qpc src/pcd2qpc_main.cpp src/qpc_io.cpp)
-target_link_libraries(recov_pcd2qpc gflags ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES})
-target_include_directories(recov_pcd2qpc PRIVATE include)
 
 message(STATUS ${PCL_INCLUDE_DIRS})
 message(STATUS ${EIGEN3_INCLUDE_DIRS})

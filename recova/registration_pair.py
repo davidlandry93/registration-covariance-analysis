@@ -19,14 +19,27 @@ class RegistrationPair:
         self.reading = reading
         self.reference = reference
         self.cache = FileCache(self.directory_of_pair / 'cache')
+        self.cache.prefix = self.prefix_from_rotation(rotation_around_z)
         self.database = database
-        self.rotation_around_z = rotation_around_z
+        self._rotation_around_z = rotation_around_z
 
     def __str__(self):
         return 'Registration Pair: {}'.format(self.pair_id)
 
     def __repr__(self):
         return self.pair_id
+
+    @property
+    def rotation_around_z(self):
+        return self._rotation_around_z
+
+    @rotation_around_z.setter
+    def set_rotation_around_z(self, new_rotation):
+        self._rotation_around_z = new_rotation
+        self.cache.prefix = self.prefix_from_rotation()
+
+    def prefix_from_rotation(self, rotation):
+        return '{:05f}'.format(rotation)
 
     @property
     def pair_id(self):
@@ -127,45 +140,6 @@ class RegistrationPair:
 
     def ground_truth(self):
         return self.transform()
-
-    def path_to_reading_pcd(self):
-        if self.rotation_around_z == 0.0:
-            path = self.database.reading_pcd(self.dataset, self.reading)
-        else:
-            path = self.path_to_rotated_reading_pcd(self.rotation_around_z)
-
-        return path
-
-
-    def path_to_reference_pcd(self):
-        if self.rotation_around_z == 0.0:
-            path = self.database.reference_pcd(self.dataset, self.reference)
-        else:
-            path = self.path_to_rotated_reference_pcd(self.rotation_around_z)
-        return path
-
-
-    def path_to_rotated_reading_pcd(self, rotation_around_z):
-        rotated_points = self.points_of_reading()
-
-        pcd_name = 'reading_rotated_{}.pcd'.format(self.rotation_around_z)
-        path = self.directory_of_pair / pcd_name
-
-        if not path.exists():
-            pointcloud_to_pcd(rotated_points, str(path))
-
-        return path
-
-    def path_to_rotated_reference_pcd(self, rotation_around_z):
-        rotated_points = self.points_of_reference()
-
-        pcd_name = 'reference_rotated_{}.pcd'.format(self.rotation_around_z)
-        path = self.directory_of_pair / pcd_name
-
-        if not path.exists():
-            pointcloud_to_pcd(rotated_points, str(path))
-
-        return path
 
 
     def points_of_reading(self):
