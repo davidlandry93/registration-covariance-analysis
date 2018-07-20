@@ -72,9 +72,9 @@ def train_test_split(dataset, mask):
     print(idx)
 
     for i in range(int(0.7 * len(idx))):
-        train_indices.append(idx[i])
+        train_indices.append(int(idx[i]))
     for i in range(int(0.7 * len(idx)), len(idx)):
-        validation_indices.append(idx[i])
+        validation_indices.append(int(idx[i]))
 
     return train_indices, validation_indices
 

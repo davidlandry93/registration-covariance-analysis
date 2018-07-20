@@ -5,7 +5,7 @@ import json
 import numpy as np
 import sys
 
-from lieroy.parallel import FunctionWrapper, se3_log
+from lieroy.parallel import FunctionWrapper, se3_log, se3_exp
 from recova.registration_dataset import lie_vectors_of_registrations
 from recova.util import eprint, dataset_to_registrations
 
@@ -32,36 +32,34 @@ def index_of_closest_to_ground_truth(dataset):
 
     return id_of_min
 
-def distance_of_cluster(dataset, cluster):
-    registrations = dataset_to_registrations(dataset)
+def distance_of_cluster(lie_registrations, cluster, ground_truth):
+    inv_of_gt = np.linalg.inv(ground_truth)
 
-    inv_of_gt = np.linalg.inv(np.array(dataset['metadata']['ground_truth']))
-
-    distances = [np.linalg.norm(se3_log(np.dot(inv_of_gt, registrations[x]))) for x in cluster]
+    distances = [np.linalg.norm(se3_log(np.dot(inv_of_gt, se3_exp(lie_registrations[x])))) for x in cluster]
     min_distance = min(distances)
 
     return min_distance
 
-def find_central_cluster(dataset, clustering):
+def find_central_cluster(lie_registrations, clustering, ground_truth):
     """
     :arg dataset: A dataset as a facet.
     :arg clustering: A list of lists reprensenting the points indices
     :returns: The cluster itself (as a list of indices).
     """
 
+    eprint(len(clustering))
     if len(clustering) == 1:
         if len(clustering[0]) == 0:
             raise RuntimeError('Empty central cluster')
 
-        return clustering[0], distance_of_cluster(dataset, clustering[0])
+        eprint('Returning early')
+        return clustering[0]
 
-    closest_point = index_of_closest_to_ground_truth(dataset)
+    closest_point = index_of_closest_to_ground_truth(lie_registrations)
 
-    lie_vectors = lie_vectors_of_registrations(dataset)
-    norms = np.linalg.norm(lie_vectors, axis=1)
+    norms = np.linalg.norm(lie_registrations, axis=1)
 
-
-    cluster_distances = list(map(lambda x: distance_of_cluster(dataset, x), clustering))
+    cluster_distances = list(map(lambda x: distance_of_cluster(lie_registrations, x), clustering))
     eprint('Clustering distances: {}'.format(cluster_distances))
 
     if cluster_distances:
@@ -69,5 +67,5 @@ def find_central_cluster(dataset, clustering):
     else:
         best_cluster = []
 
-    return best_cluster, np.min(cluster_distances)
+    return best_cluster
 

@@ -276,13 +276,16 @@ def batch_to_vtk(dataset, clustering_batch, output, center_around_gt=False):
         pool.starmap(to_vtk, [(dataset, x, '{}_{}'.format(output, i), center_around_gt) for i, x in enumerate(clustering_batch['data'])])
 
 
-def distribution_of_cluster(dataset, cluster):
-    registrations = registrations_of_dataset(dataset)
-    registrations = registrations[cluster]
+def distribution_of_cluster(lie_results, cluster):
+    registrations = lie_results[cluster]
 
+    se3_group = np.empty((len(registrations), 4, 4))
+
+    for i in range(len(registrations)):
+        se3_group[i] = se3exp(registrations[i])
 
     if len(registrations) != 0:
-        mean, covariance = se3_gaussian_distribution_of_sample(registrations)
+        mean, covariance = se3_gaussian_distribution_of_sample(se3_group)
     else:
         mean = np.identity(4)
         covariance = np.zeros((6,6))
@@ -290,21 +293,20 @@ def distribution_of_cluster(dataset, cluster):
     return mean, covariance
 
 
-def compute_distribution(dataset, clustering):
+def compute_distribution(lie_registrations, clustering, ground_truth):
     """
     :arg cluster: The data row on which we want to compute the distribution of the central cluster.
     :returns: A new data row, this time with a distribution attached.
     """
-    central_cluster, cluster_distance = find_central_cluster(dataset, clustering['clustering'])
+    central_cluster = find_central_cluster(lie_registrations, clustering['clustering'], ground_truth)
 
-    mean, covariance = distribution_of_cluster(dataset, central_cluster)
+    mean, covariance = distribution_of_cluster(lie_registrations, central_cluster)
 
     new_clustering = clustering.copy()
     new_clustering['mean_of_central'] = mean.tolist()
     new_clustering['covariance_of_central'] = covariance.tolist()
     new_clustering['central_cluster_size'] = len(central_cluster)
     new_clustering['central_cluster'] = central_cluster
-    new_clustering['cluster_distance'] = cluster_distance
 
     return new_clustering
 

@@ -90,10 +90,12 @@ def cli():
     parser.add_argument('reading', type=int)
     parser.add_argument('reference', type=int)
     parser.add_argument('-c', '--config', type=str, help='Path to a json file containing the descriptor configuration.')
+    parser.add_argument('-r', '--rotation', type=float, help='Rotation around z to apply to the pointcloud', default=0.0)
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.database)
     pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
+    pair.rotation_around_z = args.rotation
 
     if args.config:
         with open(args.config) as f:
@@ -153,7 +155,7 @@ def apply_mask_cli():
             pointcloud_to_vtk(reference[reference_masks[i]], args.output + '/' + '{}_reference_{}'.format(mask_generator.__repr__(), i))
 
         if reading_masks[i].any():
-            transformed_masked_reading= transform_points(reading[reading_masks[i]], pair.transform())
+            transformed_masked_reading = transform_points(reading[reading_masks[i]], pair.transform())
 
             pointcloud_to_vtk(transformed_masked_reading, args.output + '/' + '{}_reading_{}'.format(mask_generator.__repr__(), i))
 

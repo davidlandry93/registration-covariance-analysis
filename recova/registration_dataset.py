@@ -29,21 +29,24 @@ def registrations_of_dataset(dataset, key='result'):
     return registrations
 
 
-def lie_vectors_of_registrations(json_data, key='result', prealignment=np.identity(4)):
+
+def lie_vectors_of_registrations(json_data, key='result', left_multiply=np.identity(4), right_multiply=np.identity(4)):
     """
     Outputs the lie vectors of a json registration dataset.
 
     :param json_data: A full registration dataset.
     :param key: The key of the matrix to evaluate, inside the registration result.
+    :param prealignment: A transform to apply to the results before outputting them.
     :returns: A Nx6 numpy matrix containing the lie algebra representation of the results.
     """
-    inv_of_prealignment = np.linalg.inv(prealignment)
     lie_results = np.empty((len(json_data['data']), 6))
     for i, registration in enumerate(json_data['data']):
         m = np.array(registration[key])
 
+        res = np.dot(left_multiply, np.dot(m, right_multiply))
+
         try:
-            lie_results[i,:] = se3_log(np.dot(inv_of_prealignment, m))
+            lie_results[i,:] = se3_log(res)
         except RuntimeError:
             lie_results[i,:] = np.zeros(6)
             eprint('Warning: failed conversion to lie algebra of matrix {}'.format(m))
@@ -51,7 +54,7 @@ def lie_vectors_of_registrations(json_data, key='result', prealignment=np.identi
     return lie_results
 
 
-def positions_of_registration_data(reg_data, initial_estimates=False, prealignment=np.identity(4)):
+def positions_of_registration_data(reg_data, initial_estimates=False, left_multiply=np.identity(4), right_multiply=np.identity(4)):
     if ('what' in reg_data and
         'trails' == reg_data['what']):
         lie_vectors = lie_tensor_of_trails(reg_data)[(0 if initial_estimates else -1)]
@@ -60,7 +63,7 @@ def positions_of_registration_data(reg_data, initial_estimates=False, prealignme
         if initial_estimates:
             key = 'initial_estimate'
 
-        lie_vectors = lie_vectors_of_registrations(reg_data, key=key, prealignment=prealignment)
+        lie_vectors = lie_vectors_of_registrations(reg_data, key=key, left_multiply=left_multiply, right_multiply=right_multiply)
 
     return lie_vectors
 

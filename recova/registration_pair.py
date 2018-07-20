@@ -34,9 +34,9 @@ class RegistrationPair:
         return self._rotation_around_z
 
     @rotation_around_z.setter
-    def set_rotation_around_z(self, new_rotation):
+    def rotation_around_z(self, new_rotation):
         self._rotation_around_z = new_rotation
-        self.cache.prefix = self.prefix_from_rotation()
+        self.cache.prefix = self.prefix_from_rotation(new_rotation)
 
     def prefix_from_rotation(self, rotation):
         return '{:05f}'.format(rotation)
@@ -87,7 +87,7 @@ class RegistrationPair:
 
     def transform(self):
         R = rotation_around_z_matrix(self.rotation_around_z)
-        return np.dot(rotation_around_z_matrix(self.rotation_around_z), np.dot(self.cache['transform'], np.linalg.inv(R)))
+        return np.dot(rotation_around_z_matrix(self.rotation_around_z), np.dot(self.cache.get_no_prefix('transform'), np.linalg.inv(R)))
 
 
     def pair_exists(self):
@@ -110,8 +110,13 @@ class RegistrationPair:
             raise RuntimeError('No results available for demanded registration pair')
 
         reg_dict = self.registration_dict()
+        T = rotation_around_z_matrix(self.rotation_around_z)
 
-        return positions_of_registration_data(reg_dict)
+        def generate_lie_matrix():
+            lie_matrix = positions_of_registration_data(reg_dict, left_multiply=T, right_multiply=np.linalg.inv(T))
+            return lie_matrix
+
+        return self.cache.get_or_generate('lie_matrix_results', generate_lie_matrix)
 
     @property
     def registration_file(self):

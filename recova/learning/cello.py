@@ -1,5 +1,6 @@
 
 import json
+import gc
 from math import ceil, sqrt
 import numpy as np
 import time

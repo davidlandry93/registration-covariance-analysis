@@ -39,7 +39,9 @@ def vectorize_covariance(cov_matrix):
     return vector_of_cov
 
 
-def generate_one_example(registration_pair, descriptor, covariance_algo,descriptor_only=False):
+def generate_one_example(registration_pair, descriptor, covariance_algo,descriptor_only=False, rotation=0.0):
+    registration_pair.rotation_around_z = rotation
+
     eprint(registration_pair)
     descriptor_start = time.time()
     descriptor = descriptor.compute(registration_pair)
@@ -63,6 +65,7 @@ def generate_examples_cli():
     parser.add_argument('-j', '--n_cores', type=int, help='N of cores to use for the computation', default=8)
     parser.add_argument('-c', '--config', type=str, help='Path to a json config for the descriptor.')
     parser.add_argument('--descriptor-only', action='store_true', help='Generate only the descriptor.')
+    parser.add_argument('--rotations', '-r', nargs='+', type=float, default=[0.0])
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -82,20 +85,23 @@ def generate_examples_cli():
     descriptor = descriptor_factory(descriptor_config)
 
     eprint('Using descriptor: {}'.format(repr(descriptor)))
+    eprint('Generating with rotations: {}'.format(args.rotations))
 
-    examples = parallel_starmap_progressbar(generate_one_example, [(x, descriptor, covariance_algo, args.descriptor_only) for x in registration_pairs], n_cores=args.n_cores)
+    examples = []
+    pairs = []
+    for x in registration_pairs:
+        examples.extend([(x, descriptor, covariance_algo, args.descriptor_only, r) for r in args.rotations])
+        pairs.extend([{'dataset': x.dataset, 'reading': x.reading, 'reference': x.reference, 'rotation': r} for r in args.rotations])
 
-    # with multiprocessing.Pool(args.n_cores) as pool:
-    #     examples = tqdm.tqdm(
 
-    # examples = []
-    # for x in registration_pairs:
-    #     examples.append(generate_one_example(x, descriptor, covariance_algo, args.descriptor_only))
+    results = parallel_starmap_progressbar(generate_one_example, examples, n_cores=args.n_cores)
+
+    # results = [generate_one_example(*x) for x in examples]
 
 
     xs = []
     ys = []
-    for p in examples:
+    for p in results:
         x, y = p
         xs.append(x.tolist())
         if not args.descriptor_only:
@@ -115,10 +121,7 @@ def generate_examples_cli():
                 'n_examples': len(xs)
             },
             'data': {
-                'pairs': [{
-                    'dataset': x.dataset,
-                    'reading': x.reading,
-                    'reference': x.reference} for x in registration_pairs],
+                'pairs': pairs,
                 'xs': xs,
             }
         }

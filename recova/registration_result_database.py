@@ -351,10 +351,12 @@ def distribution_cli():
     parser.add_argument('reference', type=int)
     parser.add_argument('--covariance', type=str, help='The covariance estimation algorithm to use. <sampling|censi>', default='sampling')
     parser.add_argument('--clustering', type=str, help='The name of the clustering algorithm used by some sampling covariance algorithms.', default='identity')
+    parser.add_argument('-r', '--rotation', type=float, default=0.0, help='Rotation around the z axis to apply to the dataset')
     args = parser.parse_args()
 
     database = RegistrationPairDatabase(args.database_root)
     pair = database.get_registration_pair(args.dataset, args.reading, args.reference)
+    pair.rotation_around_z = args.rotation
 
     clustering_algo = clustering_algorithm_factory(args.clustering)
     covariance_algo = covariance_algorithm_factory(args.covariance)
@@ -363,7 +365,7 @@ def distribution_cli():
     covariance = covariance_algo.compute(pair)
 
     output_dict = {
-        'mean': pair.ground_truth().tolist(),
+        'mean': pair.transform().tolist(),
         'covariance': covariance.tolist()
     }
 
