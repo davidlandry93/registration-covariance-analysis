@@ -1,6 +1,7 @@
 
 import json
 import gc
+import logging
 from math import ceil, sqrt
 import numpy as np
 import time
@@ -8,6 +9,7 @@ import torch
 import torch.optim as optim
 from torch.autograd import Variable
 import sklearn.model_selection
+import sys
 
 from recova.learning.model import CovarianceEstimationModel
 from recova.learning.preprocessing import preprocessing_factory
@@ -55,7 +57,7 @@ def kullback_leibler_pytorch(cov1, cov2):
     # In pytorch 0.4.0 det will allow us to compute the kll directly in torch,
     # in the meantime we transfer the computation to numpy.
 
-    cov1_np, cov2_np = cov1.data.numpy(), cov2.data.numpy()
+    cov1_np, cov2_np = cov1.numpy(), cov2.numpy()
     return kullback_leibler(cov1_np, cov2_np)
 
 
@@ -86,9 +88,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         self.patience = patience
         self.preprocessing = preprocessing
         self.min_delta = 1e-4
+        self.logger = logging.getLogger()
 
     def fit(self, predictors, covariances, train_set=None, test_set=None):
-        eprint('Training with descriptors of size {}'.format(predictors.shape[1]))
+        self.logger.info('Training with descriptors of size {}'.format(predictors.shape[1]))
 
         if train_set and test_set:
             training_indices = train_set
@@ -106,6 +109,11 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         predictors_validation = Variable(torch.Tensor(predictors_test))
         covariances_validation = Variable(torch.Tensor(covariances_test))
 
+        print('Size of predictors train: %d' % (sys.getsizeof(predictors_train) / 1024))
+        print('Size of covariances train: %d' % (sys.getsizeof(covariances_train) / 1024))
+        print('Size of predictors validation: %d' % (sys.getsizeof(predictors_test) / 1024))
+        print('Size of covariances validation: %d' % (sys.getsizeof(covariances_train) / 1024))
+
         result = self._fit(predictors_validation, covariances_validation)
 
         result['train_set'] = training_indices
@@ -119,6 +127,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         """
         Given a validation set, train weights theta that optimize the validation error of the model.
         """
+
         self.theta = self.create_metric_weights()
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=10)
@@ -146,21 +155,18 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         n_epoch_without_min_delta = 0
 
         while (epoch < self.n_iterations or self.n_iterations == 0) and keep_going and n_epoch_without_improvement < self.patience and n_epoch_without_min_delta < self.patience:
+            self.logger.debug('Starting epoch %d' % epoch)
+
             epoch_start = time.time()
             optimizer.zero_grad()
 
             losses = Variable(torch.zeros(len(self.model_predictors)))
 
             for i in range(len(self.model_predictors)):
-                # eprint(self.theta)
+                self.logger.debug('Doing predictor %d on %d' % (i, len(self.model_predictors)))
                 metric_matrix = self.theta_to_metric_matrix(self.theta)
-                # eprint(metric_matrix)
 
                 distances = self._compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
-
-
-                # eprint(self.distances_to_weights(distances))
-
                 prediction = self.prediction_from_distances(self.model_covariances, distances)
 
                 loss_A = torch.log(torch.norm(prediction))
@@ -180,20 +186,24 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimizer.step()
 
             predictions = self._predict(self.model_predictors)
-            indiv_optimization_errors = self._validation_errors(predictions, self.model_covariances)
-            optimization_score = torch.mean(indiv_optimization_errors).data.numpy().item()
-            optimization_errors_log.append(indiv_optimization_errors.data.numpy().tolist())
+            self.logger.debug('Predictions have size %d kb' % sys.getsizeof(predictions))
+
+            indiv_optimization_errors = self._validation_errors(predictions, self.model_covariances.data)
+            self.logger.debug('Indiv optimization errors have size %d kb' % sys.getsizeof(indiv_optimization_errors))
+
+            optimization_score = torch.mean(indiv_optimization_errors)
+            optimization_errors_log.append(indiv_optimization_errors.numpy().tolist())
             optimization_losses.append(optimization_score)
-            optimization_stds.append(torch.std(indiv_optimization_errors).data.numpy().item())
+            optimization_stds.append(torch.std(indiv_optimization_errors))
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
             if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
                 predictions = self._predict(predictors_validation)
-                validation_errors = self._validation_errors(predictions, covariances_validation).data
+                validation_errors = self._validation_errors(predictions, covariances_validation.data)
                 validation_score = torch.mean(validation_errors)
 
-                klls = self._kll(predictions, covariances_validation)
+                klls = self._kll(predictions, covariances_validation.data)
                 kll_errors_log.append(klls.numpy().tolist())
                 kll_validation_losses.append(torch.mean(klls))
                 kll_validation_stds.append(torch.std(klls))
@@ -287,6 +297,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         kll_errors = torch.zeros(len(ys_predicted))
 
         for i in range(len(ys_predicted)):
+            eprint(type(ys_predicted))
+            eprint(type(ys_validation))
             kll_errors[i] = kullback_leibler_pytorch(ys_predicted[i], ys_validation[i]) + kullback_leibler_pytorch(ys_validation[i], ys_predicted[i]) / 2.
 
         return kll_errors
@@ -312,11 +324,16 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
-        predictions = Variable(torch.zeros(len(predictors),self.model_covariances.shape[1], self.model_covariances.shape[2]))
+
+        self.logger.debug('Preparing to predict %d values' % len(predictors))
+        eprint(self.model_covariances.shape[1])
+        eprint(self.model_covariances.shape[2])
+        predictions = torch.zeros(len(predictors),self.model_covariances.shape[1], self.model_covariances.shape[2])
 
         for i in range(len(predictors)):
+            self.logger.debug('Predicting value for predictor %d ' % i)
             distances = self._compute_distances(self.model_predictors, metric_matrix, predictors[i])
-            predictions[i] = self.prediction_from_distances(self.model_covariances, distances)
+            predictions[i] = self.prediction_from_distances(self.model_covariances, distances).data
 
         return predictions
 
@@ -366,16 +383,22 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def queries_have_neighbor(self, predictors, metric_matrix, examples):
         """Check if every descriptor in queries has at least one neighbour in the learned model."""
+        self.logger.debug('Calling queries have neighbors...')
 
         n_predictors = len(predictors)
-        distances = Variable(torch.zeros([len(examples), n_predictors]))
-        for i in range(n_predictors):
-            distances[:, i] = self._compute_distances(examples, metric_matrix, predictors[i])
+        self.logger.debug('Computing distances for %d examples and %d predictors' % (len(examples), n_predictors))
+        distances = torch.zeros([len(examples), n_predictors])
 
-        weights = self.distances_to_weights(distances)
-        sum_of_weights = torch.sum(weights, dim=0)
+        for i, q in enumerate(predictors):
+            distances = self._compute_distances(examples, metric_matrix, q)
+            weights = self.distances_to_weights(distances)
+            if torch.sum(weights).data[0] == 0.:
+                self.logger.info('Predictor %d does not have a neighbor' % i)
+                return False
 
-        return not (sum_of_weights == 0.0).any()
+        self.logger.debug('Done calling queries have neighbors.')
+        return True
+
 
     def export_model(self):
        return {

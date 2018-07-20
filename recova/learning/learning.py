@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import logging
 import numpy as np
 import random
 import re
@@ -93,11 +94,22 @@ def cli():
     parser.add_argument('--preprocessing', '-p', type=str, help='Name of the preprocessing algorithm to use.', default='identity')
     parser.add_argument('-md', '--min-delta', type=float, help='Minimum gain on the validation loss before the learning stops.', default=1e-4)
     parser.add_argument('--validate-on-end', action='store_true', help='Train on the first part of the dataset, validate on the second part.')
+    parser.add_argument('-d', '--debug', action='store_true', help='Verbose debug')
     args = parser.parse_args()
 
-    eprint('Loading document')
+    logging.basicConfig(stream=sys.stderr)
+    logger = logging.getLogger()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+
+    print(logger.getEffectiveLevel())
+    print(logging.DEBUG)
+    print(logging.INFO)
+
+    logger.info('Loading document')
     input_document = json.load(sys.stdin)
-    eprint('Done loading document')
+    logger.info('Done loading document')
 
     if args.filter:
         regex = re.compile(args.filter)
