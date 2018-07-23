@@ -103,10 +103,6 @@ def cli():
     if args.debug:
         logger.setLevel(logging.DEBUG)
 
-    print(logger.getEffectiveLevel())
-    print(logging.DEBUG)
-    print(logging.INFO)
-
     logger.info('Loading document')
     input_document = json.load(sys.stdin)
     logger.info('Done loading document')
@@ -130,7 +126,6 @@ def cli():
         train_indices, validation_indices = train_test_split(input_document, mask)
 
     eprint('Training set size: {}. Validation set size: {}'.format(len(train_indices), len(validation_indices)))
-    eprint(type(train_indices[0]))
 
     predictors = np.array(input_document['data']['xs'])
     covariances = np.array(input_document['data']['ys'])

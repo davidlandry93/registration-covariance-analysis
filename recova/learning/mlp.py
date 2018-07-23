@@ -67,20 +67,20 @@ class MlpModel(CovarianceEstimationModel):
             torch.nn.Dropout(0.1),
             torch.nn.BatchNorm1d(self.hidden_sizes[3]),
 
-            torch.nn.Linear(self.hidden_sizes[3], self.hidden_sizes[4]),
-            torch.nn.Hardtanh(),
-            torch.nn.Dropout(0.1),
-            torch.nn.BatchNorm1d(self.hidden_sizes[4]),
-            torch.nn.Linear(self.hidden_sizes[4], self.hidden_sizes[5]),
-            torch.nn.Hardtanh(),
-            torch.nn.Dropout(0.1),
-            torch.nn.BatchNorm1d(self.hidden_sizes[5]),
+            # torch.nn.Linear(self.hidden_sizes[3], self.hidden_sizes[4]),
+            # torch.nn.Hardtanh(),
+            # torch.nn.Dropout(0.1),
+            # torch.nn.BatchNorm1d(self.hidden_sizes[4]),
+            # torch.nn.Linear(self.hidden_sizes[4], self.hidden_sizes[5]),
+            # torch.nn.Hardtanh(),
+            # torch.nn.Dropout(0.1),
+            # torch.nn.BatchNorm1d(self.hidden_sizes[5]),
 
-            torch.nn.Linear(self.hidden_sizes[5], self.hidden_sizes[6]),
-            torch.nn.Hardtanh(),
-            torch.nn.Dropout(0.1),
-            torch.nn.BatchNorm1d(self.hidden_sizes[6]),
-            torch.nn.Linear(self.hidden_sizes[6], 36)
+            # torch.nn.Linear(self.hidden_sizes[5], self.hidden_sizes[6]),
+            # torch.nn.Hardtanh(),
+            # torch.nn.Dropout(0.1),
+            # torch.nn.BatchNorm1d(self.hidden_sizes[6]),
+            torch.nn.Linear(self.hidden_sizes[3], 36)
         ).to(self.device)
 
         self.best_loss = float('inf')

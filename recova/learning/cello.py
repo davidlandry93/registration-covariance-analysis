@@ -104,7 +104,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], preprocessed_covariances[training_indices], preprocessed_covariances[test_indices]
 
         self.model_predictors = Variable(torch.Tensor(predictors_train))
+        self.model_predictors_cuda = self.model_predictors.cuda()
         self.model_covariances = Variable(torch.Tensor(covariances_train))
+        self.model_covariances_cuda = self.model_covariances.cuda()
 
         predictors_validation = Variable(torch.Tensor(predictors_test))
         covariances_validation = Variable(torch.Tensor(covariances_test))
@@ -127,6 +129,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         """
         Given a validation set, train weights theta that optimize the validation error of the model.
         """
+
+        predictors_validation_cuda = predictors_validation.cuda()
 
         self.theta = self.create_metric_weights()
 
@@ -161,31 +165,36 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             optimizer.zero_grad()
 
             losses = Variable(torch.zeros(len(self.model_predictors)))
+            optimization_loss = 0.0
+            metric_matrix = self.theta_to_metric_matrix(self.theta)
 
             for i in range(len(self.model_predictors)):
-                self.logger.debug('Doing predictor %d on %d' % (i, len(self.model_predictors)))
-                metric_matrix = self.theta_to_metric_matrix(self.theta)
-
-                distances = self._compute_distances(self.model_predictors, metric_matrix, self.model_predictors[i])
-                prediction = self.prediction_from_distances(self.model_covariances, distances)
+                distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
+                prediction = self.prediction_from_distances(self.model_covariances_cuda, distances).cpu()
 
                 loss_A = torch.log(torch.norm(prediction))
                 # loss_B = torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity)
 
                 loss_B = torch.trace(torch.mm(torch.inverse(prediction), self.model_covariances[i]))
 
-                nonzero_distances = torch.gather(distances, 0, torch.nonzero(distances).squeeze())
+                distances_cpu = distances.cpu()
+                nonzero_distances = torch.gather(distances_cpu, 0, torch.nonzero(distances_cpu).squeeze())
                 regularization_term = torch.sum(torch.log(nonzero_distances))
 
-                optimization_loss = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
-                losses[i] = optimization_loss
+                loss_of_pair = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
+                optimization_loss += loss_of_pair
+                losses[i] = loss_of_pair
 
-                # eprint('A: {}, B: {}, C: {}'.format(loss_A, loss_B, regularization_term))
+                if i % 8 == 0:
+                    self.logger.debug('Backprop')
+                    optimization_loss.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    optimization_loss = 0.0
+                    metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-                optimization_loss.backward()
-                optimizer.step()
 
-            predictions = self._predict(self.model_predictors)
+            predictions = self._predict(self.model_predictors_cuda)
             self.logger.debug('Predictions have size %d kb' % sys.getsizeof(predictions))
 
             indiv_optimization_errors = self._validation_errors(predictions, self.model_covariances.data)
@@ -198,8 +207,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-            if self.queries_have_neighbor(self.model_predictors, metric_matrix, predictors_validation):
-                predictions = self._predict(predictors_validation)
+            if self.queries_have_neighbor_cuda(self.model_predictors_cuda, metric_matrix.cuda(), predictors_validation_cuda):
+                predictions = self._predict(predictors_validation_cuda)
                 validation_errors = self._validation_errors(predictions, covariances_validation.data)
                 validation_score = torch.mean(validation_errors)
 
@@ -297,8 +306,6 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         kll_errors = torch.zeros(len(ys_predicted))
 
         for i in range(len(ys_predicted)):
-            eprint(type(ys_predicted))
-            eprint(type(ys_validation))
             kll_errors[i] = kullback_leibler_pytorch(ys_predicted[i], ys_validation[i]) + kullback_leibler_pytorch(ys_validation[i], ys_predicted[i]) / 2.
 
         return kll_errors
@@ -324,6 +331,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def _predict(self, predictors):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
+        metric_matrix_cuda = metric_matrix.cuda()
 
         self.logger.debug('Preparing to predict %d values' % len(predictors))
         eprint(self.model_covariances.shape[1])
@@ -332,8 +340,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         for i in range(len(predictors)):
             self.logger.debug('Predicting value for predictor %d ' % i)
-            distances = self._compute_distances(self.model_predictors, metric_matrix, predictors[i])
-            predictions[i] = self.prediction_from_distances(self.model_covariances, distances).data
+            distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix_cuda, predictors[i].cuda())
+            predictions[i] = self.prediction_from_distances(self.model_covariances_cuda, distances).data
 
         return predictions
 
@@ -341,7 +349,10 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
     def theta_to_metric_matrix(self, theta):
         up = to_upper_triangular(theta)
-        return torch.mm(up, up.transpose(0,1))
+
+        up_cuda = up.cuda()
+
+        return torch.mm(up_cuda, up_cuda.transpose(0,1)).cpu()
 
     def _metric_matrix(self):
         return self.theta_to_metric_matrix(self.theta)
@@ -351,9 +362,17 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def _compute_distances(self, predictors, metric_matrix, predictor):
+        cuda_metric_matrix = metric_matrix.cuda()
+        cuda_predictors = predictors.cuda()
+        cuda_predictor = predictor.cuda()
+
+        return self._compute_distances_cuda(cuda_predictors, cuda_metric_matrix, cuda_predictor).cpu()
+
+    def _compute_distances_cuda(self, predictors, metric_matrix, predictor):
         delta = predictors - predictor.view(1, predictor.shape[0])
         lhs = torch.mm(delta, metric_matrix)
         return torch.sum(lhs * delta, 1).squeeze()
+
 
     def compute_distances(self, predictor):
         metric_matrix = self.theta_to_metric_matrix(self.theta)
@@ -373,6 +392,18 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
 
     def prediction_from_distances(self, covariances, distances):
+        weights = self.distances_to_weights(distances)
+        sum_of_weights = weights.sum()
+        reshaped_weights = weights.view(-1, 1, 1)
+
+        weighted_cov = covariances * reshaped_weights
+
+        predicted_cov = torch.sum(weighted_cov, 0)
+        predicted_cov /= sum_of_weights
+
+        return predicted_cov
+
+    def _prediction_from_distances_cuda(self, covariances, distances):
         weights = self.distances_to_weights(distances)
 
         predicted_cov = torch.sum(covariances * weights.view(-1,1,1), 0)
@@ -398,6 +429,23 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         self.logger.debug('Done calling queries have neighbors.')
         return True
+
+
+    def queries_have_neighbor_cuda(self, predictors, metric_matrix, examples):
+        n_predictors = len(predictors)
+        self.logger.debug('Computing distances for %d examples and %d predictors' % (len(examples), n_predictors))
+        distances = torch.zeros([len(examples), n_predictors])
+
+        for i, q in enumerate(predictors):
+            distances = self._compute_distances_cuda(examples, metric_matrix, q)
+            weights = self.distances_to_weights(distances)
+            if torch.sum(weights).data[0] == 0.:
+                self.logger.info('Predictor %d does not have a neighbor' % i)
+                return False
+
+        self.logger.debug('Done calling queries have neighbors.')
+        return True
+
 
 
     def export_model(self):
