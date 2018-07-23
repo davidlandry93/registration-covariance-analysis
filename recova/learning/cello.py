@@ -468,7 +468,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
     def import_model(self, model):
         self.theta = Variable(torch.Tensor(model['theta']))
         self.model_covariances = Variable(torch.Tensor(model['covariances']))
+        self.model_covariances_cuda = self.model_covariances.cuda()
         self.model_predictors = Variable(torch.Tensor(model['predictors']))
+        self.model_predictors_cuda = self.model_predictors.cuda()
 
         preprocessing_algo = preprocessing_factory(model['preprocessing']['name'])
         preprocessing_algo.import_model(model['preprocessing'])

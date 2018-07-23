@@ -94,7 +94,7 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         center_cluster = raw_centered_clustering(dataset, self.radius, self.k, seed, self.n_seed_init, seed_selector=self.seed_selector, logging=self.logging)
 
         clustering_row = {
-            'clustering': [center_cluster.tolist()],
+            'clustering': [center_cluster],
             'n_clusters': 1,
             'radius': self.radius,
             'n': self.k,

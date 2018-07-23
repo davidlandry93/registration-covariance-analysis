@@ -75,8 +75,11 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
+    clustering = CenteredClusteringAlgorithm(0.005, k=20)
+    clustering.seed_selector = 'localized'
+    clustering.rescale = True
 
-    clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
+    # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     with open(args.config) as f:
@@ -176,11 +179,11 @@ def dataset_summary_cli():
 
     db = RegistrationPairDatabase(args.input)
 
-    # clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
-    # clustering_algorithm.seed_selector = 'localized'
-    # clustering_algorithm.rescale = True
+    clustering_algorithm = CenteredClusteringAlgorithm(0.05, k=100)
+    clustering_algorithm.seed_selector = 'localized'
+    clustering_algorithm.rescale = True
 
-    clustering_algorithm = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
+    # clustering_algorithm = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
     covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
 
     # covariance_algorithm = CensiCovarianceComputationAlgorithm()
