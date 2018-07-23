@@ -168,7 +168,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             optimization_loss = 0.0
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
-            for i in range(len(self.model_predictors)):
+            perms = torch.randperm(len(self.model_predictors))
+            for i in perms:
                 distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
                 prediction = self.prediction_from_distances(self.model_covariances_cuda, distances).cpu()
 
