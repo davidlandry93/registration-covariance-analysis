@@ -12,7 +12,6 @@ from recov.registration_algorithm import IcpAlgorithm
 from recov.datasets import create_registration_dataset
 from recov.pointcloud_io import read_xyz_stream
 from recova.util import eprint, run_subprocess
-from recova_core import grid_pointcloud_separator
 
 
 
@@ -63,12 +62,6 @@ class MomentGridDescriptor(DescriptorAlgorithm):
 def occupancy_descriptor(bin, total_n_points):
     return len(bin) / total_n_points
 
-
-def generate_descriptor(pointcloud):
-    bins = grid_pointcloud_separator(pointcloud, 20., 20., 20., 10, 10, 10)
-    descriptor = [occupancy_descriptor(bin, len(pointcloud)) for bin in bins]
-
-    return descriptor
 
 
 def generate_descriptor_worker(dataset, i, output_dir):

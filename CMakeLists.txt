@@ -26,6 +26,7 @@ set_property(TARGET nabo_adapter PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(recova
   src/util.cpp
   src/centered_clustering.cpp
+  src/localized_seed_selection_algorithm.cpp
   src/pointcloud_separator.cpp
   src/grid_pointcloud_separator.cpp
   src/pointcloud_logger_locator.cpp
@@ -75,7 +76,3 @@ install(TARGETS
   RUNTIME DESTINATION bin)
 
 install(PROGRAMS bin/xyz2vtk bin/all_xyz2vtk bin/recov_explore_alpha bin/one_registration DESTINATION bin)
-
-if(PYTHON_BINDINGS)
-  add_subdirectory(recova_core)
-endif(PYTHON_BINDINGS)
