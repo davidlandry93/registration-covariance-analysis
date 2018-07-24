@@ -21,8 +21,6 @@ from recova.util import eprint, rescale_hypersphere, englobing_radius
 
 from lieroy.parallel import FunctionWrapper, se3_gaussian_distribution_of_sample
 
-import recova_core
-
 se3log = FunctionWrapper('log', 'lieroy.se3')
 se3exp = FunctionWrapper('exp', 'lieroy.se3')
 
