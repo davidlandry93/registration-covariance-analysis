@@ -179,8 +179,8 @@ class MlpModel(CovarianceEstimationModel):
     def _validation_errors(self, xs, ys):
         covariances_predicted = self._predict(xs)
 
-        # errors = torch.sqrt(((covariances_predicted - ys)**2).sum(dim=2).sum(dim=1))
-        errors = torch.abs((covariances_predicted - ys)).sum(dim=2).sum(dim=1)
+        errors = torch.sqrt(((covariances_predicted - ys)**2).sum(dim=2).sum(dim=1))
+        # errors = torch.abs((covariances_predicted - ys)).sum(dim=2).sum(dim=1)
 
         return errors
 
