@@ -342,6 +342,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         for i in range(len(predictors)):
             self.logger.debug('Predicting value for predictor %d ' % i)
             distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix_cuda, predictors[i].cuda())
+
             predictions[i] = self.prediction_from_distances(self.model_covariances_cuda, distances).data
 
         return predictions
@@ -468,7 +469,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
     def import_model(self, model):
         self.theta = Variable(torch.Tensor(model['theta']))
         self.model_covariances = Variable(torch.Tensor(model['covariances']))
+        self.model_covariances_cuda = self.model_covariances.cuda()
         self.model_predictors = Variable(torch.Tensor(model['predictors']))
+        self.model_predictors_cuda = self.model_predictors.cuda()
 
         preprocessing_algo = preprocessing_factory(model['preprocessing']['name'])
         preprocessing_algo.import_model(model['preprocessing'])

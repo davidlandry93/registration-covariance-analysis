@@ -170,17 +170,6 @@ def cli():
             })
 
 
-            eprint('MATRICES')
-            eprint('predictions')
-            eprint(ys_predicted[i])
-            eprint('validation')
-            eprint(ys_validation[i])
-            diff = ys_predicted[i] - ys_validation[i]
-            eprint(diff)
-
-            eprint(np.sqrt(np.sum(np.power(diff, 2.0))))
-            eprint()
-
 
 if __name__ == '__main__':
     cli()
