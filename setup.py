@@ -43,6 +43,7 @@ setup(
             'model_prediction_vtk = recova.model_validation_vtk:prediction_cli',
             'pair2vtk = recova.vtk_io:pair_to_vtk_cli',
             'pca_align = recova.alignment:pca_alignment_cli',
+            'plot_error_function = recova.plot_error_function:cli',
             'progressive_average = recova.progressive_average:cli',
             'recov_plot = recova.recov_plot:cli',
             'registration2covariance = recova.covariance_of_registrations:cli',

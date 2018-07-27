@@ -138,7 +138,9 @@ def apply_mask_cli():
     reference = pair.points_of_reference()
 
     with open(args.config) as f:
-        mask_generator = mask_factory(json.load(f))
+        config = json.load(f)
+        print(config)
+        mask_generator = mask_factory(config)
 
     reading_masks, reference_masks = mask_generator.compute(pair)
 

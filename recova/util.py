@@ -4,9 +4,12 @@ import functools
 from math import ceil, sqrt
 import multiprocessing
 import numpy as np
+import os
 import subprocess
 import sys
+import tempfile
 import tqdm
+import uuid
 
 from lieroy.parallel import FunctionWrapper
 
@@ -248,3 +251,9 @@ def rotation_around_z_matrix(theta):
                      [np.sin(theta), np.cos(theta), 0.0, 0.0],
                      [0.0, 0.0, 1.0, 0.0],
                      [0.0, 0.0, 0.0, 1.0]])
+
+def random_fifo():
+    fifo_name = tempfile.gettempdir() + '/' + str(uuid.uuid4())
+    os.mkfifo(fifo_name)
+
+    return fifo_name
