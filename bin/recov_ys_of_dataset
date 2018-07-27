@@ -1,0 +1,37 @@
+#!/usr/bin/python3
+
+import argparse
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sb
+
+from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=str, help='Learning dataset')
+    parser.add_argument('--output', '-o', type=str, default='')
+    parser.add_argument('--location', type=str, default='')
+    args = parser.parse_args()
+
+    with open(args.input) as f:
+        dataset = json.load(f)
+
+    ys = np.array(dataset['data']['ys'])
+
+
+
+    norms = []
+    traces = []
+    for i, cov in enumerate(ys):
+        if args.location == '' or dataset['data']['pairs'][i]['dataset'] == args.location:
+            norms.append(np.linalg.norm(cov))
+            traces.append(np.trace(cov))
+
+    if args.output != '':
+        for i, cov in enumerate(ys):
+            if args.location == '' or dataset['data']['pairs'][i]['dataset'] == args.location:
+                print('{}: {}'.format(i, dataset['data']['pairs'][i]))
+                distribution_to_vtk_ellipsoid(np.zeros(3), cov[0:3,0:3],  args.output + '/' + 'cov_{:04d}'.format(i))
