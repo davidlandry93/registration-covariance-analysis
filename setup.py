@@ -25,6 +25,7 @@ setup(
             'clustering2vtk = recova.clustering:clustering_to_vtk_cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',
             'clusterings2vtk = recova.clustering:batch_to_vtk_cli',
+            'compute_batches_of_pairs = recova.registration_result_database:compute_batches_of_pairs_cli',
             'dataset_summary = recova.learning_dataset:dataset_summary_cli',
             'descriptor_on_pair = recova.descriptor.factory:cli',
             'distribution_of_pair = recova.registration_result_database:distribution_cli',

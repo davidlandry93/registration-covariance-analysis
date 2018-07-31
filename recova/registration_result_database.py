@@ -16,15 +16,17 @@ from io import StringIO
 
 import lieroy
 
+from recov.registration_algorithm import IcpAlgorithm
 from recov.datasets import create_registration_dataset
-from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz
+from recov.pointcloud_io import pointcloud_to_pcd, read_xyz_stream, pointcloud_to_xyz, pointcloud_to_qpc_file
+from recov.registration_batch import compute_registration_batch_qpc
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
 from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
 from recova.covariance import covariance_algorithm_factory
 from recova.file_cache import FileCache
-from recova.util import eprint, run_subprocess, parallel_starmap_progressbar, rotation_around_z_matrix, transform_points
+from recova.util import eprint, run_subprocess, parallel_starmap_progressbar, rotation_around_z_matrix, transform_points, random_fifo
 from recova.merge_json_result import merge_result_files
 from recova.pointcloud import to_homogeneous
 from recova.registration_dataset import lie_vectors_of_registrations
@@ -110,26 +112,27 @@ class RegistrationPairDatabase:
         return pairs
 
     def import_reading(self, location, index, dataset):
-        label = '{}_{}_{}'.format(location, 'reading', index)
+        label = '{}_{}_{:04d}'.format(location, 'reading', index)
         _ = self.pointcloud_cache.get_or_generate(label, lambda: dataset.points_of_reading(index))
 
     def import_reference(self, location, index, dataset):
-        label = '{}_{}_{}'.format(location, 'reference', index)
+        label = '{}_{}_{:04d}'.format(location, 'reference', index)
         _ = self.pointcloud_cache.get_or_generate(label, lambda: dataset.points_of_reference(index))
 
 
     def get_reading(self, location, index):
-        label = '{}_{}_{}'.format(location, 'reading', index)
+        label = '{}_{}_{:04d}'.format(location, 'reading', index)
         return self.pointcloud_cache[label]
 
     def get_reference(self, location, index):
-        label = '{}_{}_{}'.format(location, 'reference', index)
+        label = '{}_{}_{:04d}'.format(location, 'reference', index)
         return self.pointcloud_cache[label]
 
 
     def reference_pcd(self, location, index):
         pointcloud_label = '{}_{}_{}'.format(location, 'reference', index)
         return self.pointcloud_pcd(pointcloud_label, self.get_reference, rotation_around_z)
+
 
 
     def reading_pcd(self, location, index):
@@ -149,39 +152,43 @@ class RegistrationPairDatabase:
 
     def normals_of_reading(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reading', index, 'normals')
-        normals = self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reading_pcd(location, index)))
+        normals = self.cache.get_or_generate(label, lambda: self.normals_of_cloud(self.get_reading(location, index)))
 
         return normals
 
     def normals_of_reference(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reference', index, 'normals')
-        normals = self.cache.get_or_generate(label, lambda: self.normals_of_pcd(self.reference_pcd(location, index)))
+        normals = self.cache.get_or_generate(label, lambda: self.normals_of_cloud(self.get_reference(location, index)))
         return normals
 
-    def normals_of_pcd(self, pcd, k=18):
-        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'
-        cmd_string = cmd_template.format(pcd, k)
-
-
-        eprint(cmd_string)
-        response = run_subprocess(cmd_string)
-        stream = StringIO(response)
-        normals = read_xyz_stream(stream)
-
-        return normals
 
     def normals_of_cloud(self, points, k=18):
-        
+        pointcloud_fifo = random_fifo(suffix='.qpc')
 
-        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'.format()
+        cmd_string = 'normals_of_cloud -pointcloud {} -k {}'.format(pointcloud_fifo, k)
+
+        proc = subprocess.Popen(
+            cmd_string,
+            shell=True,
+            stdin=None,
+            stdout=subprocess.PIPE,
+            universal_newlines=True
+        )
+
+        pointcloud_to_qpc_file(points, pointcloud_fifo)
+        normals = read_xyz_stream(StringIO(proc.stdout.read()))
+
+        os.unlink(pointcloud_fifo)
+
+        return np.array(normals)
 
     def eigenvalues_of_reading(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reading', index, 'eigvals')
-        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_pcd(self.reading_pcd(location, index)))
+        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_cloud(self.get_reading(location, index)))
 
     def eigenvalues_of_reference(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reference', index, 'eigvals')
-        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_pcd(self.reference_pcd(location, index)))
+        return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_cloud(self.get_reference(location, index)))
 
     def eigenvalues_of_pcd(self, pcd):
         cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(pcd)
@@ -189,6 +196,26 @@ class RegistrationPairDatabase:
         result_dict = json.loads(result)
 
         cloud_eig_vals = np.array(result_dict)
+
+        return cloud_eig_vals.T
+
+    def eigenvalues_of_cloud(self, points):
+        pointcloud_fifo = random_fifo(suffix='.qpc')
+        cmd_string = 'eigenvalues_of_cloud -cloud {}'.format(pointcloud_fifo)
+
+        proc = subprocess.Popen(
+            cmd_string,
+            shell=True,
+            stdin=None,
+            stdout=subprocess.PIPE,
+            universal_newlines=True
+        )
+
+        pointcloud_to_qpc_file(points, pointcloud_fifo)
+        result = json.loads(proc.stdout.read())
+        cloud_eig_vals = np.array(result)
+
+        os.unlink(pointcloud_fifo)
 
         return cloud_eig_vals.T
 
@@ -266,6 +293,22 @@ def import_pointclouds_of_one_pair(registration_pair, dataset):
     _ = registration_pair.registration_dict()
 
 
+def import_one_kitti_pointcloud_pair(db, dataset, location, i):
+    print('Doing reference: {}'.format(i))
+
+    if not db.pair_exists(location, i+1, i):
+        pair = db.create_pair(location, i + 1, i)
+    else:
+        pair = db.get_registration_pair(location, i+1, i)
+
+    pair.cache['transform'] = dataset.ground_truth(i+1, i)
+
+    db.import_reading(location, i + 1, dataset)
+    compute_data_reading(location, i + 1, db)
+    db.import_reference(location, i, dataset)
+    compute_data_reference(location, i, db)
+
+
 def import_kitti_pointclouds_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', help='Location of the registration result database', type=str)
@@ -280,14 +323,37 @@ def import_kitti_pointclouds_cli():
     pointcloud_root = pathlib.Path(args.pointcloud_root)
     pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, args.pointcloud_root)
 
-    for i in range(pointcloud_dataset.n_clouds() - 1):
-        pair = db.create_pair(args.sequence_name, i + 1, i)
-        db.import_reading(args.sequence_name, i + 1, pointcloud_dataset)
-        compute_data_reading(args.sequence_name, i + 1, db)
-        db.import_reference(args.sequence_name, i, pointcloud_dataset)
-        compute_data_reference(args.sequence_name, i, db)
+    data = [(db, pointcloud_dataset, args.sequence_name, i) for i in range(pointcloud_dataset.n_clouds() - 1)]
+    parallel_starmap_progressbar(import_one_kitti_pointcloud_pair, data, n_cores=args.n_cores)
 
-        pair.cache['transform'] = pointcloud_dataset.ground_truth(i+1, i)
+
+    # for i in range(pointcloud_dataset.n_clouds() - 1):
+    #     import_one_kitti_pointcloud_pair(db, pointcloud_dataset, args.sequence_name, i)
+
+
+def compute_batches_of_pairs_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database_root', help='Root of the registration database')
+    parser.add_argument('pointcloud_root', help='Location of the pointcloud dataset')
+    parser.add_argument('--pointcloud-dataset-type', default='kitti')
+    parser.add_argument('-j', '-n-cores', default=6, type=int)
+    parser.add_argument('--location', type=str)
+    args = parser.parse_args()
+
+
+    db = RegistrationPairDatabase(args.database_root)
+    pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, args.pointcloud_root)
+    algo = IcpAlgorithm()
+    algo.n_samples = 10
+    algo.initial_estimate_covariance = 0.05
+    algo.initial_estimate_covariance_rot = 0.05
+    algo.estimate_dist_type = 'normal'
+
+
+    for pair in db.registration_pairs():
+        registration_dataset = compute_registration_batch_qpc(pointcloud_dataset, pair.reading, pair.reference, algo)
+        print(registration_dataset)
+
 
 
 

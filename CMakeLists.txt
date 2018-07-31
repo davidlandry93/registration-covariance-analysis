@@ -4,12 +4,12 @@ project(recova VERSION 0.1)
 option(PYTHON_BINDINGS "Build the python bindings of the c++ code" ON)
 
 find_package(lieroy REQUIRED)
-find_package(Boost 1.58 EXACT)
 find_package(Eigen3 REQUIRED)
 find_package(gflags REQUIRED)
 find_package(glog REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(Boost 1.58 COMPONENTS thread filesystem system program_options date_time iostreams REQUIRED)
 find_package(PCL 1.3 REQUIRED COMPONENTS common io features)
 find_package(recov REQUIRED)
 

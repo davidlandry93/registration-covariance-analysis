@@ -252,8 +252,8 @@ def rotation_around_z_matrix(theta):
                      [0.0, 0.0, 1.0, 0.0],
                      [0.0, 0.0, 0.0, 1.0]])
 
-def random_fifo():
-    fifo_name = tempfile.gettempdir() + '/' + str(uuid.uuid4())
+def random_fifo(suffix=''):
+    fifo_name = tempfile.gettempdir() + '/' + str(uuid.uuid4()) + suffix
     os.mkfifo(fifo_name)
 
     return fifo_name
