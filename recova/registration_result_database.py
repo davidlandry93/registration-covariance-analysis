@@ -170,6 +170,11 @@ class RegistrationPairDatabase:
 
         return normals
 
+    def normals_of_cloud(self, points, k=18):
+        
+
+        cmd_template = 'normals_of_cloud -pointcloud {} -k {}'.format()
+
     def eigenvalues_of_reading(self, location, index):
         label = '{}_{}_{}_{}'.format(location, 'reading', index, 'eigvals')
         return self.cache.get_or_generate(label, lambda: self.eigenvalues_of_pcd(self.reading_pcd(location, index)))
@@ -261,6 +266,31 @@ def import_pointclouds_of_one_pair(registration_pair, dataset):
     _ = registration_pair.registration_dict()
 
 
+def import_kitti_pointclouds_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--root', help='Location of the registration result database', type=str)
+    parser.add_argument('--pointcloud_root', help='Location of the point clouds designated by the pairs', type=str)
+    parser.add_argument('--pointcloud_dataset_type', help='The type of pointcloud dataset we import pointclouds from', type=str, default='ethz')
+    parser.add_argument('-j', '--n-cores', default=8, type=int)
+    parser.add_argument('--sequence-name', type=str)
+    args = parser.parse_args()
+
+
+    db = RegistrationPairDatabase(args.root)
+    pointcloud_root = pathlib.Path(args.pointcloud_root)
+    pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, args.pointcloud_root)
+
+    for i in range(pointcloud_dataset.n_clouds() - 1):
+        pair = db.create_pair(args.sequence_name, i + 1, i)
+        db.import_reading(args.sequence_name, i + 1, pointcloud_dataset)
+        compute_data_reading(args.sequence_name, i + 1, db)
+        db.import_reference(args.sequence_name, i, pointcloud_dataset)
+        compute_data_reference(args.sequence_name, i, db)
+
+        pair.cache['transform'] = pointcloud_dataset.ground_truth(i+1, i)
+
+
+
 def import_files_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--files', nargs='*', type=str, help='The files to import')
@@ -273,13 +303,10 @@ def import_files_cli():
 
     db = RegistrationPairDatabase(args.root)
 
-    added_pairs_ids = set()
-
     if not args.pointcloud_only:
         for registration_file in args.files:
             print(registration_file)
             pair_id = db.import_file(registration_file)
-            added_pairs_ids.add(pair_id)
 
     pointcloud_root = pathlib.Path(args.pointcloud_root)
 

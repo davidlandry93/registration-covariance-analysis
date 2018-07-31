@@ -34,6 +34,7 @@ setup(
             'generate_cube = recova.pointcloud_gen.cube:cli',
             'generate_learning_dataset = recova.learning_dataset:generate_examples_cli',
             'import_husky_pointclouds = recova.registration_result_database:import_husky_pointclouds_cli',
+            'import_kitti_pointclouds = recova.registration_result_database:import_kitti_pointclouds_cli',
             'import_registration_files = recova.registration_result_database:import_files_cli',
             'json_cat = recova.json_util:json_cat_cli',
             'learn_recov = recova.learning.learning:cli',

@@ -8,8 +8,13 @@
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d_omp.h>
 
+#include "recov/pointcloud.h"
+#include "recov/pointcloud_loader.h"
+
 DEFINE_string(pointcloud, "", "Pointcloud on which we compute the normals.");
 DEFINE_int32(k, 12, "Number of neighbors to use to compute the normal of a point.");
+
+using namespace recov;
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -22,14 +27,12 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    if(pcl::io::loadPCDFile<pcl::PointXYZ>(FLAGS_pointcloud, *cloud) == -1) {
-        std::cout << "Could not load pointcloud" << '\n';
-        return 0;
-    }
+    PointcloudLoader loader;
+    Pointcloud pointcloud = loader.load(FLAGS_pointcloud);
+    auto pcl_pointcloud = pointcloud.as_pcl_pointcloud();
 
     pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> ne;
-    ne.setInputCloud(cloud);
+    ne.setInputCloud(pcl_pointcloud);
 
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
     ne.setSearchMethod(tree);
