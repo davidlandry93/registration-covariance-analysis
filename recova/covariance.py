@@ -63,7 +63,7 @@ class CensiCovarianceComputationAlgorithm:
             covariance = censi_estimate_from_points(reading, reference, registration_pair.ground_truth(), self.algo)
             return covariance
 
-        return self.cache.get_or_generate(repr(self), generate_covariance)
+        return registration_pair.cache.get_or_generate(repr(self), generate_covariance)
 
 
 def covariance_algorithm_factory(algo):

@@ -301,7 +301,7 @@ def import_one_kitti_pointcloud_pair(db, dataset, location, i):
     else:
         pair = db.get_registration_pair(location, i+1, i)
 
-    pair.cache['transform'] = dataset.ground_truth(i+1, i)
+    pair.cache.set_no_prefix('transform', dataset.ground_truth(i+1, i))
 
     db.import_reading(location, i + 1, dataset)
     compute_data_reading(location, i + 1, db)
@@ -348,12 +348,16 @@ def compute_batches_of_pairs_cli():
     algo.initial_estimate_covariance = 0.05
     algo.initial_estimate_covariance_rot = 0.05
     algo.estimate_dist_type = 'normal'
+    algo.rand_sampling_reading = 0.5
+    algo.rand_sampling_ref = 0.75
 
 
     for pair in db.registration_pairs():
-        registration_dataset = compute_registration_batch_qpc(pointcloud_dataset, pair.reading, pair.reference, algo)
-        print(registration_dataset)
+        print(pair)
+        if not pair.registration_file.exists():
+            registration_dataset = compute_registration_batch_qpc(pointcloud_dataset, pair.reading, pair.reference, algo)
 
+            pair.accept_registration_dataset(registration_dataset)
 
 
 
