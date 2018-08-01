@@ -3,13 +3,15 @@ project(recova VERSION 0.1)
 
 option(PYTHON_BINDINGS "Build the python bindings of the c++ code" ON)
 
+find_package(lieroy REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(gflags REQUIRED)
-find_package(lieroy REQUIRED)
+find_package(glog REQUIRED)
 find_package(libnabo REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(Boost 1.58 COMPONENTS thread filesystem system program_options date_time iostreams REQUIRED)
 find_package(PCL 1.3 REQUIRED COMPONENTS common io features)
-find_package(recov)
+find_package(recov REQUIRED)
 
 add_definitions(${PCL_DEFINITIONS})
 
@@ -55,6 +57,7 @@ add_executable(json2xyz src/json2xyz_main.cpp)
 target_include_directories(json2xyz PRIVATE include)
 
 
+
 message(STATUS ${PCL_INCLUDE_DIRS})
 message(STATUS ${EIGEN3_INCLUDE_DIRS})
 
@@ -62,8 +65,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 
 add_executable(normals_of_cloud src/normals_of_cloud_main.cpp)
 target_include_directories(normals_of_cloud PRIVATE include ${EIGEN3_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS} PUBLIC)
-target_link_libraries(normals_of_cloud gflags ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_FEATURES_LIBRARIES})
-
+target_link_libraries(normals_of_cloud recov::recov gflags ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_FEATURES_LIBRARIES})
 
 # Installation
 install(TARGETS

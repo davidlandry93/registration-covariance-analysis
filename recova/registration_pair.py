@@ -122,6 +122,10 @@ class RegistrationPair:
     def registration_file(self):
         return self.directory_of_pair / 'registrations.json'
 
+    def accept_registration_dataset(self, dataset):
+        with open(str(self.registration_file), 'w') as f:
+            json.dump(dataset, f)
+
 
     def registration_dict(self):
         if not self.registration_file.exists():

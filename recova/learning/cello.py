@@ -381,15 +381,25 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return self._compute_distances(self.model_predictors, metric_matrix, Variable(torch.Tensor(predictor))).data.numpy()
 
     def distances_to_weights(self, distances):
-        # zero_distances = distances < 1e-10
-        # distances.masked_fill(zero_distances, 1.)
-        # # eprint(distances)
+        zero_distances = distances < 1e-10
+        # eprint(zero_distances.sum())
+        distances.masked_fill_(zero_distances, 1000000.)
+        # distances[zero_distances] = 1000000.
         # weights = torch.clamp(1. - distances, min=0.)
 
-        weights = torch.exp(-distances)
+        # srt, _ = distances.sort()
+        # eprint('dsts')
+        # eprint(srt)
+
+        # weights = torch.exp(-distances)
+        weights = 1.0 / distances
+
+        # srt, _ = weights.sort()
+        # eprint('weights')
+        # eprint(srt)
 
         # Points that were a perfect match should have no weight.
-        weights.masked_fill(weights == 1.0, 0.0)
+        # weights.masked_fill(weights == 1.0, 0.0)
         return weights
 
 

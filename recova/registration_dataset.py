@@ -68,7 +68,7 @@ def positions_of_registration_data(reg_data, initial_estimates=False, left_multi
     return lie_vectors
 
 
-def data_dict_of_registration_data(registration_data):
+def data_dict_of_registration_data(registration_data, k=100):
     data_dict = {}
     lie_vectors = positions_of_registration_data(registration_data)
 
@@ -89,7 +89,7 @@ def data_dict_of_registration_data(registration_data):
 
             data_dict['outlier'] = np.ascontiguousarray(outlier_mask)
 
-    density = density_of_points(lie_vectors, k=100)
+    density = density_of_points(lie_vectors, k=k)
     data_dict['density'] = np.ascontiguousarray(density)
 
     return data_dict

@@ -148,7 +148,7 @@ def cli():
     print(np.mean(np.array(klls)))
 
     with open(args.output + '/summary.csv', 'w') as summary_file:
-        writer = csv.DictWriter(summary_file, ['location', 'reading', 'reference', 'loss', 'kullback_leibler'])
+        writer = csv.DictWriter(summary_file, ['location', 'reading', 'reference', 'loss', 'kullback_leibler', 'predicted_trace', 'reference_trace'])
         writer.writeheader()
 
         for i in range(len(ys_predicted)):
@@ -166,7 +166,9 @@ def cli():
                 'reading': dataset['data']['pairs'][index_of_example]['reading'],
                 'reference': dataset['data']['pairs'][index_of_example]['reference'],
                 'loss': errors[i],
-                'kullback_leibler': klls[i]
+                'kullback_leibler': klls[i],
+                'predicted_trace': np.trace(ys_predicted[i]),
+                'reference_trace': np.trace(ys_validation[i])
             })
 
 

@@ -23,6 +23,7 @@ def cli():
     parser.add_argument('--initial-estimate', action='store_true', help='Print initial estimates instead of results.')
     parser.add_argument('--center_around_gt', action='store_true', help='Center the results around the ground truth')
     parser.add_argument('-rz', '--rotation_around_z', type=float, default=0.0)
+    parser.add_argument('-k', help='N of neighbors for density computation', type=int, default=100)
     args = parser.parse_args()
 
     json_data = json.load(sys.stdin)
@@ -42,7 +43,7 @@ def cli():
 
     print(points)
 
-    data_dict = empty_to_none(data_dict_of_registration_data(json_data))
+    data_dict = empty_to_none(data_dict_of_registration_data(json_data, k=args.k))
     pointcloud_to_vtk(points[:, dims], args.output, data_dict)
 
 

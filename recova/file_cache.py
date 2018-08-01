@@ -158,3 +158,6 @@ class FileCache:
     def _save_numpy(self, key, ndarray):
         np.save(self._np_file_of_key(key), ndarray)
 
+    def set_no_prefix(self, key, value):
+        self._set(key, value)
+
