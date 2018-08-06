@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+
+import recov.censi
+
+from lieroy import se3
+
+def filter_outliers(se3_results):
+    distances = np.empty(len(se3_results))
+    for i, t in enumerate(se3_results):
+        print(t)
+        lie = se3.log(t)
+        print(np.linalg.norm(lie))
+        distances[i] = np.linalg.norm(lie)
+
+
+    mask = distances < np.percentile(distances, 95)
+
+    return se3_results[mask]
+
+
+
+def cli():
+    dataset = json.load(sys.stdin)
+
+    noise_levels = []
+    samples = []
+    covariances = np.empty((len(dataset), 6, 6))
+    censi = np.empty((len(dataset), 6, 6))
+    censi_traces = np.empty(len(dataset))
+    censi_norms = np.empty(len(dataset))
+    traces = np.empty(len(dataset))
+    norms = np.empty(len(dataset))
+    for i, pair in enumerate(dataset):
+        noise_levels.append(pair['noise_level'])
+
+        sample = filter_outliers(np.array(pair['results']))
+        samples.append(sample)
+
+        _, covariances[i] = se3.gaussian_from_sample(sample)
+        traces[i] = np.trace(covariances[i])
+        norms[i] = np.linalg.norm(covariances[i])
+        censi[i] = np.array(pair['censi'])
+        censi_traces[i] = np.trace(censi[i])
+        censi_norms[i] = np.linalg.norm(censi[i])
+
+
+    fig, ax = plt.subplots()
+    ax.plot(noise_levels, traces, color='black', label='Reference covariance')
+    ax.plot(noise_levels, censi_traces, color='black', linestyle='dashed', label='Censi Estimate')
+
+    ax.legend()
+    ax.set_title('Trace of covariance matrix against sensor noise')
+    ax.set_xlabel('Sensor noise STD (m)')
+    ax.set_ylabel('Covariance matrix trace')
+
+    plt.show()
+
+
+if __name__ == '__main__':
+    cli()

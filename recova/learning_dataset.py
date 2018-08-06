@@ -79,7 +79,7 @@ def generate_examples_cli():
     # clustering.seed_selector = 'localized'
     # clustering.rescale = True
 
-    clustering = DensityThresholdClusteringAlgorithm(threshold=1e5, k=100)
+    clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     with open(args.config) as f:

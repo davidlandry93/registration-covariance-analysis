@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import numpy as np
+import sys
+
+from recov.censi import censi_estimate_from_points
+import recov.registration_algorithm
+import recov.registration_batch
+import recova.pointcloud_gen.cube
+
+
+def generate_cube_pair(noise_level):
+    cube1 = recova.pointcloud_gen.cube.points_of_cube(10., 10000, noise=noise_level)
+    cube2 = recova.pointcloud_gen.cube.points_of_cube(10., 10000, noise=noise_level)
+
+    return (cube1, cube2)
+
+
+def registration_results_of_pair(algo, cloud1, cloud2):
+    result, _ = recov.registration_batch.registration_batch_raw(algo, cloud1, cloud2)
+
+    return result
+
+
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('noise_begin', type=float)
+    parser.add_argument('noise_end', type=float)
+    parser.add_argument('n_noise_step', type=int)
+    parser.add_argument('-n_samples', '-n', type=int, help='N samples per noise level', default=20)
+    args = parser.parse_args()
+
+
+
+    noise_levels = np.linspace(args.noise_begin, args.noise_end, args.n_noise_step)
+
+    algo = recov.registration_algorithm.IcpAlgorithm()
+    algo.initial_estimate_covariance = 0.05
+    algo.initial_estimate_covariance_rot = 0.05
+    algo.estimate_dist_type = 'normal'
+    algo.n_samples = args.n_samples
+    algo.max_iteration_count = 100
+
+    output_list = []
+    for level in noise_levels:
+        cloud1, cloud2 = generate_cube_pair(level)
+
+        results = registration_results_of_pair(algo, cloud1, cloud2)
+        _, se3 = recov.registration_batch.raw_results_to_se3(results)
+        censi = censi_estimate_from_points(cloud1, cloud2, np.identity(4), algo, sensor_noise_std=level)
+
+        output_list.append({
+            'noise_level': level,
+            'results': se3.tolist(),
+            'censi': censi.tolist()
+        })
+
+    json.dump(output_list, sys.stdout)
+
+if __name__ == '__main__':
+    cli()

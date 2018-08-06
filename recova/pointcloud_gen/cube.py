@@ -14,6 +14,21 @@ def points_of_cube_face(face_index, size, n_points):
 
     return points_of_face
 
+def points_of_cube(size, n_points, noise=0.01):
+    n_points_per_face = int(n_points / 6)
+
+    p = np.zeros((6 * n_points_per_face,), dtype=[('x', np.float32), ('y', np.float32), ('z', np.float32)])
+
+    for face in range(0,6):
+        points = points_of_cube_face(face, size, n_points)
+        points += np.random.normal(scale=noise, size=points.shape)
+
+        for i, point in enumerate(points):
+            p[i + face * n_points_per_face] = tuple(point)
+
+    return p
+
+
 def cli():
     parser = argparse.ArgumentParser()
 
@@ -24,18 +39,7 @@ def cli():
 
     args = parser.parse_args()
 
-    pointcloud = np.empty((0,3))
-
-    n_points_per_face = int(args.npoints / 6)
-
-    p = np.zeros((6 * n_points_per_face,), dtype=[('x', np.float32), ('y', np.float32), ('z', np.float32)])
-
-    for face in range(0,6):
-        points = points_of_cube_face(face, args.size, args.npoints)
-        points += np.random.normal(scale=args.noise, size=points.shape)
-
-        for i, point in enumerate(points):
-            p[i + face * n_points_per_face] = tuple(point)
+    p = points_of_cube(args.size, args.npoints, args.noise)
 
     el = plyfile.PlyElement.describe(p, 'vertex', val_types={'x': 'f8', 'y': 'f8', 'z': 'f8'}, )
     plyfile.PlyData([el]).write(args.output)
