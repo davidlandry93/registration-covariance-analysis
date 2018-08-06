@@ -18,9 +18,10 @@ add_definitions(${PCL_DEFINITIONS})
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include_directories(${libnabo_INCLUDE_DIRS})
+
 add_library(nabo_adapter src/nabo_adapter.cpp)
-target_include_directories(nabo_adapter
-  PUBLIC include ${EIGEN3_INCLUDE_DIRS})
+target_include_directories(nabo_adapter PUBLIC ${libnabo_INCLUDE_DIRS} include ${EIGEN3_INCLUDE_DIRS})
 target_link_libraries(nabo_adapter ${libnabo_LIBRARIES} ${OpenMP_CXX_FLAGS})
 target_compile_options(nabo_adapter PRIVATE ${OpenMP_CXX_FLAGS})
 set_property(TARGET nabo_adapter PROPERTY POSITION_INDEPENDENT_CODE ON)

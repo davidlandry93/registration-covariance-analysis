@@ -14,7 +14,7 @@ setup(
     package_data={
         'recova': ['core.so']
     },
-    install_requires=['matplotlib', 'numpy', 'pillow', 'pyclustering', 'pyevtk', 'sklearn', 'tqdm', 'scipy', 'pyyaml'],
+    install_requires=['matplotlib', 'numpy', 'pillow', 'plyfile', 'pyclustering', 'pyevtk', 'sklearn', 'tqdm', 'scipy', 'pyyaml'],
     scripts = ['bin/all_registration_to_vtk_ellipsoid',
                'bin/meta_of_json'],
     entry_points = {
