@@ -13,7 +13,7 @@ import sys
 
 from recova.learning.model import CovarianceEstimationModel
 from recova.learning.preprocessing import preprocessing_factory
-from recova.util import eprint, kullback_leibler
+from recova.util import eprint, kullback_leibler, wishart_kl_divergence
 
 
 def to_upper_triangular(v):
@@ -49,7 +49,7 @@ def size_of_triangular_vector(n):
     return int((n * n + n) / 2.)
 
 
-def kullback_leibler_pytorch(cov1, cov2):
+def kullback_leibler_pytorch(base, base_df, prediction, prediction_df):
     """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
     cov1 and cov2 must be numpy matrices.
     See http://bit.ly/2FAYCgu. """
@@ -57,8 +57,8 @@ def kullback_leibler_pytorch(cov1, cov2):
     # In pytorch 0.4.0 det will allow us to compute the kll directly in torch,
     # in the meantime we transfer the computation to numpy.
 
-    cov1_np, cov2_np = cov1.numpy(), cov2.numpy()
-    return kullback_leibler(cov1_np, cov2_np)
+    base_np, prediction_np = base.numpy(), prediction.numpy()
+    return wishart_kl_divergence(base_np, base_df, prediction_np, prediction_df)
 
 
 def pytorch_norm_distance(cov1, cov2):
@@ -136,8 +136,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         selector = sklearn.model_selection.RepeatedKFold(n_splits=5, n_repeats=10)
 
-        # optimizer = optim.SGD([self.theta], lr=self.learning_rate)
-        optimizer = optim.Adam([self.theta], lr=self.learning_rate)
+        optimizer = optim.SGD([self.theta], lr=self.learning_rate)
+        # optimizer = optim.Adam([self.theta], lr=self.learning_rate)
 
         validation_losses = []
         validation_stds = []
@@ -171,9 +171,13 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             perms = torch.randperm(len(self.model_predictors))
             for i in perms:
                 distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
-                prediction = self.prediction_from_distances(self.model_covariances_cuda, distances).cpu()
+                prediction = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).cpu()
 
-                loss_A = torch.log(torch.norm(prediction))
+
+                det_pred = torch.det(prediction)
+                log_det = torch.log(det_pred + 1e-15)
+
+                loss_A = log_det
                 # loss_B = torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity)
 
                 loss_B = torch.trace(torch.mm(torch.inverse(prediction), self.model_covariances[i]))
@@ -183,6 +187,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 regularization_term = torch.sum(torch.log(nonzero_distances))
 
                 loss_of_pair = (1 - self.alpha) * (loss_A + loss_B) + self.alpha * regularization_term
+
                 optimization_loss += loss_of_pair
                 losses[i] = loss_of_pair
 
@@ -215,8 +220,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
                 klls = self._kll(predictions, covariances_validation.data)
                 kll_errors_log.append(klls.numpy().tolist())
-                kll_validation_losses.append(torch.mean(klls))
-                kll_validation_stds.append(torch.std(klls))
+                kll_validation_losses.append(torch.mean(klls).numpy().item())
+                kll_validation_stds.append(torch.std(klls).numpy().item())
 
 
                 eprint('-- Validation of epoch %d --' % epoch)
@@ -244,8 +249,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 eprint()
 
                 validation_errors_log.append(validation_errors.numpy().tolist())
-                validation_losses.append(validation_score)
-                validation_stds.append(torch.std(validation_errors))
+                validation_losses.append(validation_score.numpy().tolist())
+                validation_stds.append(torch.std(validation_errors).numpy().tolist())
             else:
                 keep_going = False
                 eprint('Stopping because elements in the validation dataset have no neighbors.')
@@ -307,7 +312,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         kll_errors = torch.zeros(len(ys_predicted))
 
         for i in range(len(ys_predicted)):
-            kll_errors[i] = kullback_leibler_pytorch(ys_predicted[i], ys_validation[i]) + kullback_leibler_pytorch(ys_validation[i], ys_predicted[i]) / 2.
+            kll_errors[i] = kullback_leibler_pytorch(ys_validation[i] / 6, 6, ys_predicted[i] / 100, 100)
 
         return kll_errors
 
@@ -391,8 +396,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         # eprint('dsts')
         # eprint(srt)
 
-        # weights = torch.exp(-distances)
-        weights = 1.0 / distances
+        weights = torch.exp(-distances)
+        # weights = 1.0 / distances
 
         # srt, _ = weights.sort()
         # eprint('weights')

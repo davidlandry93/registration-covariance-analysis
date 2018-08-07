@@ -44,6 +44,26 @@ class IdentityPreprocessing(PreprocessingAlgorithm):
         return 'identity_preprocessing'
 
 
+class RescalePreprocessing(PreprocessingAlgorithm):
+    def __init__(self, factor=1.0):
+        self.factor = factor
+
+    def process(self, m):
+        return self.factor * m
+
+    def unprocess(self, m):
+        return m / self.factor
+
+    def export(self):
+        return {
+            'name': 'rescale'
+        }
+
+    def __repr__(self):
+        return 'rescale_{}'.format(self.factor)
+
+
+
 class TranslationOnlyPreprocessing(PreprocessingAlgorithm):
     def __init__(self):
         pass
@@ -121,6 +141,8 @@ def preprocessing_factory(algo):
         return TranslationOnlyPreprocessing()
     elif algo == 'cholesky':
         return CholeskyPreprocessing()
+    elif algo == 'rescale':
+        return RescalePreprocessing(100.0)
     else:
         raise RuntimeError('Unrecognized preprocessing algorithm {}'.format(algo))
 

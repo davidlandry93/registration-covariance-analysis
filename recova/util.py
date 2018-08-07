@@ -5,6 +5,7 @@ from math import ceil, sqrt
 import multiprocessing
 import numpy as np
 import os
+import scipy.special
 import subprocess
 import sys
 import tempfile
@@ -257,3 +258,56 @@ def random_fifo(suffix=''):
     os.mkfifo(fifo_name)
 
     return fifo_name
+
+def wishart_kl_divergence(base_v, base_degress_of_freedom, prediction_v, prediction_degrees_of_freedom):
+    """
+    https://en.wikipedia.org/wiki/Wishart_distribution
+    """
+    vdiff = np.dot(np.linalg.inv(prediction_v), base_v)
+
+    # print(base_v)
+    # print(prediction_v)
+    # print('Det vdiff: {}'.format(np.log(np.linalg.det(vdiff))))
+    # print('Trace vdiff: {}'.format(np.trace(vdiff) - 6))
+    # print('Gammas: {}'.format((scipy.special.multigammaln(prediction_degrees_of_freedom / 2., 6) - scipy.special.multigammaln(base_degress_of_freedom / 2., 6))))
+    # print('Trigamma: {}'.format(((base_degress_of_freedom - prediction_degrees_of_freedom) / 2.) * scipy.special.polygamma(1, base_degress_of_freedom / 2.)))
+
+    return (
+        (-prediction_degrees_of_freedom / 2.) * np.log(np.linalg.det(vdiff)) +
+        (base_degress_of_freedom / 2.) * (np.trace(vdiff) - 6) +
+        (scipy.special.multigammaln(prediction_degrees_of_freedom / 2., 6) - scipy.special.multigammaln(base_degress_of_freedom / 2., 6)) +
+        ((base_degress_of_freedom - prediction_degrees_of_freedom) / 2.) * scipy.special.polygamma(1, base_degress_of_freedom / 2.)
+    )
+
+
+def tri_gamma(x):
+    """Polynomial approximation of the Tri-Gamma function.
+    https://en.wikipedia.org/wiki/Trigamma_function"""
+    return (
+        1. / x +
+        1. / 2. * x**2 +
+        1. / 6. * x**3 -
+        1. / 30. * x**5 +
+        1. / 42. * x**7 -
+        1. / 30. * x**9 +
+        5. / 66. * x**11 -
+        691. / 2730. * x**13 +
+        7. / 6. * x**15
+    )
+
+def wishart_likelihood(v, degrees_of_freedom, observation):
+    a = (np.linalg.det(observation)**((degrees_of_freedom - 6 - 1) / 2))
+    b = np.exp(-0.5 * np.trace(np.dot(np.linalg.inv(v), observation)))
+    c = 2 ** (degrees_of_freedom * 6 / 2)
+    d = (np.linalg.det(v)) ** (degrees_of_freedom / 2)
+    e = np.exp(scipy.special.multigammaln(degrees_of_freedom / 2, 6))
+
+    print('Det v: {}'.format(np.linalg.det(v)))
+    print(a)
+    print(b)
+    print(c)
+    print(d)
+    print(e)
+
+
+    return (a * b) / (c * d * e)
