@@ -12,8 +12,8 @@ import recova.pointcloud_gen.cube
 
 
 def generate_cube_pair(noise_level):
-    cube1 = recova.pointcloud_gen.cube.points_of_cube(10., 10000, noise=noise_level)
-    cube2 = recova.pointcloud_gen.cube.points_of_cube(10., 10000, noise=noise_level)
+    cube1 = recova.pointcloud_gen.cube.points_of_cube(1., 10000, noise=noise_level)
+    cube2 = recova.pointcloud_gen.cube.points_of_cube(1., 10000, noise=noise_level)
 
     return (cube1, cube2)
 

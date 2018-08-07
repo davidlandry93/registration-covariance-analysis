@@ -93,13 +93,18 @@ def plot_loss_comparison(ax, learning_runs, std=False, labels=[]):
         if std:
             ax.fill_between(range(0, len(validation_loss)), validation_loss + validation_std, validation_loss - validation_std, alpha=0.5)
 
-def plot_single_loss(ax, learning_run, median=False, std=False):
+def plot_single_loss(ax, learning_run, median=False, std=False, kll=False):
     if median:
         validation_errors = np.array(learning_run['validation_errors'])
         validation_data = np.percentile(validation_errors, [0.25, 0.5, 0.75], axis=1)
 
         optimization_errors = np.array(learning_run['optimization_errors'])
         optimization_data = np.percentile(optimization_errors, [0.25, 0.5, 0.75], axis=1)
+    elif kll:
+        kll_training = np.arrau(learning_run['kll_validation'])
+
+        kll_errors = np.array(learning_run['kll_errors'])
+        optimization_data = np.percentile(kll_errors, [0.25, 0.5, 0.75], axis=1)
     else:
         optimization_loss = np.array(learning_run['optimization_loss'])
         optimization_std = np.array(learning_run['optimization_errors']).std(axis=1)
@@ -143,6 +148,7 @@ def plot_loss_on_time(args):
     parser.add_argument('-std', action='store_true', help='Show the standard deviations/interquartile spread.')
     parser.add_argument('--labels', '-l', type=str, default='', help='Comma separated list of labels for the different plots.')
     parser.add_argument('-t', '--title', type=str, default='Evolution of validation loss during learning')
+    parser.add_argument('-kll', action='store_true')
     args = parser.parse_args(args)
 
     learning_run = json.load(sys.stdin)
@@ -150,7 +156,7 @@ def plot_loss_on_time(args):
     fig, ax = plt.subplots()
 
     if isinstance(learning_run, dict):
-        plot_single_loss(ax, learning_run, median=args.median, std=args.std, )
+        plot_single_loss(ax, learning_run, median=args.median, std=args.std, kll=args.kll)
     elif isinstance(learning_run, list):
         plot_loss_comparison(ax, learning_run, std=args.std, labels=args.labels.split(','))
 

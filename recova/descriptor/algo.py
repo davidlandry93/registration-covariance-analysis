@@ -36,6 +36,7 @@ class ConcatDescriptorAlgo(DescriptorAlgo):
         return '_'.join(algo_reprs)
 
     def compute(self, pair, reading_mask, reference_mask):
+        descriptors = []
 
         for algo in self.algos:
             descriptor = algo.compute(pair, reading_mask, reference_mask)

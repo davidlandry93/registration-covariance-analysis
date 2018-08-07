@@ -161,10 +161,7 @@ def cli():
 
     for key in learning_run:
         print(key)
-        print(learning_run[key])
-        json.dumps(learning_run[key])
-        print()
-        print()
+        _ = json.dumps(learning_run[key])
 
     with open(args.output + '.json', 'w') as f:
         json.dump(learning_run, f)
