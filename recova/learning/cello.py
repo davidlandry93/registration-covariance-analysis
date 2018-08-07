@@ -171,8 +171,8 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             perms = torch.randperm(len(self.model_predictors))
             for i in perms:
                 distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
-                # prediction = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).cpu()
-                prediction = self.prediction_from_distances_eigen(self.model_covariances, distances)
+                prediction = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).cpu()
+                # prediction = self._prediction_from_distances_cu(self.model_covariances, distances)
 
 
                 det_pred = torch.det(prediction)
@@ -348,7 +348,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             self.logger.debug('Predicting value for predictor %d ' % i)
             distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix_cuda, predictors[i].cuda())
 
-            predictions[i] = self.prediction_from_distances_eigen(self.model_covariances, distances).data
+            predictions[i] = self._prediction_from_distances_cuda(self.model_covariances, distances).data
 
         return predictions
 
