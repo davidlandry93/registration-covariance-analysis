@@ -56,11 +56,15 @@ class RescalePreprocessing(PreprocessingAlgorithm):
 
     def export(self):
         return {
-            'name': 'rescale'
+            'name': 'rescale',
+            'factor': self.factor,
         }
 
     def __repr__(self):
         return 'rescale_{}'.format(self.factor)
+
+    def import_model(self, model):
+        self.factor = model['factor']
 
 
 
