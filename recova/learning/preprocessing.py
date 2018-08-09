@@ -67,6 +67,9 @@ class RescalePreprocessing(PreprocessingAlgorithm):
     def __repr__(self):
         return 'rescale_{}'.format(self.factor)
 
+    def import_model(self, model):
+        self.factor = model['factor']
+
 
 
 class TranslationOnlyPreprocessing(PreprocessingAlgorithm):
