@@ -335,6 +335,7 @@ def compute_batches_of_pairs_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('database_root', help='Root of the registration database')
     parser.add_argument('pointcloud_root', help='Location of the pointcloud dataset')
+    parser.add_argument('-n', '--n-samples', type=int, default=100, help='N samples per pair')
     parser.add_argument('--pointcloud-dataset-type', default='kitti')
     parser.add_argument('-j', '-n-cores', default=6, type=int)
     parser.add_argument('--location', type=str, default=None)
@@ -345,7 +346,7 @@ def compute_batches_of_pairs_cli():
     db = RegistrationPairDatabase(args.database_root)
     pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, args.pointcloud_root)
     algo = IcpAlgorithm()
-    algo.n_samples = 10
+    algo.n_samples = args.n_samples
     algo.initial_estimate_covariance = 0.05
     algo.initial_estimate_covariance_rot = 0.05
     algo.estimate_dist_type = 'normal'
