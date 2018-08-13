@@ -75,8 +75,8 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
-    # clustering = CenteredClusteringAlgorithm(0.005, k=20)
-    # clustering.seed_selector = 'localized'
+    clustering = CenteredClusteringAlgorithm(0.005, k=20, n_seed_init=20)
+    clustering.seed_selector = 'localized'
     # clustering.rescale = True
 
     # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
