@@ -7,6 +7,7 @@ import sys
 
 
 import recov.censi
+import recov.util
 
 from lieroy import se3
 
@@ -19,7 +20,7 @@ def filter_outliers(se3_results):
         distances[i] = np.linalg.norm(lie)
 
 
-    mask = distances < np.percentile(distances, 95)
+    mask = distances < np.percentile(distances, 90)
 
     return se3_results[mask]
 
@@ -50,15 +51,36 @@ def cli():
         censi_norms[i] = np.linalg.norm(censi[i])
 
 
+    noise_levels = np.array(noise_levels)
+    traces = np.array(traces)
+    censi_traces = np.array(censi_traces)
+
+    recov.util.matplotlib_paper_config()
+
     fig, ax = plt.subplots()
-    ax.plot(noise_levels, traces, color='black', label='Reference covariance')
-    ax.plot(noise_levels, censi_traces, color='black', linestyle='dashed', label='Censi Estimate')
+    fig.set_size_inches((3.412, 1.9))
+    fig.set_dpi(72)
+
+
+    ax.plot(100. * noise_levels, traces, color='black', label='Reference Covariance', linewidth=0.8)
+    ax.plot(100. * noise_levels, censi_traces, color='black', linestyle='dashed', label='Censi Cov. Estimate', linewidth=0.8)
+
+    ax.ticklabel_format(style='sci', ax='y', scilimits=(0,0))
+
+    ax.set_xlim(-0.1, 100.0 * np.max(noise_levels) + 0.1)
+
+    # for side in ['top', 'bottom', 'left', 'right']:
+    #     ax.spines[side].set_visible(False)
+
 
     ax.legend()
-    ax.set_title('Trace of covariance matrix against sensor noise')
-    ax.set_xlabel('Sensor noise STD (m)')
-    ax.set_ylabel('Covariance matrix trace')
+    # ax.set_title('Trace of covariance matrix against sensor noise')
+    ax.set_xlabel('Sensor noise standard deviation (cm)')
+    ax.set_ylabel('Trace of covariance matrix')
+    fig.subplots_adjust(bottom=0.2)
 
+    # plt.tight_layout(pad=1.00, w_pad=0.5, h_pad=1.1)
+    plt.savefig('fig.pdf')
     plt.show()
 
 

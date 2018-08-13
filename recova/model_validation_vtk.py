@@ -141,8 +141,7 @@ def cli():
     klls = []
     for i in range(len(ys_validation)):
         kll_left = kullback_leibler(ys_validation[i], ys_predicted[i])
-        kll_right = kullback_leibler(ys_predicted[i], ys_validation[i])
-        klls.append(kll_left + kll_right)
+        klls.append(kll_left)
 
     print(np.mean(errors))
     print(np.mean(np.array(klls)))
@@ -170,6 +169,30 @@ def cli():
                 'predicted_trace': np.trace(ys_predicted[i]),
                 'reference_trace': np.trace(ys_validation[i])
             })
+
+
+def covariances_cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('learning_set', type=str)
+    parser.add_argument('output', type=str)
+    args = parser.parse_args()
+
+
+    print('Loading dataset...')
+    with open(args.learning_set) as f:
+        dataset = json.load(f)
+    print('Done')
+
+    ys_validation = np.array(dataset['data']['ys'])
+
+    for i in range(len(ys_validation)):
+        pair = dataset['data']['pairs'][i]
+        covariance = ys_validation[i]
+
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_{}_{}_{}_tra'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_tra_{}'.format(pair['dataset'], i))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_{}_{}_{}_rot'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_rot_{}'.format(pair['dataset'], i))
 
 
 

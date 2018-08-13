@@ -42,6 +42,29 @@ class ClusteringAlgorithm:
         raise NotImplementedError('Clustering Algorithms must implement the cluster method')
 
 
+class OutlierFilterClusteringAlgorithm:
+    def __init__(self, quantile=0.8):
+        self.quantile = quantile
+
+    def __repr__(self):
+        return 'outlier_filter_{:.4E}'.format(self.quantile)
+
+    def cluster(self, dataset, seed=None):
+        distances = np.linalg.norm(dataset - seed, axis=1)
+        eprint('Distances shape: {}'.format(distances.shape))
+
+        percentile = np.percentile(distances, self.quantile)
+        cluster = np.where(distances < percentile)[0]
+        eprint('Removing all points more that {} away'.format(percentile))
+
+        return {
+            'clustering': [cluster.tolist()],
+            'n_clusters': 1,
+            'outliers': inverse_of_cluster(cluster, len(dataset)).tolist(),
+            'outlier_ratio': 1.0 - (len(cluster) / len(dataset)),
+        }
+
+
 class DensityThresholdClusteringAlgorithm:
     def __init__(self, threshold=1e6, k=18):
         self.threshold = threshold
@@ -210,6 +233,7 @@ def clustering_algorithm_factory(algo_name):
         'dbscan':  DBSCANClusteringAlgorithm,
         'identity': IdentityClusteringAlgorithm,
         'density': DensityThresholdClusteringAlgorithm,
+        'quantile': OutlierFilterClusteringAlgorithm,
     }
     return algo_dict[algo_name]()
 

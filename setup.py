@@ -15,8 +15,11 @@ setup(
         'recova': ['core.so']
     },
     install_requires=['matplotlib', 'numpy', 'pillow', 'plyfile', 'pyclustering', 'pyevtk', 'sklearn', 'tqdm', 'scipy', 'pyyaml'],
-    scripts = ['bin/all_registration_to_vtk_ellipsoid',
-               'bin/meta_of_json'],
+    scripts = [
+        'bin/all_registration_to_vtk_ellipsoid',
+        'bin/meta_of_json',
+        'bin/recov_npy2pcd'
+    ],
     entry_points = {
         'console_scripts': [
             'center_registrations = recova.registration_dataset:center_around_gt_cli',
@@ -39,6 +42,7 @@ setup(
             'import_registration_files = recova.registration_result_database:import_files_cli',
             'json_cat = recova.json_util:json_cat_cli',
             'learn_recov = recova.learning.learning:cli',
+            'learning_set_covariances = recova.model_validation_vtk:covariances_cli',
             'mask_on_pair = recova.descriptor.factory:apply_mask_cli',
             'merge_json_result = recova.merge_json_result:cli',
             'model_validation_vtk = recova.model_validation_vtk:cli',

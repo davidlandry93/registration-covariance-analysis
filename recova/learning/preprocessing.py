@@ -57,8 +57,12 @@ class RescalePreprocessing(PreprocessingAlgorithm):
     def export(self):
         return {
             'name': 'rescale',
-            'factor': self.factor,
+            'factor': self.factor
         }
+
+    def import_model(self, model):
+        # self.factor = model.factor
+        pass
 
     def __repr__(self):
         return 'rescale_{}'.format(self.factor)
@@ -146,7 +150,7 @@ def preprocessing_factory(algo):
     elif algo == 'cholesky':
         return CholeskyPreprocessing()
     elif algo == 'rescale':
-        return RescalePreprocessing(100.0)
+        return RescalePreprocessing(10.0)
     else:
         raise RuntimeError('Unrecognized preprocessing algorithm {}'.format(algo))
 
