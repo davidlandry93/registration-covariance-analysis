@@ -335,28 +335,35 @@ def compute_batches_of_pairs_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('database_root', help='Root of the registration database')
     parser.add_argument('pointcloud_root', help='Location of the pointcloud dataset')
+    parser.add_argument('-n', '--n-samples', type=int, default=100, help='N samples per pair')
     parser.add_argument('--pointcloud-dataset-type', default='kitti')
     parser.add_argument('-j', '-n-cores', default=6, type=int)
-    parser.add_argument('--location', type=str)
+    parser.add_argument('--location', type=str, default='')
+    parser.add_argument('--begin', type=int, default=-1)
+    parser.add_argument('--end', type=int, default=-1)
     args = parser.parse_args()
-
 
     db = RegistrationPairDatabase(args.database_root)
     pointcloud_dataset = create_registration_dataset(args.pointcloud_dataset_type, args.pointcloud_root)
     algo = IcpAlgorithm()
-    algo.n_samples = 10
+    algo.n_samples = args.n_samples
     algo.initial_estimate_covariance = 0.05
     algo.initial_estimate_covariance_rot = 0.05
     algo.estimate_dist_type = 'normal'
     algo.rand_sampling_reading = 0.5
     algo.rand_sampling_ref = 0.75
 
+    pairs = db.registration_pairs()
+    if args.location and args.end != -1 and args.begin != -1:
+        filtered_pairs = list(filter(lambda x: x.reference >= args.begin and x.reference < args.end and x.dataset == args.location, pairs))
+        pairs = filtered_pairs
 
-    for pair in db.registration_pairs():
+    print('Computing batches of {} pairs'.format(len(pairs)))
+
+    for pair in pairs:
         print(pair)
         if not pair.registration_file.exists():
             registration_dataset = compute_registration_batch_qpc(pointcloud_dataset, pair.reading, pair.reference, algo)
-
             pair.accept_registration_dataset(registration_dataset)
 
 

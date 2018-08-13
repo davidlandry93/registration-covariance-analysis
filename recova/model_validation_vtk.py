@@ -141,8 +141,7 @@ def cli():
     klls = []
     for i in range(len(ys_validation)):
         kll_left = kullback_leibler(ys_validation[i], ys_predicted[i])
-        kll_right = kullback_leibler(ys_predicted[i], ys_validation[i])
-        klls.append(kll_left + kll_right)
+        klls.append(kll_left)
 
     print(np.mean(errors))
     print(np.mean(np.array(klls)))
