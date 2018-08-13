@@ -16,7 +16,7 @@ from lieroy import se3
 
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
-from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm
+from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm, OutlierFilterClusteringAlgorithm
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
@@ -79,7 +79,8 @@ def generate_examples_cli():
     # clustering.seed_selector = 'localized'
     # clustering.rescale = True
 
-    clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
+    # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
+    clustering = OutlierFilterClusteringAlgorithm()
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     with open(args.config) as f:

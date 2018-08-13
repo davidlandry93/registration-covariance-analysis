@@ -39,6 +39,7 @@ setup(
             'import_registration_files = recova.registration_result_database:import_files_cli',
             'json_cat = recova.json_util:json_cat_cli',
             'learn_recov = recova.learning.learning:cli',
+            'learning_set_covariances = recova.model_validation_vtk:covariances_cli',
             'mask_on_pair = recova.descriptor.factory:apply_mask_cli',
             'merge_json_result = recova.merge_json_result:cli',
             'model_validation_vtk = recova.model_validation_vtk:cli',

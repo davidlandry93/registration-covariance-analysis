@@ -348,7 +348,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             self.logger.debug('Predicting value for predictor %d ' % i)
             distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix_cuda, predictors[i].cuda())
 
-            predictions[i] = self._prediction_from_distances_cuda(self.model_covariances, distances).data
+            predictions[i] = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).data
 
         return predictions
 
