@@ -183,7 +183,7 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
     strings_of_seed = list(map(str, seed.tolist()))
     string_of_seed = ','.join(strings_of_seed)
 
-    command = 'centered_clustering -seed_selector {} -k {} -radius {} -seed {} {}'.format(seed_selector, n, radius, string_of_seed, ('--pointcloud_log' if logging else '--nopointcloud_log'))
+    command = 'centered_clustering -n_seed_init {} -seed_selector {} -k {} -radius {} -seed {} {}'.format(n_seed_init, seed_selector, n, radius, string_of_seed, ('--pointcloud_log' if logging else '--nopointcloud_log'))
 
     eprint(command)
     stream = io.StringIO()
