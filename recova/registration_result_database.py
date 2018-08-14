@@ -338,9 +338,9 @@ def compute_batches_of_pairs_cli():
     parser.add_argument('-n', '--n-samples', type=int, default=100, help='N samples per pair')
     parser.add_argument('--pointcloud-dataset-type', default='kitti')
     parser.add_argument('-j', '-n-cores', default=6, type=int)
-    parser.add_argument('--location', type=str, default=None)
-    parser.add_argument('--begin', type=int, default=None)
-    parser.add_argument('--end', type=int, default=None)
+    parser.add_argument('--location', type=str, default='')
+    parser.add_argument('--begin', type=int, default=-1)
+    parser.add_argument('--end', type=int, default=-1)
     args = parser.parse_args()
 
     db = RegistrationPairDatabase(args.database_root)
@@ -354,7 +354,7 @@ def compute_batches_of_pairs_cli():
     algo.rand_sampling_ref = 0.75
 
     pairs = db.registration_pairs()
-    if args.location and args.begin and args.end:
+    if args.location and args.end != -1 and args.begin != -1:
         filtered_pairs = list(filter(lambda x: x.reference >= args.begin and x.reference < args.end and x.dataset == args.location, pairs))
         pairs = filtered_pairs
 
