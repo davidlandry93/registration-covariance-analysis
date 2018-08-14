@@ -429,4 +429,3 @@ def cli():
     json.dump(clustering_with_distribution, sys.stdout)
 
     cluster_sizes = sorted(list(map(len, clustering['clustering'])), reverse=True)
-    eprint(cluster_sizes)

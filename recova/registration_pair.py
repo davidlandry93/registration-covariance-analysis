@@ -226,7 +226,7 @@ class RegistrationPair:
 
             return json.loads(response)
 
-        response = self.cache.get_or_generate(key, lambda: compute_overlapping_region(radius))
+        response = self.cache.get_or_generate_invariant(key, lambda: compute_overlapping_region(radius))
         reading_mask = np.array(response['reading'], dtype=bool)
         reference_mask = np.array(response['reference'], dtype=bool)
 
