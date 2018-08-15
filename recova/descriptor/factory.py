@@ -145,7 +145,8 @@ def apply_mask_cli():
     reading_masks, reference_masks = mask_generator.compute(pair)
 
 
-    eprint(mask_generator.labels())
+    eprint('Transform of pair: ')
+    eprint(pair.transform())
 
 
     pointcloud_to_vtk(reference, args.output + '/reference')

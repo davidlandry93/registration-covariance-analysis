@@ -169,14 +169,22 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             metric_matrix = self.theta_to_metric_matrix(self.theta)
 
             perms = torch.randperm(len(self.model_predictors))
+            identity = torch.Tensor(np.identity(6))
             for i in perms:
                 distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
                 prediction = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).cpu()
                 # prediction = self._prediction_from_distances_cu(self.model_covariances, distances)
 
+                # eprint('Prediction')
+                # eprint(prediction)
+                # eprint('Det')
+                # eprint(torch.det(prediction + identity * 1e-9))
 
-                det_pred = torch.det(prediction)
-                log_det = torch.log(det_pred + 1e-9)
+                det_pred = torch.det(prediction + identity * 1e-9)
+                log_det = torch.log(det_pred + 1e-18)
+
+                # eprint('Log det')
+                # eprint(log_det)
 
                 loss_A = log_det
                 # loss_B = torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity)
@@ -344,8 +352,6 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         metric_matrix_cuda = metric_matrix.cuda()
 
         self.logger.debug('Preparing to predict %d values' % len(predictors))
-        eprint(self.model_covariances.shape[1])
-        eprint(self.model_covariances.shape[2])
         predictions = torch.zeros(len(predictors),self.model_covariances.shape[1], self.model_covariances.shape[2])
 
         for i in range(len(predictors)):

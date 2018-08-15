@@ -42,6 +42,29 @@ class ClusteringAlgorithm:
         raise NotImplementedError('Clustering Algorithms must implement the cluster method')
 
 
+class OutlierFilterClusteringAlgorithm:
+    def __init__(self, quantile=0.8):
+        self.quantile = quantile
+
+    def __repr__(self):
+        return 'outlier_filter_{:.4E}'.format(self.quantile)
+
+    def cluster(self, dataset, seed=None):
+        distances = np.linalg.norm(dataset - seed, axis=1)
+        eprint('Distances shape: {}'.format(distances.shape))
+
+        percentile = np.percentile(distances, self.quantile)
+        cluster = np.where(distances < percentile)[0]
+        eprint('Removing all points more that {} away'.format(percentile))
+
+        return {
+            'clustering': [cluster.tolist()],
+            'n_clusters': 1,
+            'outliers': inverse_of_cluster(cluster, len(dataset)).tolist(),
+            'outlier_ratio': 1.0 - (len(cluster) / len(dataset)),
+        }
+
+
 class DensityThresholdClusteringAlgorithm:
     def __init__(self, threshold=1e6, k=18):
         self.threshold = threshold
@@ -183,7 +206,7 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
     strings_of_seed = list(map(str, seed.tolist()))
     string_of_seed = ','.join(strings_of_seed)
 
-    command = 'centered_clustering -seed_selector {} -k {} -radius {} -seed {} {}'.format(seed_selector, n, radius, string_of_seed, ('--pointcloud_log' if logging else '--nopointcloud_log'))
+    command = 'centered_clustering -n_seed_init {} -seed_selector {} -k {} -radius {} -seed {} {}'.format(n_seed_init, seed_selector, n, radius, string_of_seed, ('--pointcloud_log' if logging else '--nopointcloud_log'))
 
     eprint(command)
     stream = io.StringIO()
@@ -210,6 +233,7 @@ def clustering_algorithm_factory(algo_name):
         'dbscan':  DBSCANClusteringAlgorithm,
         'identity': IdentityClusteringAlgorithm,
         'density': DensityThresholdClusteringAlgorithm,
+        'quantile': OutlierFilterClusteringAlgorithm,
     }
     return algo_dict[algo_name]()
 
@@ -405,4 +429,3 @@ def cli():
     json.dump(clustering_with_distribution, sys.stdout)
 
     cluster_sizes = sorted(list(map(len, clustering['clustering'])), reverse=True)
-    eprint(cluster_sizes)

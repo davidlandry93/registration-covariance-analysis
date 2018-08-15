@@ -109,17 +109,18 @@ def isPD(B):
     except np.linalg.LinAlgError:
         return False
 
-def kullback_leibler(cov1, cov2):
+def kullback_leibler(base, distrib):
     """Returns the kullback leibler divergence on a pair of covariances that have the same mean.
     cov1 and cov2 must be numpy matrices.
     See http://bit.ly/2FAYCgu."""
 
-    corrected_cov1, corrected_cov2 = nearestPD(cov1), nearestPD(cov2)
-    det1, det2 = np.linalg.det(corrected_cov1), np.linalg.det(corrected_cov2)
+    det0, det1 = np.linalg.det(base + np.identity(6)*1e-15), np.linalg.det(distrib + np.identity(6)*1e-15)
+    print(det0)
+    print(det1)
 
-    A = np.trace(np.dot(np.linalg.inv(corrected_cov1), corrected_cov2))
+    A = np.trace(np.dot(np.linalg.inv(distrib), base))
     B = 6.
-    C = float(np.log(det1) - np.log(det2))
+    C = float(np.log(det1) - np.log(det0))
 
     kll = 0.5 * (A - B + C)
 

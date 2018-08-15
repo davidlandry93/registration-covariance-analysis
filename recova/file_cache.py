@@ -117,6 +117,9 @@ class FileCache:
         pkey = self.prefixed_key(key)
         return self._get_or_generate(pkey, generator)
 
+    def get_or_generate_invariant(self, key, generator):
+        return self._get_or_generate(key, generator)
+
     def _get_or_generate(self, key, generator):
         if self._contains(key):
             return self._get(key)
