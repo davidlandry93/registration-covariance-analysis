@@ -7,5 +7,5 @@
 #SBATCH --ntasks-per-node 1
 
 source activate torch
-compute_batches_of_pairs --begin 0 --end 10 --location 00 -n 100 $HOME/project/dlandry/dbs/db_kitti $HOME/project/dataset/sequences/00/
+compute_batches_of_pairs --begin $BEGIN --end $END --location 01 -n 100 $HOME/project/dlandry/dbs/db_kitti $HOME/project/dataset/sequences/01/
 
