@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+#SBATCH --account=def-philg
+#SBATCH --time=00:40:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem-per-cpu=1024M
+#SBATCH --ntasks-per-node 1
+#SBATCH --array=0-10
+
+DEFAULT_ALPHA=1e-6
+DEFAULT_BETA=1e4
+DEFAULT_LR=1e-7
+DEFAULT_W=10
+
+DEFAULT_ALGORITHM=cello
+
+
+source activate torch
+cat $DATASET_FILE | learn_recov -a ${ALPHA:-$DEFAULT_ALPHA} -b ${BETA:-$DEFAULT_BETA} -lr ${LR:-$DEFAULT_LR} \
+                                --filter hauptgebaude -w ${W:-$DEFAULT_W} \
+                                ${ALGORITHM:-$DEFAULT_ALGORITHM} learning_${SLURM_ARRAY_TASK_ID}
+
