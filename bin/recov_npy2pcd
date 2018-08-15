@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+import argparse
+import numpy as np
+import pathlib
+
+import recov.pointcloud_io
+
+def pointcloud_to_npy(points, output_file):
+    np.save(output_file, points)
+
+def pointcloud_to_vtk(points, output_file):
+    output = pathlib.Path(output_file)
+    recov.pointcloud_io.pointcloud_to_vtk(points, output.stem)
+
+
+pointcloud_import_functions = {
+    '.pcd': recov.pointcloud_io.points_of_pcd,
+    '.npy': np.load
+}
+
+pointcloud_export_functions = {
+    '.pcd': recov.pointcloud_io.pointcloud_to_pcd,
+    '.vtu': pointcloud_to_vtk,
+    '.npy': pointcloud_to_npy
+}
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_pointcloud', type=str)
+    parser.add_argument('output_pointcloud', type=str)
+    args = parser.parse_args()
+
+    input_path = pathlib.Path(args.input_pointcloud)
+    output_path = pathlib.Path(args.output_pointcloud)
+
+    import_f = pointcloud_import_functions[input_path.suffix]
+    export_f = pointcloud_export_functions[output_path.suffix]
+
+    points = import_f(args.input_pointcloud)
+    export_f(points, args.output_pointcloud)

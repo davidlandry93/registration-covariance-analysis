@@ -48,11 +48,12 @@ class SamplingCovarianceComputationAlgorithm:
 
 
 class CensiCovarianceComputationAlgorithm:
-    def __init__(self, registration_algorithm = IcpAlgorithm()):
+    def __init__(self, registration_algorithm = IcpAlgorithm(), sensor_noise_std=0.01):
         self.algo = registration_algorithm
+        self.sensor_noise_std = sensor_noise_std
 
     def __repr__(self):
-        return 'censi'
+        return 'censi_{:.4f}'.format(self.sensor_noise_std)
 
 
     def compute(self, registration_pair):
@@ -60,7 +61,7 @@ class CensiCovarianceComputationAlgorithm:
             reading = registration_pair.points_of_reading()
             reference = registration_pair.points_of_reference()
 
-            covariance = censi_estimate_from_points(reading, reference, registration_pair.ground_truth(), self.algo)
+            covariance = censi_estimate_from_points(reading, reference, registration_pair.ground_truth(), self.algo, sensor_noise_std=self.sensor_noise_std)
             return covariance
 
         return registration_pair.cache.get_or_generate(repr(self), generate_covariance)

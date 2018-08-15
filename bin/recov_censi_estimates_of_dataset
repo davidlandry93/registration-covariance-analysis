@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+import argparse
+import json
+import numpy as np
+
+
+from recov.censi import registration_and_censi_estimate_from_points
+from recov.registration_algorithm import IcpAlgorithm
+from recova.covariance import CensiCovarianceComputationAlgorithm
+from recova.registration_result_database import RegistrationPairDatabase
+from recova.util import parallel_starmap_progressbar
+
+def compute_one_censi(pair, covariance_algo):
+    covariance = covariance_algo.compute(pair)
+
+    return covariance
+
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database', type=str)
+    parser.add_argument('learning_set', type=str)
+    parser.add_argument('learning_run', type=str)
+    parser.add_argument('output', type=str)
+    parser.add_argument('-j', default=8, type=int)
+    args = parser.parse_args()
+
+    database = RegistrationPairDatabase(args.database)
+
+    with open(args.learning_set) as f:
+        learning_set = json.load(f)
+
+    with open(args.learning_run) as f:
+        learning_run = json.load(f)
+
+    validation_set = np.array(learning_run['validation_set'])
+
+    icp_algo = IcpAlgorithm()
+    icp_algo.estimate_dist_type = 'normal'
+    icp_algo.initial_estimate_covariance = 0.01
+    icp_algo.initial_estimate_covariance_rot = 0.01
+
+    covariance_algo = CensiCovarianceComputationAlgorithm(icp_algo)
+
+    pairs = []
+    for i in validation_set:
+        pair_info = learning_set['data']['pairs'][i]
+        pairs.append(database.get_registration_pair(pair_info['dataset'], pair_info['reading'], pair_info['reference']))
+
+    result = parallel_starmap_progressbar(compute_one_censi, [(x, covariance_algo) for x in pairs], n_cores=args.j)
+
+    output_dict = {
+        'what': 'censi_estimates',
+        'metadata': {
+            'algo_config': icp_algo.config_dict(),
+        },
+        'data': {
+            'pairs': [{'location': x.dataset, 'reading': x.reading, 'reference': x.reference} for x in pairs],
+            'censi_estimates': [x.tolist() for x in result],
+        }
+    }
+
+    with open(args.output, 'w') as f:
+        json.dump(output_dict, f)
+
+
+if __name__ == '__main__':
+    cli()

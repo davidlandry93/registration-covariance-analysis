@@ -18,7 +18,8 @@ setup(
     scripts = [
         'bin/all_registration_to_vtk_ellipsoid',
         'bin/meta_of_json',
-        'bin/recov_npy2pcd'
+        'bin/recov_npy2pcd',
+        'bin/recov_censi_estimates_of_dataset',
     ],
     entry_points = {
         'console_scripts': [

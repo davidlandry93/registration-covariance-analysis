@@ -115,8 +115,6 @@ def kullback_leibler(base, distrib):
     See http://bit.ly/2FAYCgu."""
 
     det0, det1 = np.linalg.det(base + np.identity(6)*1e-15), np.linalg.det(distrib + np.identity(6)*1e-15)
-    print(det0)
-    print(det1)
 
     A = np.trace(np.dot(np.linalg.inv(distrib), base))
     B = 6.
@@ -243,7 +241,7 @@ def unpacker(function, tup):
 def parallel_starmap_progressbar(worker, data, n_cores=8):
     with multiprocessing.Pool(n_cores) as pool:
         results = []
-        for x in tqdm.tqdm(pool.imap_unordered(functools.partial(unpacker, worker), data), total=len(data), file=sys.stdout, smoothing=0.8):
+        for x in tqdm.tqdm(pool.imap_unordered(functools.partial(unpacker, worker), data), total=len(data), file=sys.stdout, smoothing=0.8, ncols=80):
             results.append(x)
 
     return results
