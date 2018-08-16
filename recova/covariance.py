@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 
 
-from lieroy.parallel import se3_log
+from lieroy.parallel import se3_log, se3_gaussian_distribution_of_sample
 from recov.registration_algorithm import IcpAlgorithm
 from recov.censi import censi_estimate_from_points
 from recova.clustering import compute_distribution, IdentityClusteringAlgorithm
@@ -24,25 +24,16 @@ class SamplingCovarianceComputationAlgorithm:
 
     def compute(self, registration_pair):
         def generate_covariance():
-            results = registration_pair.lie_matrix_of_results()
-            clustering = self.clustering_of_pair(registration_pair)
-            distribution = compute_distribution(results, clustering, registration_pair.transform())
+            clustering = self.clustering_algorithm.compute(registration_pair)
 
-            if clustering['outlier_ratio'] >= 1.0:
-                raise RuntimeError('Empty clustering when running SamplingCovarianceComputationAlgorithm')
+            group_results = registration_pair.registration_results()[clustering]
+            mean, covariance = se3_gaussian_distribution_of_sample(group_results)
 
-            return np.array(distribution['covariance_of_central'])
+            print('Distance from gt: {}'.format(np.linalg.norm(se3_log(np.linalg.inv(registration_pair.ground_truth()) @ mean))))
+
+            return covariance
 
         return registration_pair.cache.get_or_generate(repr(self) + '_covariance', generate_covariance)
-
-
-
-    def clustering_of_pair(self, registration_pair):
-        def generate_clustering():
-            results = registration_pair.lie_matrix_of_results()
-            return self.clustering_algorithm.cluster(results, seed=se3_log(registration_pair.ground_truth()))
-
-        return registration_pair.cache.get_or_generate(repr(self), generate_clustering)
 
 
 

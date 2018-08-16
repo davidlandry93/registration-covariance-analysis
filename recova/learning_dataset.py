@@ -16,7 +16,7 @@ from lieroy import se3
 
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
-from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm, OutlierFilterClusteringAlgorithm
+from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm, OutlierFilterClusteringAlgorithm, RegistrationPairClusteringAdapter
 from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm
 from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
@@ -57,6 +57,35 @@ def generate_one_example(registration_pair, descriptor, covariance_algo,descript
     return (descriptor, np.array(covariance))
 
 
+def distance_mean_ground_truth(pair, clustering_algo):
+    lie_results = pair.lie_matrix_of_results()
+    ground_truth = pair.ground_truth()
+    cluster = clustering_algo.compute(pair)
+
+    group_results = np.empty((len(cluster), 4, 4))
+    for i in range(len(cluster)):
+        group_results[i] = se3.exp(lie_results[cluster[i]])
+
+    mean, covariance = se3.gaussian_from_sample(group_results)
+
+    delta = np.linalg.inv(ground_truth) @ mean
+
+    return np.linalg.norm(se3.log(delta))
+
+def filter_failing_registrations(registration_pairs, clustering, filter_threshold=0.3):
+    distances = parallel_starmap_progressbar(distance_mean_ground_truth, [(x, clustering) for x in registration_pairs])
+
+    filtered_registration_pairs = []
+    for i in range(len(distances)):
+        if distances[i] < filter_threshold:
+            filtered_registration_pairs.append(registration_pairs[i])
+        else:
+            print('Rejecting {} because it has a distance of {}'.format(registration_pairs[i], distances[i]))
+
+    return filtered_registration_pairs
+
+
+
 def generate_examples_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str, help='Where to store the examples', default='dataset.json')
@@ -66,6 +95,7 @@ def generate_examples_cli():
     parser.add_argument('-c', '--config', type=str, help='Path to a json config for the descriptor.')
     parser.add_argument('--descriptor-only', action='store_true', help='Generate only the descriptor.')
     parser.add_argument('--rotations', '-r', nargs='+', type=float, default=[0.0])
+    parser.add_argument('--max-mean-gt-distance', type=float, default=0.3)
     args = parser.parse_args()
 
     np.set_printoptions(linewidth=120)
@@ -75,12 +105,15 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
-    clustering = CenteredClusteringAlgorithm(0.005, k=20, n_seed_init=20)
-    clustering.seed_selector = 'localized'
+    clustering_algo = CenteredClusteringAlgorithm(0.005, k=20, n_seed_init=20)
+    clustering_algo.seed_selector = 'localized'
     # clustering.rescale = True
 
+    clustering = RegistrationPairClusteringAdapter(clustering_algo)
+    registration_pairs = filter_failing_registrations(registration_pairs, clustering, filter_threshold=args.max_mean_gt_distance)
+
     # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
-    clustering = OutlierFilterClusteringAlgorithm()
+    # clustering = OutlierFilterClusteringAlgorithm()
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     with open(args.config) as f:
@@ -98,9 +131,9 @@ def generate_examples_cli():
         pairs.extend([{'dataset': x.dataset, 'reading': x.reading, 'reference': x.reference, 'rotation': r} for r in args.rotations])
 
 
-    results = parallel_starmap_progressbar(generate_one_example, examples, n_cores=args.n_cores)
+    # results = parallel_starmap_progressbar(generate_one_example, examples, n_cores=args.n_cores)
 
-    # results = [generate_one_example(*x) for x in examples]
+    results = [generate_one_example(*x) for x in examples]
 
 
     xs = []

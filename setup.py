@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'center_registrations = recova.registration_dataset:center_around_gt_cli',
             'clustering = recova.clustering:cli',
+            'clustering_of_pair = recova.clustering_on_pair:cli',
             'clustering_batch = recova.clustering_batch:cli',
             'clustering2vtk = recova.clustering:clustering_to_vtk_cli',
             'clusterings2distributions = recova.clustering:compute_distributions_cli',

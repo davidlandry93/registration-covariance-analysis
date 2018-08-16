@@ -41,7 +41,7 @@ set_property(TARGET recova PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 add_executable(centered_clustering src/centered_clustering_main.cpp src/centered_clustering.cpp src/greedy_seed_selection_algorithm.cpp src/localized_seed_selection_algorithm.cpp)
 target_include_directories(centered_clustering PRIVATE include)
-target_link_libraries(centered_clustering recova nabo_adapter gflags lieroy::lieroy)
+target_link_libraries(centered_clustering recova nabo_adapter gflags glog::glog lieroy::lieroy)
 
 add_executable(grid_pointcloud_separator src/grid_pointcloud_separator_main.cpp)
 target_link_libraries(grid_pointcloud_separator recova gflags)

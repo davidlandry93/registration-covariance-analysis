@@ -18,7 +18,6 @@ from recova.distribution_to_vtk_ellipsoid import distribution_to_vtk_ellipsoid
 from recova.registration_dataset import positions_of_registration_data, registrations_of_dataset, lie_vectors_of_registrations, data_dict_of_registration_data
 from recova.find_center_cluster import find_central_cluster
 from recova.util import eprint, rescale_hypersphere, englobing_radius
-
 from lieroy.parallel import FunctionWrapper, se3_gaussian_distribution_of_sample
 
 se3log = FunctionWrapper('log', 'lieroy.se3')
@@ -88,7 +87,7 @@ class DensityThresholdClusteringAlgorithm:
         return clustering_row
 
 class CenteredClusteringAlgorithm(ClusteringAlgorithm):
-    def __init__(self, radius=0.2, k=12, n_seed_init=100):
+    def __init__(self, radius=0.2, k=12, n_seed_init=10):
         self.radius = radius
         self.k = k
         self.n_seed_init = n_seed_init
@@ -97,7 +96,7 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
         self.logging = False
 
     def __repr__(self):
-        return 'centered_{:.5f}_{}_{}'.format(self.radius, self.k, self.rescale)
+        return 'centered_{}_{:.5f}_{}_{}'.format(self.seed_selector, self.radius, self.k, self.rescale)
 
     def cluster(self, dataset, seed=np.array([0., 0., 0., 0., 0., 0.])):
         if self.rescale:
@@ -171,6 +170,27 @@ class IdentityClusteringAlgorithm(ClusteringAlgorithm):
             'outlier_ratio': 0.0,
         }
 
+class RegistrationPairClusteringAdapter:
+    """
+    Wrap a ClusteringAlgorithm so that it can accept registration pairs as argument.
+    This has the benefit that the clustering results can be cached in the registration pair.
+    """
+    def __init__(self, clustering_algorithm):
+        self.algo = clustering_algorithm
+
+    def __repr__(self):
+        return repr(self.algo)
+
+    def compute(self, registration_pair):
+        return registration_pair.cache.get_or_generate_invariant(repr(self), lambda: self._compute(registration_pair))
+
+    def _compute(self, registration_pair):
+        lie_results = registration_pair.lie_matrix_of_results()
+        response = self.algo.cluster(lie_results, seed=se3log(registration_pair.ground_truth()))
+
+        cluster = np.array(response['clustering'][0])
+        return cluster
+
 
 
 
@@ -210,6 +230,11 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
 
     eprint(command)
     stream = io.StringIO()
+
+    #DEBUG
+    with open('clustering_input.json', 'w') as f:
+        json.dump(dataset.tolist(), f)
+
     json.dump(dataset.tolist(), stream)
     response = subprocess.run(command,
                               input=json.dumps(dataset.tolist()),
@@ -300,6 +325,9 @@ def batch_to_vtk(dataset, clustering_batch, output, center_around_gt=False):
 
 def distribution_of_cluster(lie_results, cluster):
     registrations = lie_results[cluster]
+
+    if len(cluster) < 10:
+        raise RuntimeError('Not enough results in cluster to compute a distirbution.')
 
     se3_group = np.empty((len(registrations), 4, 4))
 
@@ -397,6 +425,8 @@ def batch_to_vtk_cli():
         dataset = json.load(dataset_file)
 
     batch_to_vtk(dataset, clusterings, args.output, args.center_around_gt)
+
+
 
 
 def cli():

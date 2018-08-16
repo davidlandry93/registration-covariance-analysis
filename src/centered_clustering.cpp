@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include <Eigen/Core>
+#include <glog/logging.h>
 
 #include "centered_clustering.h"
 #include "localized_seed_selection_algorithm.h"
@@ -107,10 +108,13 @@ std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
                                       const int& k,
                                       const double& radius,
                                       const bool log) {
+    VLOG(100) << "Running centered clustering...";
     NaboAdapter knn_algorithm;
     knn_algorithm.set_dataset(dataset);
 
+    VLOG(100) << "Selecting seed...";
     int seed_index = seed_selector->select(dataset);
+    VLOG(100) << "Done selecting seed...";
 
     if(log) {
         std::ofstream output_stream;
@@ -124,6 +128,7 @@ std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
         output_stream.close();
     }
 
+    VLOG(100) << "Returning from centered clustering.";
     return cluster_with_seed(knn_algorithm, dataset->col(seed_index), k, radius);
 }
 }

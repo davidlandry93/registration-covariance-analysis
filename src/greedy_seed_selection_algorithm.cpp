@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <glog/logging.h>
 
 #include "greedy_seed_selection_algorithm.h"
 #include "lieroy/algebra_se3.hpp"
@@ -13,6 +14,8 @@ namespace recova {
 GreedySeedSelectionAlgorithm::GreedySeedSelectionAlgorithm(NaboAdapter& knn_algorithm, const AlgebraSE3<double>& seed, const int& k) : knn_algorithm(knn_algorithm), seed(seed),  k(k) {}
 
 int GreedySeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& dataset) {
+    VLOG(100) << "Selecting seed with GreedySeedSelectionAlgorithm...";
+
     Eigen::MatrixXi indices(k, dataset->rows());
     Eigen::MatrixXd distances(k, dataset->rows());
 
@@ -20,12 +23,10 @@ int GreedySeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& datas
     std::tie(indices, distances) = knn_algorithm.query(*dataset, k);
     std::vector<float> densities(dataset->cols());
 
-    std::cerr << distances.col(0) << std::endl;
-
-    std::cerr << "KNN query distances has " << distances.rows() << " rows and " << distances.cols() << " columns." << '\n';
+    VLOG(90) << "KNN query distances has " << distances.rows() << " rows and " << distances.cols() << " columns." << '\n';
 
     for(auto i = 0; i < dataset->cols(); i++) {
-        float density = distances(i, k-1);
+        float density = distances(k-1, i);
         densities[i] = density;
     }
 
@@ -53,11 +54,12 @@ int GreedySeedSelectionAlgorithm::select(std::shared_ptr<Eigen::MatrixXd>& datas
 
     // }
 
-    auto to_return = std::min_element(densities.begin(), densities.end()) - densities.begin();
-    std::cerr << "Returning index: " << to_return << " with value " << densities[to_return] << '\n';
-    std::cerr << "Value of returned index: " << '\n';
-    std::cerr << dataset->col(to_return) << '\n';
-    std::cerr << knn_algorithm.get_id_from_dataset(to_return) << '\n';
+    int to_return = std::min_element(densities.begin(), densities.end()) - densities.begin();
+    VLOG(90) << "Returning index: " << to_return << " with value " << densities[to_return];
+    VLOG(90) << "Value of returned index: " << densities[to_return];
+
+
+    VLOG(100) << "Done selecting seed with GreedySeedSelectionAlgorithm...";
     return to_return;
 }
 

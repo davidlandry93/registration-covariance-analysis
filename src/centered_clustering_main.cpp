@@ -4,6 +4,7 @@
 #include <string>
 
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include "json.hpp"
 
 #include "centered_clustering.h"
@@ -53,6 +54,7 @@ DEFINE_string(seed_selector, "localized", "The seed selection strategy.");
 DEFINE_bool(pointcloud_log, false, "Export pointcloud logging");
 
 int main(int argc, char** argv) {
+    google::InitGoogleLogging(argv[0]);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   json json_dataset;
@@ -61,7 +63,7 @@ int main(int argc, char** argv) {
   std::shared_ptr<Eigen::MatrixXd> eigen_dataset(new Eigen::MatrixXd);
   *eigen_dataset = json_array_to_matrix(json_dataset).transpose();
 
-  std::cerr << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
+  VLOG(10) << "Matrix has " << eigen_dataset->rows() << " rows and " << eigen_dataset->cols() << " columns." << '\n';
 
   PointcloudLoggerLocator locator;
   std::unique_ptr<PointcloudLogger> logger;
@@ -86,6 +88,7 @@ int main(int argc, char** argv) {
   }
 
   auto center = parse_seed(FLAGS_seed);
+
 
 
   std::unique_ptr<SeedSelectionAlgorithm> seed_selector;

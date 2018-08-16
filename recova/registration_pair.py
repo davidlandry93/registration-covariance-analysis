@@ -10,7 +10,7 @@ from recov.registration_algorithm import IcpAlgorithm
 from recova.file_cache import FileCache
 from recova.merge_json_result import merge_result_files
 from recova.registration_dataset import positions_of_registration_data
-from recova.util import eprint, run_subprocess, rotation_around_z_matrix, transform_points
+from recova.util import eprint, run_subprocess, rotation_around_z_matrix, transform_points, dataset_to_registrations
 
 class RegistrationPair:
     def __init__(self, database_root, dataset, reading, reference, database, rotation_around_z = 0.0):
@@ -117,6 +117,22 @@ class RegistrationPair:
             return lie_matrix
 
         return self.cache.get_or_generate('lie_matrix_results', generate_lie_matrix)
+
+    def registration_results(self):
+        def generate_registration_results():
+            T = rotation_around_z_matrix(self.rotation_around_z)
+            reg_dict = self.registration_dict()
+
+            registration_results = dataset_to_registrations(reg_dict)
+
+            registration_results = np.empty((len(reg_dict['data']), 4, 4))
+            for i, registration in enumerate(reg_dict['data']):
+                m = np.array(registration['result'])
+                registration_results[i] = T @ (m @ np.linalg.inv(T))
+
+            return registration_results
+
+        return self.cache.get_or_generate('group_registration_results', generate_registration_results)
 
     @property
     def registration_file(self):

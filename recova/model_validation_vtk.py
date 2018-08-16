@@ -181,18 +181,20 @@ def covariances_cli():
     print('Loading dataset...')
     with open(args.learning_set) as f:
         dataset = json.load(f)
+
     print('Done')
 
     ys_validation = np.array(dataset['data']['ys'])
 
     for i in range(len(ys_validation)):
         pair = dataset['data']['pairs'][i]
+        print('{}: {}'.format(i, pair))
         covariance = ys_validation[i]
 
-        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_{}_{}_{}_tra'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
-        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_tra_{}'.format(pair['dataset'], i))
-        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_{}_{}_{}_rot'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
-        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_rot_{}'.format(pair['dataset'], i))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_{:03d}_{:03d}_{}_tra'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[0:3,0:3], args.output + '/' + '{}_tra_{:03d}'.format(pair['dataset'], i))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_{:03d}_{:03d}_{}_rot'.format(pair['dataset'], pair['reading'], pair['reference'], pair['rotation']))
+        distribution_to_vtk_ellipsoid(np.zeros(3), covariance[3:6,3:6], args.output + '/' + '{}_rot_{:03d}'.format(pair['dataset'], i))
 
 
 
