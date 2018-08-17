@@ -9,31 +9,58 @@ from recov.censi import censi_estimate_from_points
 from recova.clustering import compute_distribution, IdentityClusteringAlgorithm
 
 
+class DistributionComputationAlgorithm:
+    """
+    Compute the mean and covariance the registration results of a pair.
+    """
+    def compute(self, registration_pair):
+        raise NotImplementedError('DistributionComputationAlgorithm must implement compute method.')
+
+    def __repr__(self):
+        raise NotImplementedError('DistributionComputationAlgorithm must implement __repr__ method')
+
+
+class SamplingDistributionComputationAlgorithm(DistributionComputationAlgorithm):
+    def __init__(self, clustering_algorithm=IdentityClusteringAlgorithm()):
+        self.clustering_algo = clustering_algorithm
+
+    def __repr__(self):
+        return 'sampling_distribution_{}'.format(repr(self.clustering_algo))
+
+    def compute(self, registration_pair):
+        def compute_distribution():
+            clustering = self.clustering_algo.compute(registration_pair)
+
+            group_results = registration_pair.registration_results()[clustering]
+            mean, covariance = se3_gaussian_distribution_of_sample(group_results)
+
+            # Here we return a json instead of numpy arrays to make sure the result can be cached properly.
+            # As of 2018-08-17 file_cache.py does not handle embedded numpy arrays because they are not json serializable.
+            return {
+                'mean': mean.tolist(),
+                'covariance': covariance.tolist()
+            }
+
+        return registration_pair.cache.get_or_generate(repr(self), compute_distribution)
+
+
 class CovarianceComputationAlgorithm:
     def compute(self, registration_pair):
         raise NotImplementedError('CovarianceComputationAlgorithms must implement compute method.')
 
 
+
+
 class SamplingCovarianceComputationAlgorithm:
     def __init__(self, clustering_algorithm=IdentityClusteringAlgorithm()):
-        self.clustering_algorithm = clustering_algorithm
+        self.distribution_algo = SamplingDistributionComputationAlgorithm(clustering_algorithm)
 
     def __repr__(self):
-        return 'sampling_covariance_{}'.format(str(self.clustering_algorithm))
-
+        return 'sampling_covariance_{}'.format(repr(self.distribution_algo))
 
     def compute(self, registration_pair):
-        def generate_covariance():
-            clustering = self.clustering_algorithm.compute(registration_pair)
-
-            group_results = registration_pair.registration_results()[clustering]
-            mean, covariance = se3_gaussian_distribution_of_sample(group_results)
-
-            print('Distance from gt: {}'.format(np.linalg.norm(se3_log(np.linalg.inv(registration_pair.ground_truth()) @ mean))))
-
-            return covariance
-
-        return registration_pair.cache.get_or_generate(repr(self) + '_covariance', generate_covariance)
+        distribution = self.distribution_algo.compute(registration_pair)
+        return np.array(distribution['covariance'])
 
 
 
