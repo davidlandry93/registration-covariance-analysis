@@ -185,18 +185,8 @@ class OverlapMaskGenerator(MaskGenerator):
 
 
     def compute(self, pair):
-        reading_mask_label = '{}_reading'.format(repr(self))
-        reference_mask_label = '{}_reference'.format(repr(self))
-
-        if reading_mask_label in pair.cache and reference_mask_label in pair.cache:
-            return MaskPair(pair.cache[reading_mask_label], pair.cache[reference_mask_label])
-        else:
-            reading_array, reference_array = pair.overlapping_region(self.radius)
-
-            pair.cache[reading_mask_label] = np.expand_dims(reading_array, axis=0)
-            pair.cache[reference_mask_label] = np.expand_dims(reference_array, axis=0)
-
-            return MaskPair([reading_array], [reference_array])
+        reading_mask, reference_mask = pair.overlapping_region(self.radius)
+        return MaskPair([reading_mask], [reference_mask])
 
 
 class CylinderGridMask(MaskGenerator):
