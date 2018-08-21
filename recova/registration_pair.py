@@ -145,7 +145,8 @@ class RegistrationPair:
 
     def registration_dict(self):
         if not self.registration_file.exists():
-            self.merge_raw_results()
+            raise RuntimeError('No registration results available for {}'.format(repr(self)))
+
 
         with self.registration_file.open() as f:
             registration_dict = json.load(f)

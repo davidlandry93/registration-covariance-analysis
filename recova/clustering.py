@@ -186,6 +186,10 @@ class RegistrationPairClusteringAdapter:
 
     def _compute(self, registration_pair):
         lie_results = registration_pair.lie_matrix_of_results()
+
+        if lie_results.shape[0] < 6:
+            raise RuntimeError('Not enough results in lie_matrix')
+
         response = self.algo.cluster(lie_results, seed=se3log(registration_pair.ground_truth()))
 
         cluster = np.array(response['clustering'][0])

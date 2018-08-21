@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import numpy as np
 import pathlib
+import random
 import re
 import sys
 import time
@@ -58,6 +59,7 @@ def generate_one_example(registration_pair, descriptor, covariance_algo,descript
 
 
 def distance_mean_ground_truth(pair, distribution_algo):
+    eprint(pair)
     ground_truth = pair.ground_truth()
     distribution = distribution_algo.compute(pair)
     mean = np.array(distribution['mean'])
@@ -75,10 +77,10 @@ def compute_mean_result(pair, distribution_algo):
     return np.array(distribution['mean'])
 
 
-def filter_failing_registrations(registration_pairs, clustering, filter_threshold=0.3):
+def filter_failing_registrations(registration_pairs, clustering, filter_threshold=0.3, n_cores=8):
     distribution_algo = SamplingDistributionComputationAlgorithm(clustering)
 
-    distances = parallel_starmap_progressbar(distance_mean_ground_truth, [(x, distribution_algo) for x in registration_pairs])
+    distances = parallel_starmap_progressbar(distance_mean_ground_truth, [(x, distribution_algo) for x in registration_pairs], n_cores=n_cores)
 
     filtered_registration_pairs = []
     for i in range(len(distances)):
@@ -110,12 +112,12 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
-    clustering_algo = CenteredClusteringAlgorithm(0.005, k=20, n_seed_init=20)
+    clustering_algo = CenteredClusteringAlgorithm(0.01, k=20, n_seed_init=20)
     clustering_algo.seed_selector = 'localized'
     # clustering.rescale = True
 
     clustering = RegistrationPairClusteringAdapter(clustering_algo)
-    registration_pairs = filter_failing_registrations(registration_pairs, clustering, filter_threshold=args.max_mean_gt_distance)
+    registration_pairs = filter_failing_registrations(registration_pairs, clustering, filter_threshold=args.max_mean_gt_distance, n_cores=args.n_cores)
 
     # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
     # clustering = OutlierFilterClusteringAlgorithm()
@@ -135,6 +137,9 @@ def generate_examples_cli():
         examples.extend([(x, descriptor, covariance_algo, args.descriptor_only, r) for r in args.rotations])
         pairs.extend([{'dataset': x.dataset, 'reading': x.reading, 'reference': x.reference, 'rotation': r} for r in args.rotations])
 
+    
+
+    random.shuffle(examples)
 
     results = parallel_starmap_progressbar(generate_one_example, examples, n_cores=args.n_cores)
 
