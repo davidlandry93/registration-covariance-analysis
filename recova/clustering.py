@@ -458,7 +458,7 @@ def cli():
     algo.logging = True
     clustering = algo.cluster(data, seed=se3log(ground_truth))
 
-    clustering_with_distribution = compute_distribution(json_dataset, clustering)
+    clustering_with_distribution = compute_distribution(data, clustering, ground_truth)
 
     json.dump(clustering_with_distribution, sys.stdout)
 

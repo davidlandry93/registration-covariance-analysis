@@ -1,23 +1,27 @@
-
-
-
 #!/usr/bin/env python3
 
 import argparse
 import json
+import matplotlib.patches
 import matplotlib.pyplot as plt
-import multiprocessing
 import numpy as np
-import seaborn as sb
+import pathlib
+import random
+import seaborn as sns
 import sys
 import torch
-from torch.autograd import Variable
 
+import recov.datasets
+import recova.clustering
+from recova.descriptor.factory import descriptor_factory
 from recova.learning.learning import model_from_file
 from recova.registration_dataset import registrations_of_dataset
-from recova.util import eprint
+from recova.registration_result_database import RegistrationPairDatabase
+from recova.util import eprint, parallel_starmap_progressbar
 
+from lieroy import se3
 from lieroy.parallel import se3_gaussian_distribution_of_sample
+
 
 def covariance_of_central_cluster(dataset, clustering):
     """
@@ -209,9 +213,11 @@ def plot_activation_matrix(args):
     xs = torch.Tensor(np.array(dataset['data']['xs']))
     ys = torch.Tensor(np.array(dataset['data']['ys']))
 
-    learning_indices = np.array(learning_run['train_set'])
+    learning_indices = np.array(sorted(learning_run['train_set']))
     validation_indices = np.array(sorted(learning_run['validation_set']))
     sort_of_learning_examples = np.argsort(learning_indices)
+
+    print(learning_indices)
 
     # Generate the activation data
     activation_matrix = np.zeros((len(learning_indices), len(validation_indices)))
@@ -222,7 +228,7 @@ def plot_activation_matrix(args):
 
 
     fig, ax = plt.subplots()
-    sb.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5})
+    sns.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5})
 
 
     # Compute the data to configure the x axis labels
@@ -251,10 +257,120 @@ def plot_activation_matrix(args):
     plt.show()
 
 
+
+
+def plot_trajectory_evaluation(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database', type=str, help='Path to registration database')
+    parser.add_argument('location', type=str, help='Name of the location to work on.')
+    parser.add_argument('dataset', type=str, help='Path to point cloud dataset.')
+    parser.add_argument('learning_dataset', type=str)
+    parser.add_argument('model', type=str, help='Path to covariance prediction model.')
+    args = parser.parse_args(args)
+
+    with open(args.learning_dataset) as f:
+        learning_dataset = json.load(f)
+        descriptor_algo = descriptor_factory(learning_dataset['metadata']['descriptor_config'])
+
+    dataset = recov.datasets.KittiDataset(pathlib.Path(args.dataset))
+    print(dataset.times)
+    database = RegistrationPairDatabase(args.database)
+
+    pairs = database.registration_pairs()
+    pairs = list(filter(lambda x: x.dataset == args.location, pairs))
+
+    model = model_from_file(args.model, 'cello')
+    predictions = predict_covariances(pairs, descriptor_algo, model)
+    cum_covariances = np.cumsum(predictions, axis=0)
+
+    gt_trajectory = np.empty((len(pairs) + 1, 4, 4))
+    gt_trajectory[0] = np.identity(4)
+
+    for i in range(1, dataset.n_clouds()):
+        gt_trajectory[i] = gt_trajectory[i - 1] @ dataset.ground_truth(i, i-1)
+
+    
+    clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.1, k=20, n_seed_init=20)
+    clustering_algo = recova.clustering.RegistrationPairClusteringAdapter(clustering_algo)
+    sampled_trajectory = make_sampled_trajectory(database, args.location, len(gt_trajectory), clustering_algo)
+
+    fig, ax = plt.subplots()
+    plot_trajectory_translation(gt_trajectory, ax, palette='Blues')
+    plot_trajectory_translation(sampled_trajectory, ax, palette='Oranges')
+    # plot_trajectory_rotation(dataset.times, gt_trajectory, ax)
+    for i in range(0, len(pairs), 10):
+        plot_covariance(gt_trajectory[i], cum_covariances[i], ax)
+
+    plt.show()
+
+
+def make_sampled_trajectory(database, location, trajectory_length, clustering_algo):
+    trajectory = np.empty((trajectory_length, 4, 4))
+    trajectory[0] = np.identity(4)
+
+    for i in range(1, trajectory_length):
+        pair = database.get_registration_pair(location, i, i-1)
+        results = pair.registration_results()
+        clustering = clustering_algo.compute(pair)
+
+        print(clustering)
+
+        t = random.choice(results)
+
+        trajectory[i] = trajectory[i-1] @ t
+
+    return trajectory
+
+
+
+def predict_covariance(pair, descriptor_algo):
+    return descriptor_algo.compute(pair)
+
+def predict_covariances(pairs, descriptor_algo, model):
+    descriptors = parallel_starmap_progressbar(predict_covariance, [(pair, descriptor_algo) for pair in pairs])
+
+    descriptors_np = np.empty((len(pairs), len(descriptor_algo.labels())))
+    for i, descriptor in enumerate(descriptors):
+        descriptors_np[i] = descriptor
+
+    predictions = model.predict(descriptors_np)
+
+    return predictions
+
+
+def plot_covariance(mean, covariance, ax):
+    eigvals, eigvecs = np.linalg.eig(covariance[0:2,0:2])
+    angle = np.arctan2(eigvecs[0,0], eigvecs[0,1]) * 360 / (2 * np.pi)
+    width, height = 3 * np.sqrt(eigvals)
+
+    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=angle * 360 / (2 * np.pi), fill=False)
+    ax.add_artist(ellipse)
+
+
+def plot_trajectory_translation(trajectory, ax, palette='Blues'):
+    xs, ys = trajectory[:, 0, 3], trajectory[:, 1, 3]
+
+    sns.scatterplot(xs, ys, list(range(len(trajectory))), palette=palette)
+    # ax.plot(trajectory[:,0,3], trajectory[:,1,3])
+    ax.axis('equal')
+
+
+def plot_trajectory_rotation(times, trajectory, ax):
+    heading = np.empty(len(trajectory))
+    for i, t in enumerate(trajectory):
+        lie_vec = se3.log(t)
+        heading[i] = lie_vec[5]
+
+    ax.plot(times, -heading)
+
+    ax.plot()
+
+
 functions_of_plots = {
     'cov_on_density': plot_cov_against_density,
     'loss_on_time': plot_loss_on_time,
     'activation_matrix': plot_activation_matrix,
+    'trajectory_evaluation': plot_trajectory_evaluation,
 }
 
 
