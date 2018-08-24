@@ -293,15 +293,21 @@ def plot_trajectory_evaluation(args):
 
     clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.1, k=20, n_seed_init=20)
     clustering_algo = recova.clustering.RegistrationPairClusteringAdapter(clustering_algo)
-    sampled_trajectory = make_sampled_trajectory(database, args.location, len(gt_trajectory), clustering_algo)
 
     fig, ax = plt.subplots()
-    plot_trajectory_translation(gt_trajectory, ax, palette='Blues')
-    plot_trajectory_translation(sampled_trajectory, ax, palette='Oranges')
+
+    for i in range(20):
+        sampled_trajectory = make_sampled_trajectory(database, args.location, len(gt_trajectory), clustering_algo)
+        plot_trajectory_translation(sampled_trajectory, ax, palette='magma', opacity=0.2, size=0.5)
+
+    plot_trajectory_translation(gt_trajectory, ax, palette='magma')
+    # plot_trajectory_translation(sampled_trajectory[0::10], ax, palette='Oranges')
     # plot_trajectory_rotation(dataset.times, gt_trajectory, ax)
-    for i in range(0, len(pairs), 3):
-        plot_covariance(gt_trajectory[i], cum_covariances[i], ax)
-        plot_covariance(gt_trajectory[i], predictions[i], ax, color='blue')
+    # for i in range(0, len(pairs), 10):
+    #     plot_covariance(gt_trajectory[i], cum_covariances[i], ax)
+    #     plot_covariance(gt_trajectory[i], predictions[i], ax, color='blue')
+
+    print(cum_covariances[-1])
 
     plt.show()
 
@@ -341,6 +347,7 @@ def make_sampled_trajectory(database, location, trajectory_length, clustering_al
     return trajectory
 
 
+
 def compute_clustering(pair, clustering_algo):
     return clustering_algo.compute(pair)
 
@@ -362,17 +369,20 @@ def predict_covariances(pairs, descriptor_algo, model):
 
 def plot_covariance(mean, covariance, ax, color='black'):
     eigvals, eigvecs = np.linalg.eig(covariance[0:2,0:2])
-    angle = np.arctan2(eigvecs[1,0], eigvecs[0,0]) * 360 / (2 * np.pi)
-    width, height = 3 * np.sqrt(eigvals)
+    sort_indices = np.argsort(eigvals)[::-1]
+    eigvals, eigvecs = eigvals[sort_indices], eigvecs[:, sort_indices]
+
+    angle = np.arctan2(eigvecs[0,0], eigvecs[1,0])
+    width, height = 2 * np.sqrt(5.991 * eigvals) # 95% confidence interval, see http://www.visiondummy.com/2014/04/draw-error-ellipse-representing-covariance-matrix/
 
     ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=angle * 360 / (2 * np.pi), fill=False, color=color)
     ax.add_artist(ellipse)
 
 
-def plot_trajectory_translation(trajectory, ax, palette='Blues'):
+def plot_trajectory_translation(trajectory, ax, palette='viridis', opacity=1.0, size=0.9):
     xs, ys = trajectory[:, 0, 3], trajectory[:, 1, 3]
 
-    sns.scatterplot(xs, ys, list(range(len(trajectory))), palette=palette, edgecolors=None)
+    ax.scatter(xs, ys, c=np.linspace(0,1.0,len(trajectory)), s=size, cmap=palette, edgecolors=None, alpha=opacity)
     # ax.plot(trajectory[:,0,3], trajectory[:,1,3])
     ax.axis('equal')
 
