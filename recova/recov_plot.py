@@ -268,6 +268,8 @@ def plot_trajectory_evaluation(args):
     parser.add_argument('model', type=str, help='Path to covariance prediction model.')
     args = parser.parse_args(args)
 
+    np.set_printoptions(precision=3)
+
     with open(args.learning_dataset) as f:
         learning_dataset = json.load(f)
         descriptor_algo = descriptor_factory(learning_dataset['metadata']['descriptor_config'])
@@ -281,15 +283,14 @@ def plot_trajectory_evaluation(args):
 
     model = model_from_file(args.model, 'cello')
     predictions = predict_covariances(pairs, descriptor_algo, model)
-    cum_covariances = np.cumsum(predictions, axis=0)
 
     gt_trajectory = np.empty((len(pairs) + 1, 4, 4))
     gt_trajectory[0] = np.identity(4)
-
     for i in range(1, dataset.n_clouds()):
         gt_trajectory[i] = gt_trajectory[i - 1] @ dataset.ground_truth(i, i-1)
 
-    
+    cum_covariances = make_cumulative_covariances(gt_trajectory, predictions)
+
     clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.1, k=20, n_seed_init=20)
     clustering_algo = recova.clustering.RegistrationPairClusteringAdapter(clustering_algo)
     sampled_trajectory = make_sampled_trajectory(database, args.location, len(gt_trajectory), clustering_algo)
@@ -298,29 +299,50 @@ def plot_trajectory_evaluation(args):
     plot_trajectory_translation(gt_trajectory, ax, palette='Blues')
     plot_trajectory_translation(sampled_trajectory, ax, palette='Oranges')
     # plot_trajectory_rotation(dataset.times, gt_trajectory, ax)
-    for i in range(0, len(pairs), 10):
+    for i in range(0, len(pairs), 3):
         plot_covariance(gt_trajectory[i], cum_covariances[i], ax)
+        plot_covariance(gt_trajectory[i], predictions[i], ax, color='blue')
 
     plt.show()
+
+
+def make_cumulative_covariances(trajectory, predictions):
+    cum_covariances = np.empty((len(trajectory), 6, 6))
+    cum_covariances[0] = np.zeros((6,6))
+    for i in range(1, len(trajectory)):
+        delta = trajectory[i]
+        adjoint = se3.adjoint(delta)
+        rotated_covariance = adjoint @ (predictions[i - 1] @ adjoint.T)
+
+        print(delta)
+        print(adjoint)
+        print(rotated_covariance)
+        print('---')
+
+        cum_covariances[i] = cum_covariances[i-1] + rotated_covariance
+
+    return cum_covariances
 
 
 def make_sampled_trajectory(database, location, trajectory_length, clustering_algo):
     trajectory = np.empty((trajectory_length, 4, 4))
     trajectory[0] = np.identity(4)
 
+    pairs = [database.get_registration_pair(location, i, i-1) for i in range(1, trajectory_length)]
+    clusterings = parallel_starmap_progressbar(compute_clustering, [(pair, clustering_algo) for pair in pairs])
+
     for i in range(1, trajectory_length):
         pair = database.get_registration_pair(location, i, i-1)
         results = pair.registration_results()
-        clustering = clustering_algo.compute(pair)
 
-        print(clustering)
-
-        t = random.choice(results)
-
+        t = random.choice(results[clusterings[i - 1]])
         trajectory[i] = trajectory[i-1] @ t
 
     return trajectory
 
+
+def compute_clustering(pair, clustering_algo):
+    return clustering_algo.compute(pair)
 
 
 def predict_covariance(pair, descriptor_algo):
@@ -338,19 +360,19 @@ def predict_covariances(pairs, descriptor_algo, model):
     return predictions
 
 
-def plot_covariance(mean, covariance, ax):
+def plot_covariance(mean, covariance, ax, color='black'):
     eigvals, eigvecs = np.linalg.eig(covariance[0:2,0:2])
-    angle = np.arctan2(eigvecs[0,0], eigvecs[0,1]) * 360 / (2 * np.pi)
+    angle = np.arctan2(eigvecs[1,0], eigvecs[0,0]) * 360 / (2 * np.pi)
     width, height = 3 * np.sqrt(eigvals)
 
-    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=angle * 360 / (2 * np.pi), fill=False)
+    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=angle * 360 / (2 * np.pi), fill=False, color=color)
     ax.add_artist(ellipse)
 
 
 def plot_trajectory_translation(trajectory, ax, palette='Blues'):
     xs, ys = trajectory[:, 0, 3], trajectory[:, 1, 3]
 
-    sns.scatterplot(xs, ys, list(range(len(trajectory))), palette=palette)
+    sns.scatterplot(xs, ys, list(range(len(trajectory))), palette=palette, edgecolors=None)
     # ax.plot(trajectory[:,0,3], trajectory[:,1,3])
     ax.axis('equal')
 
