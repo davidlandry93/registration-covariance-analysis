@@ -54,6 +54,7 @@ setup(
             'plot_error_function = recova.plot_error_function:cli',
             'progressive_average = recova.progressive_average:cli',
             'recov_plot = recova.recov_plot:cli',
+            'recov_registration_on_pair = recova.registration_on_pair:cli',
             'registration2covariance = recova.covariance_of_registrations:cli',
             'registration2lie = recova.registration_dataset:registration2lie_cli',
             'registration2vtk = recova.results_to_vtk:cli',

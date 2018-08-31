@@ -2,6 +2,7 @@
 
 import functools
 from math import ceil, sqrt
+import matplotlib.pyplot as plt
 import multiprocessing
 import numpy as np
 import os
@@ -246,6 +247,15 @@ def parallel_starmap_progressbar(worker, data, n_cores=8):
 
     return results
 
+def parallel_map_progressbar(worker, data, n_cores=8):
+    with multiprocessing.Pool(n_cores) as pool:
+        results = []
+        for x in tqdm.tqdm(pool.imap(worker, data), total=len(data), file=sys.stdout, smoothing=0.9, ncols=100):
+            results.append(x)
+
+    return results
+
+
 def rotation_around_z_matrix(theta):
     return np.array([[np.cos(theta), -np.sin(theta), 0.0, 0.0],
                      [np.sin(theta), np.cos(theta), 0.0, 0.0],
@@ -310,3 +320,11 @@ def wishart_likelihood(v, degrees_of_freedom, observation):
 
 
     return (a * b) / (c * d * e)
+
+def set_matplotlibrc():
+    plt.rc('font', family='Times New Roman')
+    plt.rc('text', usetex=True)
+    plt.rc('xtick', labelsize=8)
+    plt.rc('ytick', labelsize=8)
+    plt.rc('axes', labelsize=8, linewidth=0.3, titlesize=8)
+    plt.rc('legend', fontsize=8)

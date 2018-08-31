@@ -6,7 +6,7 @@ import multiprocessing
 import numpy as np
 import sys
 
-from recova.clustering import DensityThresholdClusteringAlgorithm
+from recova.clustering import DensityThresholdClusteringAlgorithm, RegistrationPairClusteringAdapter
 from recova.covariance import SamplingCovarianceComputationAlgorithm
 from recova.registration_dataset import registrations_of_dataset
 from recova.registration_result_database import RegistrationPairDatabase
@@ -40,6 +40,7 @@ def cli():
     args = parser.parse_args()
 
     clustering = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
+    clustering = RegistrationPairClusteringAdapter(clustering)
     covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
 
     db = RegistrationPairDatabase(args.database)

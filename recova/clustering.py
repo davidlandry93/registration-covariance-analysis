@@ -104,6 +104,12 @@ class CenteredClusteringAlgorithm(ClusteringAlgorithm):
             radius_translation = englobing_radius(dataset[:, 0:3], 90.0)
             radius_rotation = englobing_radius(dataset[:, 3:6], 90.0)
 
+            if radius_translation <= 1e-9:
+                radius_translation = 1.0
+
+            if radius_rotation <= 1e-9:
+                radius_rotation = 1.0
+
             dataset[:,0:3] = dataset[:,0:3] / radius_translation
             dataset[:,3:6] = dataset[:,3:6] / radius_rotation
 
@@ -187,6 +193,7 @@ class RegistrationPairClusteringAdapter:
     def _compute(self, registration_pair):
         lie_results = registration_pair.lie_matrix_of_results()
 
+        print(lie_results.shape)
         if lie_results.shape[0] < 6:
             raise RuntimeError('Not enough results in lie_matrix')
 
