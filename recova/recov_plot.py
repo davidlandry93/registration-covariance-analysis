@@ -367,24 +367,31 @@ def predict_covariances(pairs, descriptor_algo, model):
     return predictions
 
 
-def plot_covariance(mean, covariance, ax, color='black'):
+def plot_covariance(mean, covariance, ax, color='black', fill=True, label=None):
     eigvals, eigvecs = np.linalg.eig(covariance[0:2,0:2])
     sort_indices = np.argsort(eigvals)[::-1]
     eigvals, eigvecs = eigvals[sort_indices], eigvecs[:, sort_indices]
 
-    angle = np.arctan2(eigvecs[0,0], eigvecs[1,0])
+    # print(covariance[0:2,0:2])
+    # print(eigvals)
+    # print(eigvecs)
+    # print('Det: {}'.format(np.linalg.det(eigvecs)))
+    # print('Det: {}'.format(np.linalg.det(eigvecs[:,[1,0]])))
+    # print(covariance[0:2,0:2])
+    angle = np.arctan2(eigvecs[1,0], eigvecs[0,0])
+    # print('Angle: {}'.format(np.degrees( angle )))
     width, height = 2 * np.sqrt(5.991 * eigvals) # 95% confidence interval, see http://www.visiondummy.com/2014/04/draw-error-ellipse-representing-covariance-matrix/
 
-    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=angle * 360 / (2 * np.pi), fill=False, color=color)
-    ax.add_artist(ellipse)
+    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=np.degrees(angle), fill=fill, color=color, zorder=1, label=label)
+    return ax.add_artist(ellipse)
 
 
-def plot_trajectory_translation(trajectory, ax, palette='viridis', opacity=1.0, size=0.9):
+def plot_trajectory_translation(trajectory, ax, color='black', opacity=1.0, size=0.9, linestyle='-', label=None):
     xs, ys = trajectory[:, 0, 3], trajectory[:, 1, 3]
 
-    ax.scatter(xs, ys, c=np.linspace(0,1.0,len(trajectory)), s=size, cmap=palette, edgecolors=None, alpha=opacity)
-    # ax.plot(trajectory[:,0,3], trajectory[:,1,3])
+    # ax.scatter(xs, ys, c=np.linspace(0,1.0,len(trajectory)), s=size, cmap=palette, edgecolors=None, alpha=opacity)
     ax.axis('equal')
+    return ax.plot(trajectory[:,0,3], trajectory[:,1,3], linestyle=linestyle, color=color, label=label, linewidth=size)
 
 
 def plot_trajectory_rotation(times, trajectory, ax):

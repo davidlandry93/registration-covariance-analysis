@@ -172,6 +172,14 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
             identity = torch.Tensor(np.identity(6))
             for i in perms:
                 distances = self._compute_distances_cuda(self.model_predictors_cuda, metric_matrix.cuda(), self.model_predictors[i].cuda())
+                # eprint('Distances')
+                # eprint(distances)
+                # eprint('Sum of distances')
+                # eprint(distances.sum())
+                # eprint('N of weights larger than almost nothing')
+                # eprint((self.distances_to_weights(distances) > 1e-20).sum())
+                # eprint('Sum of weights')
+                # eprint(self.distances_to_weights(distances).sum())
                 prediction = self._prediction_from_distances_cuda(self.model_covariances_cuda, distances).cpu()
                 # prediction = self._prediction_from_distances_cu(self.model_covariances, distances)
 
@@ -180,16 +188,15 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 # eprint('Det')
                 # eprint(torch.det(prediction + identity * 1e-9))
 
-                det_pred = torch.det(prediction + identity * 1e-9)
-                log_det = torch.log(det_pred + 1e-18)
+                regur_prediction = prediction + identity * 1e-12
 
-                # eprint('Log det')
-                # eprint(log_det)
+                det_pred = torch.det(regur_prediction)
+                log_det = torch.log(det_pred + 1e-18)
 
                 loss_A = log_det
                 # loss_B = torch.norm(torch.mm(torch.inverse(prediction), self.model_covariances[i]) - identity)
 
-                loss_B = torch.trace(torch.mm(torch.inverse(prediction), self.model_covariances[i]))
+                loss_B = torch.trace(torch.mm(torch.inverse(regur_prediction), self.model_covariances[i]))
 
                 distances_cpu = distances.cpu()
                 nonzero_distances = torch.gather(distances_cpu, 0, torch.nonzero(distances_cpu).squeeze())
@@ -200,11 +207,13 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
                 optimization_loss += loss_of_pair
                 losses[i] = loss_of_pair
 
+                # eprint('Index: {}'.format(i))
                 # eprint('loss_A: {}'.format(loss_A))
                 # eprint('loss_B: {}'.format(loss_B))
                 # eprint('Regur: {}'.format(self.alpha * regularization_term))
+                # eprint(torch.inverse(regur_prediction))
 
-                if i % 1 == 0:
+                if i % 4 == 0:
                     self.logger.debug('Backprop')
                     optimization_loss.backward()
                     optimizer.step()
@@ -396,7 +405,7 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
         return self._compute_distances(self.model_predictors, metric_matrix, Variable(torch.Tensor(predictor))).data.numpy()
 
     def distances_to_weights(self, distances):
-        zero_distances = distances < 1e-10
+        zero_distances = distances < 1e-20
         # eprint(zero_distances.sum())
         distances.masked_fill_(zero_distances, 1000000.)
         # distances[zero_distances] = 1000000.
@@ -408,6 +417,9 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         weights = torch.exp(-distances)
         # weights = 1.0 / distances
+
+        # if weights.sum() < 1e-20:
+        #     weights = weights.new_ones(weights.shape)
 
         # srt, _ = weights.sort()
         # eprint('weights')

@@ -49,7 +49,18 @@ def plot_trajectory_evaluation_mahalanobis(args):
     plt.show()
 
 
-def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config, covariance_model, n_sampled_trajectories = 1):
+def select_sequential_pairs(db, location):
+    pairs = db.registration_pairs()
+    return list(filter(lambda x: x.dataset == location and x.reference == x.reading - 1, pairs))
+
+
+def make_reference_cum_cov(trajectory, pairs, cov_algo):
+    covariances = [cov_algo.compute(pair) for pair in pairs]
+    return make_cumulative_covariances(trajectory, covariances)
+
+
+
+def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config, covariance_model, n_sampled_trajectories = 1, second_order=False):
     descriptor_algo = descriptor_factory(descriptor_config)
 
     pairs = db.registration_pairs()
@@ -59,12 +70,14 @@ def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config,
 
     # Compute predicted covariance.
     predictions = predict_covariances(pairs, descriptor_algo, covariance_model)
-    cum_covariances = make_cumulative_covariances(gt_trajectory, predictions)
+    cum_covariances = make_cumulative_covariances(gt_trajectory, predictions, second_order=second_order)
 
     # Make sampled trajectory.
-    # clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.01, k=20, n_seed_init=32)
-    # clustering_algo.rescale = True
-    clustering_algo = recova.clustering.DensityThresholdClusteringAlgorithm(threshold=100, k=16)
+    clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.01, k=20, n_seed_init=32)
+    # clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.5, k=30, n_seed_init=32)
+    clustering_algo.rescale = True
+    clustering_algo.seed_selector = 'localized'
+    # clustering_algo = recova.clustering.DensityThresholdClusteringAlgorithm(threshold=1, k=16)
     clustering_algo = recova.clustering.RegistrationPairClusteringAdapter(clustering_algo)
 
     if n_sampled_trajectories == 1:
@@ -83,6 +96,17 @@ def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config,
 
 
 
+def trajectory_linear_length(trajectory):
+    sum_x = 0.0
+    for i in range(1, len(trajectory)):
+        delta = np.linalg.inv(trajectory[i-1]) @ trajectory[i]
+        distance = np.linalg.norm(delta[0:3,3])
+        sum_x += distance
+
+    return sum_x
+
+
+
 def mahalanobis_plot(gt_trajectory, sampled_trajectory, predicted_cum_cov, censi_cum_cov, ax):
     pass
 
@@ -92,9 +116,6 @@ def build_trajectory_from_dataset(p_dataset, begin=0, p_end=-1):
         end = p_dataset.n_clouds()
     else:
         end = p_end
-
-    print(begin)
-    print(end)
 
     trajectory = np.empty((end - begin, 4, 4))
     trajectory[0] = np.identity(4)
@@ -121,13 +142,12 @@ def predict_covariances(pairs, descriptor_algo, model):
     return predictions
 
 
-def make_cumulative_covariances(trajectory, predictions):
+def make_cumulative_covariances(trajectory, predictions, second_order=False):
     cum_covariances = np.empty((len(trajectory), 6, 6))
     cum_covariances[0] = np.zeros((6,6))
     for i in range(1, len(trajectory)):
-
-        _, compound_covariance = se3.compound_poses(trajectory[i], predictions[i-1], trajectory[i-1], cum_covariances[i-1])
-
+        delta = np.linalg.inv(trajectory[i-1]) @ trajectory[i]
+        _, compound_covariance = se3.compound_poses_py(trajectory[i-1], cum_covariances[i-1], delta, predictions[i-1], second_order=second_order)
         cum_covariances[i] = compound_covariance
 
     return cum_covariances

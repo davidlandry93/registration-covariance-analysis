@@ -1,4 +1,5 @@
 
+#include <glog/logging.h>
 #include <iostream>
 
 #include "localized_seed_selection_algorithm.h"
@@ -16,9 +17,12 @@ LocalizedSeedSelectionAlgorithm::LocalizedSeedSelectionAlgorithm(
 
 int LocalizedSeedSelectionAlgorithm::select(
     std::shared_ptr<Eigen::MatrixXd>& dataset) {
+    VLOG(100) << "Entering select...";
     PointcloudLoggerLocator logger_locator;
     PointcloudLogger& logger = logger_locator.get();
+    VLOG(100) << "Logger found";
 
+    VLOG(30) << "N seeds to consider: " << n_seeds_to_consider;
 
     Eigen::MatrixXi neighbors_of_seed_indices(n_seeds_to_consider, 1);
     Eigen::MatrixXd neighbors_of_seed_distances(n_seeds_to_consider, 1);

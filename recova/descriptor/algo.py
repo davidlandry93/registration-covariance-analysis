@@ -249,3 +249,31 @@ class AveragePlanarityDescriptor(DescriptorAlgo):
         else:
             planarities = (concat[:,1] - concat[:,0]) / np.linalg.norm(concat, axis=1)
             return [planarities.mean()]
+
+
+class AverageShapeDescriptor(DescriptorAlgo):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return 'avg_shape'
+
+    def labels(self):
+        return ['avg_planarity', 'avg_cylindricality']
+
+    def compute(self, pair, reading_mask, reference_mask):
+        reading = pair.points_of_reading()[reading_mask]
+        reference = pair.points_of_reference()[reference_mask]
+
+        eigvals_reading = pair.eigenvalues_of_reading()[reading_mask]
+        eigvals_reference = pair.eigenvalues_of_reference()[reference_mask]
+
+        concat = np.vstack((eigvals_reading, eigvals_reference))
+        concat.sort(axis=1)
+
+        if len(concat) == 0:
+            return [0.0, 0.0]
+        else:
+            planarities = (concat[:,1] - concat[:,0]) / np.linalg.norm(concat, axis=1)
+            cylindricalities = (concat[:,2] - concat[:,1])
+            return [planarities.mean(), cylindricalities.mean()]

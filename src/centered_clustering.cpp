@@ -104,7 +104,7 @@ std::vector<int> potential_seeds(const NaboAdapter &knn_algorithm,
 }
 
 std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
-                                      std::unique_ptr<SeedSelectionAlgorithm>&& seed_selector,
+                                      SeedSelectionAlgorithm& seed_selector,
                                       const int& k,
                                       const double& radius,
                                       const bool log) {
@@ -113,7 +113,7 @@ std::set<int> run_centered_clustering(std::shared_ptr<Eigen::MatrixXd> &dataset,
     knn_algorithm.set_dataset(dataset);
 
     VLOG(100) << "Selecting seed...";
-    int seed_index = seed_selector->select(dataset);
+    int seed_index = seed_selector.select(dataset);
     VLOG(100) << "Done selecting seed...";
 
     if(log) {

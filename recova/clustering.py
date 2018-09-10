@@ -243,8 +243,8 @@ def raw_centered_clustering(dataset, radius, n=12, seed=np.zeros(6), n_seed_init
     stream = io.StringIO()
 
     #DEBUG
-    with open('clustering_input.json', 'w') as f:
-        json.dump(dataset.tolist(), f)
+    # with open('/home/dlandry/clustering_input.json', 'w') as f:
+    #     json.dump(dataset.tolist(), f)
 
     json.dump(dataset.tolist(), stream)
     response = subprocess.run(command,
