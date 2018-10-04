@@ -60,7 +60,7 @@ def make_reference_cum_cov(trajectory, pairs, cov_algo):
 
 
 
-def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config, covariance_model, n_sampled_trajectories = 1, second_order=False):
+def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config, covariance_model, clustering_algo, n_sampled_trajectories = 1, second_order=False):
     descriptor_algo = descriptor_factory(descriptor_config)
 
     pairs = db.registration_pairs()
@@ -71,14 +71,6 @@ def collect_trajectory_data(db, location, pointcloud_dataset, descriptor_config,
     # Compute predicted covariance.
     predictions = predict_covariances(pairs, descriptor_algo, covariance_model)
     cum_covariances = make_cumulative_covariances(gt_trajectory, predictions, second_order=second_order)
-
-    # Make sampled trajectory.
-    clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.01, k=20, n_seed_init=32)
-    # clustering_algo = recova.clustering.CenteredClusteringAlgorithm(radius=0.5, k=30, n_seed_init=32)
-    clustering_algo.rescale = True
-    clustering_algo.seed_selector = 'localized'
-    # clustering_algo = recova.clustering.DensityThresholdClusteringAlgorithm(threshold=1, k=16)
-    clustering_algo = recova.clustering.RegistrationPairClusteringAdapter(clustering_algo)
 
     if n_sampled_trajectories == 1:
         sampled_trajectory = make_sampled_trajectory(pairs, clustering_algo)

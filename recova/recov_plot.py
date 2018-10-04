@@ -386,12 +386,12 @@ def plot_covariance(mean, covariance, ax, color='black', fill=True, label=None):
     return ax.add_artist(ellipse)
 
 
-def plot_trajectory_translation(trajectory, ax, color='black', opacity=1.0, size=0.9, linestyle='-', label=None):
+def plot_trajectory_translation(trajectory, ax, color='black', opacity=1.0, linewidth=0.9, linestyle='-', label=None):
     xs, ys = trajectory[:, 0, 3], trajectory[:, 1, 3]
 
     # ax.scatter(xs, ys, c=np.linspace(0,1.0,len(trajectory)), s=size, cmap=palette, edgecolors=None, alpha=opacity)
     ax.axis('equal')
-    return ax.plot(trajectory[:,0,3], trajectory[:,1,3], linestyle=linestyle, color=color, label=label, linewidth=size)
+    return ax.plot(trajectory[:,0,3], trajectory[:,1,3], linestyle=linestyle, color=color, label=label, linewidth=linewidth)
 
 
 def plot_trajectory_rotation(times, trajectory, ax):

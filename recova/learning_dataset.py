@@ -18,7 +18,7 @@ from lieroy import se3
 from recov.datasets import create_registration_dataset
 from recova.alignment import IdentityAlignmentAlgorithm, PCAlignmentAlgorithm
 from recova.clustering import CenteredClusteringAlgorithm, IdentityClusteringAlgorithm, DensityThresholdClusteringAlgorithm, OutlierFilterClusteringAlgorithm, RegistrationPairClusteringAdapter
-from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm, SamplingDistributionComputationAlgorithm
+from recova.covariance import SamplingCovarianceComputationAlgorithm, CensiCovarianceComputationAlgorithm, SamplingDistributionComputationAlgorithm, FixedCenterSamplingDistributionAlgorithm, DistributionAlgorithmToCovarianceAlgorithm
 from recova.descriptor.factory import descriptor_factory
 from recova.registration_result_database import RegistrationPairDatabase
 from recova.util import eprint, nearestPD, parallel_starmap_progressbar
@@ -112,16 +112,16 @@ def generate_examples_cli():
 
     output_path = pathlib.Path(args.output)
 
-    clustering_algo = CenteredClusteringAlgorithm(0.01, k=20, n_seed_init=20)
-    clustering_algo.seed_selector = 'localized'
-    # clustering.rescale = True
 
-    clustering = RegistrationPairClusteringAdapter(clustering_algo)
-    registration_pairs = filter_failing_registrations(registration_pairs, clustering, filter_threshold=args.max_mean_gt_distance, n_cores=args.n_cores)
+    clustering_algorithm = CenteredClusteringAlgorithm(radius=1.0, k=16, n_seed_init=32)
+    clustering_algorithm.seed_selector = 'localized'
+    clustering_algorithm.rescale = True
 
-    # clustering = DensityThresholdClusteringAlgorithm(threshold=1e3, k=100)
-    # clustering = OutlierFilterClusteringAlgorithm()
-    covariance_algo = SamplingCovarianceComputationAlgorithm(clustering_algorithm=clustering)
+    clustering_algorithm = RegistrationPairClusteringAdapter(clustering_algorithm)
+
+    distribution_algorithm = FixedCenterSamplingDistributionAlgorithm(clustering_algorithm)
+    covariance_algo = DistributionAlgorithmToCovarianceAlgorithm(distribution_algorithm)
+
 
     with open(args.config) as f:
         descriptor_config = json.load(f)
@@ -136,8 +136,6 @@ def generate_examples_cli():
     for x in registration_pairs:
         examples.extend([(x, descriptor, covariance_algo, args.descriptor_only, r) for r in args.rotations])
         pairs.extend([{'dataset': x.dataset, 'reading': x.reading, 'reference': x.reference, 'rotation': r} for r in args.rotations])
-
-    
 
     random.shuffle(examples)
 
@@ -227,10 +225,10 @@ def dataset_summary_cli():
     clustering_algorithm.seed_selector = 'localized'
     clustering_algorithm.rescale = True
 
-    # clustering_algorithm = DensityThresholdClusteringAlgorithm(args.density_filter, k=100)
-    covariance_algorithm = SamplingCovarianceComputationAlgorithm(clustering_algorithm)
+    clustering_algorithm = RegistrationPairClusteringAdapter(clustering_algorithm)
 
-    # covariance_algorithm = CensiCovarianceComputationAlgorithm()
+    distribution_algorithm = FixedCenterSamplingDistributionAlgorithm(clustering_algorithm)
+    covariance_algorithm = DistributionAlgorithmToCovarianceAlgorithm(distribution_algorithm)
 
     with multiprocessing.Pool(1) as p:
         rows = p.starmap(compute_one_summary_line, [(x, covariance_algorithm) for x in db.registration_pairs()])

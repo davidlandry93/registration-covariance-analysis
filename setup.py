@@ -35,6 +35,7 @@ setup(
             'descriptor_on_pair = recova.descriptor.factory:cli',
             'distribution_of_pair = recova.registration_result_database:distribution_cli',
             'distribution2vtk = recova.distribution_to_vtk_ellipsoid:cli',
+            'error_landscape_of_pair = recova.error_landscape:cli',
             'find_central_cluster = recova.find_center_cluster:cli',
             'generate_cello_dataset = recova.learning_dataset:generate_cello_dataset_cli',
             'generate_cube = recova.pointcloud_gen.cube:cli',

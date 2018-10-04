@@ -44,11 +44,43 @@ class SamplingDistributionComputationAlgorithm(DistributionComputationAlgorithm)
         return registration_pair.cache.get_or_generate(repr(self), compute_distribution)
 
 
+class FixedCenterSamplingDistributionAlgorithm(DistributionComputationAlgorithm):
+    def __init__(self, clustering_algorithm=IdentityClusteringAlgorithm()):
+        self.clustering_algo = clustering_algorithm
+
+    def __repr__(self):
+        return 'fixed_center_sampling_{}'.format(self.clustering_algo)
+
+    def compute(self, pair):
+        clustering = self.clustering_algo.compute(pair)
+        group_registration_ts = pair.registration_results()[clustering]
+
+        gt_inv = np.linalg.inv(pair.ground_truth())
+
+        deltas = np.array([se3_log(gt_inv @ t) for t in group_registration_ts])
+        cov = (deltas.T @ deltas) / max(len(deltas), 1.0)
+
+        return {
+            'mean': pair.ground_truth().tolist(),
+            'covariance': cov.tolist()
+        }
+
+
+
 class CovarianceComputationAlgorithm:
     def compute(self, registration_pair):
         raise NotImplementedError('CovarianceComputationAlgorithms must implement compute method.')
 
 
+class DistributionAlgorithmToCovarianceAlgorithm(CovarianceComputationAlgorithm):
+    def __init__(self, distribution_algo):
+        self.distribution_algo = distribution_algo
+
+    def __repr__(self):
+        return '{}_covariance'.format(repr(self.distribution_algo))
+
+    def compute(self, registration_pair):
+        return np.array(self.distribution_algo.compute(registration_pair)['covariance'])
 
 
 class SamplingCovarianceComputationAlgorithm:

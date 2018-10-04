@@ -58,11 +58,17 @@ def cli():
     recov.util.matplotlib_paper_config()
 
     fig, ax = plt.subplots()
-    fig.set_size_inches((3.412, 1.9))
-    fig.set_dpi(72)
+    fig.set_size_inches((3.412, 1.5))
+    fig.set_dpi(300)
 
+    plt.rc('font', family='Times New Roman')
+    plt.rc('text', usetex=True)
+    plt.rc('xtick', labelsize=8)
+    plt.rc('ytick', labelsize=8)
+    plt.rc('axes', labelsize=8, linewidth=0.3, titlesize=8)
+    plt.rc('legend', fontsize=8)
 
-    ax.plot(100. * noise_levels, traces, color='black', label='Reference Covariance', linewidth=0.8)
+    ax.plot(100. * noise_levels, traces, color='black', label='Sampled Covariance', linewidth=0.8)
     ax.plot(100. * noise_levels, censi_traces, color='black', linestyle='dashed', label='Censi Cov. Estimate', linewidth=0.8)
 
     ax.ticklabel_format(style='sci', ax='y', scilimits=(0,0))
@@ -77,7 +83,7 @@ def cli():
     # ax.set_title('Trace of covariance matrix against sensor noise')
     ax.set_xlabel('Sensor noise standard deviation (cm)')
     ax.set_ylabel('Trace of covariance matrix')
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(bottom=0.28, right=0.95)
 
     # plt.tight_layout(pad=1.00, w_pad=0.5, h_pad=1.1)
     plt.savefig('fig.pdf')
