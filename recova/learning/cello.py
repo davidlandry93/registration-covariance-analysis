@@ -101,7 +101,12 @@ class CelloCovarianceEstimationModel(CovarianceEstimationModel):
 
         preprocessed_covariances = self.preprocessing.process(covariances)
 
-        predictors_train, predictors_test, covariances_train, covariances_test = predictors[training_indices], predictors[test_indices], preprocessed_covariances[training_indices], preprocessed_covariances[test_indices]
+        predictors_train, predictors_test, covariances_train, covariances_test = (
+            predictors[training_indices],
+            predictors[test_indices],
+            preprocessed_covariances[training_indices],
+            preprocessed_covariances[test_indices]
+        )
 
         self.model_predictors = Variable(torch.Tensor(predictors_train))
         self.model_predictors_cuda = self.model_predictors.cuda()

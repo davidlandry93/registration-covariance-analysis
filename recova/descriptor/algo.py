@@ -217,8 +217,8 @@ class CensiDescriptor(DescriptorAlgo):
         points_reference = pair.points_of_reference()[reference_mask]
 
         icp_algo = IcpAlgorithm()
-        icp_algo.use_vtk_inspector()
         icp_algo.max_point_density = 0
+        icp_algo.max_iteration_count = 80
 
         censi_estimate = censi_estimate_from_points(points_reading, points_reference, pair.transform(), icp_algo)
 

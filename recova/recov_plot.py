@@ -17,7 +17,7 @@ from recova.descriptor.factory import descriptor_factory
 from recova.learning.learning import model_from_file
 from recova.registration_dataset import registrations_of_dataset
 from recova.registration_result_database import RegistrationPairDatabase
-from recova.util import eprint, parallel_starmap_progressbar
+from recova.util import eprint, parallel_starmap_progressbar, set_matplotlibrc
 
 from lieroy import se3
 from lieroy.parallel import se3_gaussian_distribution_of_sample
@@ -174,7 +174,7 @@ def plot_loss_on_time(args):
 def generate_axis_configuration(dataset, indices_of_axis):
     location_count = dict()
     for i in indices_of_axis:
-        location = dataset['data']['pairs'][i]['dataset']
+        location = dataset['data']['pairs'][i]['dataset'].replace('_', ' ')
 
         if location in location_count:
             location_count[location] += 1
@@ -213,23 +213,24 @@ def plot_activation_matrix(args):
     xs = torch.Tensor(np.array(dataset['data']['xs']))
     ys = torch.Tensor(np.array(dataset['data']['ys']))
 
-    learning_indices = np.array(sorted(learning_run['train_set']))
-    validation_indices = np.array(sorted(learning_run['validation_set']))
+    learning_indices = np.array(learning_run['train_set'])
+    validation_indices = np.array(learning_run['validation_set'])
     sort_of_learning_examples = np.argsort(learning_indices)
+    sort_of_val_indices = np.argsort(validation_indices)
 
-    print(learning_indices)
+    print(learning_indices[sort_of_learning_examples])
+    print(validation_indices[sort_of_val_indices])
 
     # Generate the activation data
     activation_matrix = np.zeros((len(learning_indices), len(validation_indices)))
     for i, q in enumerate(validation_indices):
         distances = model.compute_distances(xs[q])
         weights = model.distances_to_weights(torch.Tensor(distances))
-        activation_matrix[:, i] = weights[sort_of_learning_examples]
+        activation_matrix[:, sort_of_val_indices[i]] = weights[sort_of_learning_examples]
 
-
+    set_matplotlibrc()
     fig, ax = plt.subplots()
-    sns.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5})
-
+    sns.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5}, rasterized=True)
 
     # Compute the data to configure the x axis labels
     major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, validation_indices)
@@ -237,22 +238,32 @@ def plot_activation_matrix(args):
     ax.set_yticklabels('')
     ax.set_yticks(minor_ticks, minor=True)
     ax.set_yticklabels(labels, minor=True)
+    # ax.set_yticklabels(labels, minor=True, rotation=90)
 
     # Compute the data to configure the y axis labels
     major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
     ax.set_xticks(major_ticks)
     ax.set_xticklabels('')
     ax.set_xticks(minor_ticks, minor=True)
+    # ax.set_xticklabels(labels, minor=True)
     ax.set_xticklabels(labels, minor=True, rotation=90)
 
     ax.tick_params(axis='both', which='minor', length=0)
 
     ax.grid(color='white', linestyle='--')
 
-    ax.set_ylabel('Validation pairs')
-    ax.set_xlabel('Training pairs')
-    ax.set_title('Weight of learning examples when predicting validation examples')
+    ax.set_ylabel('Validation pair')
+    ax.set_xlabel('Training pair')
 
+
+    #Remove xticks if there are only one dataset on each side.
+    # ax.set_xticklabels([], minor=True)
+    # ax.set_yticklabels([], minor=True)
+    # fig.suptitle('Wood Autumn predicted using Wood Summer')
+    fig.set_size_inches((8, 4))
+
+    plt.subplots_adjust(left=0.2, right=0.99, top=1.2, bottom=0.1)
+    plt.savefig('activation_matrix.pdf')
     plt.tight_layout()
     plt.show()
 
