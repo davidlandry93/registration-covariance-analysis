@@ -230,39 +230,39 @@ def plot_activation_matrix(args):
 
     set_matplotlibrc()
     fig, ax = plt.subplots()
-    sns.heatmap(activation_matrix.T, ax=ax, square=True, cbar_kws={'shrink': 0.5}, rasterized=True)
+    sns.heatmap(activation_matrix, ax=ax, square=True, cbar_kws={'shrink': 0.5}, rasterized=True)
 
     # Compute the data to configure the x axis labels
     major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, validation_indices)
-    ax.set_yticks(major_ticks)
-    ax.set_yticklabels('')
-    ax.set_yticks(minor_ticks, minor=True)
-    ax.set_yticklabels(labels, minor=True)
-    # ax.set_yticklabels(labels, minor=True, rotation=90)
-
-    # Compute the data to configure the y axis labels
-    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
     ax.set_xticks(major_ticks)
     ax.set_xticklabels('')
     ax.set_xticks(minor_ticks, minor=True)
     # ax.set_xticklabels(labels, minor=True)
     ax.set_xticklabels(labels, minor=True, rotation=90)
 
+    # Compute the data to configure the y axis labels
+    major_ticks, minor_ticks, labels = generate_axis_configuration(dataset, learning_indices)
+    ax.set_yticks(major_ticks)
+    ax.set_yticklabels('')
+    ax.set_yticks(minor_ticks, minor=True)
+    ax.set_yticklabels(labels, minor=True)
+    # ax.set_yticklabels(labels, minor=True, rotation=90)
+
     ax.tick_params(axis='both', which='minor', length=0)
 
     ax.grid(color='white', linestyle='--')
 
-    ax.set_ylabel('Validation pair')
-    ax.set_xlabel('Training pair')
+    ax.set_xlabel('Validation pair')
+    ax.set_ylabel('Training pair')
 
 
     #Remove xticks if there are only one dataset on each side.
     # ax.set_xticklabels([], minor=True)
     # ax.set_yticklabels([], minor=True)
     # fig.suptitle('Wood Autumn predicted using Wood Summer')
-    fig.set_size_inches((8, 4))
+    fig.set_size_inches((5, 9))
 
-    plt.subplots_adjust(left=0.2, right=0.99, top=1.2, bottom=0.1)
+    plt.subplots_adjust(left=0.3, right=0.90, top=1.0, bottom=0.1)
     plt.savefig('activation_matrix.pdf')
     plt.tight_layout()
     plt.show()
@@ -378,7 +378,7 @@ def predict_covariances(pairs, descriptor_algo, model):
     return predictions
 
 
-def plot_covariance(mean, covariance, ax, color='black', fill=True, label=None):
+def plot_covariance(mean, covariance, ax, color='black', fill=True, label=None, linewidth=1):
     eigvals, eigvecs = np.linalg.eig(covariance[0:2,0:2])
     sort_indices = np.argsort(eigvals)[::-1]
     eigvals, eigvecs = eigvals[sort_indices], eigvecs[:, sort_indices]
@@ -393,7 +393,7 @@ def plot_covariance(mean, covariance, ax, color='black', fill=True, label=None):
     # print('Angle: {}'.format(np.degrees( angle )))
     width, height = 2 * np.sqrt(5.991 * eigvals) # 95% confidence interval, see http://www.visiondummy.com/2014/04/draw-error-ellipse-representing-covariance-matrix/
 
-    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=np.degrees(angle), fill=fill, color=color, zorder=1, label=label)
+    ellipse = matplotlib.patches.Ellipse(xy=mean[0:2,3], width=width, height=height, angle=np.degrees(angle), fill=fill, color=color, zorder=1, label=label, linewidth=linewidth)
     return ax.add_artist(ellipse)
 
 

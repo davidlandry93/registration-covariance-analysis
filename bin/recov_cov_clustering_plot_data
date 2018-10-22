@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+
+
+import argparse
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+
+from lieroy import se3
+
+from recova.clustering import CenteredClusteringAlgorithm, DensityThresholdClusteringAlgorithm
+from recova.covariance import IdentityClusteringAlgorithm, RegistrationPairClusteringAdapter, SamplingDistributionComputationAlgorithm
+from recova.registration_result_database import RegistrationPairDatabase
+from recova.util import set_matplotlibrc
+
+
+def distribution_with_parameter(pair, param):
+    # clustering_algo = RegistrationPairClusteringAdapter(CenteredClusteringAlgorithm(radius=param, k=12, n_seed_init=32))
+    clustering_algo = RegistrationPairClusteringAdapter(DensityThresholdClusteringAlgorithm(threshold=param))
+    distribution_algo = SamplingDistributionComputationAlgorithm(clustering_algo)
+
+    clustering = clustering_algo.compute(pair)
+    print(clustering)
+
+    mean, covariance = se3.gaussian_from_sample(pair.registration_results()[clustering])
+
+    proportion = len(clustering) / 5000
+    return covariance, proportion
+
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database_root', type=str)
+    parser.add_argument('dataset', type=str)
+    parser.add_argument('reading', type=int)
+    parser.add_argument('reference', type=int)
+    args = parser.parse_args()
+
+    db = RegistrationPairDatabase(args.database_root)
+    pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
+
+    clustering_algo = RegistrationPairClusteringAdapter(IdentityClusteringAlgorithm())
+    distribution_algo = SamplingDistributionComputationAlgorithm(clustering_algo)
+
+    distribution = distribution_algo.compute(pair)
+
+    max_covariance = np.trace(np.array(distribution['covariance']))
+
+    # param_values = np.geomspace(1e-6, 10, 40)
+    param_values = np.geomspace(1, 1e7, 40)
+    # param_values = np.linspace(1e-6, 10.0, 40)
+    print(param_values)
+
+    traces = []
+    proportions = []
+    for val in param_values:
+        covariance, proportion = distribution_with_parameter(pair, val)
+        traces.append(np.trace(covariance))
+        proportions.append(100 * proportion)
+
+    pair2 = db.get_registration_pair('plain', 11, 8)
+    traces2 = []
+    proportions2 = []
+    for val in param_values:
+        covariance, proportion = distribution_with_parameter(pair2, val)
+        traces2.append(np.trace(covariance))
+        proportions2.append(100* proportion)
+
+
+    set_matplotlibrc()
+
+    fig, [ax1, ax2] = plt.subplots(1,2)
+    fig.set_size_inches((7, 3))
+    ax1_hook = ax1.semilogx(param_values, traces, color='black', linewidth=1.5, label='Trace')
+    ax2.semilogx(param_values, traces2, color='black', linewidth=1.5, label='Trace of covariance')
+    # ax.axhline(y=max_covariance, xmin=0, xmax=1, linestyle=':', color='black', linewidth=1.3, label='No filtering')
+
+    # ax1.set_ylim([0.0, 1.25e-8])
+    ax1_twin = ax1.twinx()
+    ax1_twin.set_ylim([0,101])
+    # ax1_twin.set_ylabel('\% of transformations kept')
+    ax1_twin_hook = ax1_twin.plot(param_values, proportions, linestyle='--', color='black', label='\% kept')
+
+    ax2_twin = ax2.twinx()
+    ax2_twin.plot(param_values, proportions2, linestyle='--', color='black')
+    ax2_twin.set_ylim([0,101])
+    ax2_twin.set_ylabel('\% of transformations kept')
+
+    ax1.set_xlabel(r'Density threshold $\tau_\rho$')
+    ax2.set_xlabel(r'Density threshold $\tau_\rho$')
+    ax1.set_ylabel('Trace of covariance matrix')
+    # ax2.set_ylabel('Trace of covariance matrix')
+    ax1.set_title('Apartment')
+    ax2.set_title('Plain')
+
+    lns = ax1_hook + ax1_twin_hook
+    labels = [l.get_label() for l in lns]
+    ax1.legend(lns, labels, loc='lower left')
+    plt.subplots_adjust(bottom=0.2, top=0.9, wspace=0.4)
+    plt.savefig('cov-clustering.pdf')
+    plt.show()
+
+    print(json.dumps({
+        'max_trace': np.trace(np.array(distribution['covariance'])),
+        'traces': traces,
+        'param': param_values.tolist()
+    }))
+
+
+if __name__ == '__main__':
+    cli()

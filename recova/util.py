@@ -324,7 +324,7 @@ def wishart_likelihood(v, degrees_of_freedom, observation):
 def set_matplotlibrc():
     plt.rc('font', family='Times New Roman')
     plt.rc('text', usetex=True)
-    plt.rc('xtick', labelsize=8)
-    plt.rc('ytick', labelsize=8)
-    plt.rc('axes', labelsize=8, linewidth=0.3, titlesize=8)
-    plt.rc('legend', fontsize=8)
+    plt.rc('xtick', labelsize=10)
+    plt.rc('ytick', labelsize=10)
+    plt.rc('axes', labelsize=10, linewidth=0.3, titlesize=12)
+    plt.rc('legend', fontsize=10)

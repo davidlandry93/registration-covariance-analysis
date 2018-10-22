@@ -6,7 +6,7 @@ import numpy as np
 from lieroy.parallel import se3_log, se3_gaussian_distribution_of_sample
 from recov.registration_algorithm import IcpAlgorithm
 from recov.censi import censi_estimate_from_points
-from recova.clustering import compute_distribution, IdentityClusteringAlgorithm
+from recova.clustering import compute_distribution, IdentityClusteringAlgorithm, RegistrationPairClusteringAdapter
 
 
 class DistributionComputationAlgorithm:
@@ -21,7 +21,7 @@ class DistributionComputationAlgorithm:
 
 
 class SamplingDistributionComputationAlgorithm(DistributionComputationAlgorithm):
-    def __init__(self, clustering_algorithm=IdentityClusteringAlgorithm()):
+    def __init__(self, clustering_algorithm=RegistrationPairClusteringAdapter(IdentityClusteringAlgorithm())):
         self.clustering_algo = clustering_algorithm
 
     def __repr__(self):

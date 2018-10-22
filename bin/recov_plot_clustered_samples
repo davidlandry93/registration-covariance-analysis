@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+
+
+import argparse
+import matplotlib.pyplot as plt
+import numpy as np
+
+from lieroy import se3
+
+from recova.clustering import DensityThresholdClusteringAlgorithm
+from recova.covariance import IdentityClusteringAlgorithm, RegistrationPairClusteringAdapter, SamplingDistributionComputationAlgorithm
+from recova.recov_plot import plot_covariance
+from recova.registration_result_database import RegistrationPairDatabase
+from recova.util import set_matplotlibrc
+
+def cli():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('database_root', type=str)
+    parser.add_argument('dataset', type=str)
+    parser.add_argument('reading', type=int)
+    parser.add_argument('reference', type=int)
+    args = parser.parse_args()
+
+    db = RegistrationPairDatabase(args.database_root)
+    pair = db.get_registration_pair(args.dataset, args.reading, args.reference)
+
+    clustering_algo = RegistrationPairClusteringAdapter(DensityThresholdClusteringAlgorithm(threshold=1e6))
+    distribution_algo = SamplingDistributionComputationAlgorithm(clustering_algo)
+
+    clustering = clustering_algo.compute(pair)
+
+    points = np.empty([len(pair.registration_results()), 6])
+    for i, r in enumerate(pair.registration_results()):
+        points[i] = se3.log(np.linalg.inv(pair.ground_truth()) @ r)
+
+    points = points[clustering][:,0:2]
+
+    mean, covariance = se3.gaussian_from_sample(pair.registration_results()[clustering])
+
+    set_matplotlibrc()
+    fig, ax = plt.subplots()
+    fig.set_size_inches((3.5,3.4))
+    ax.scatter(points[:,0], points[:,1], s=0.7, color='black')
+
+    inv_gt_adj = se3.adjoint(np.linalg.inv(pair.ground_truth()))
+
+    plot_covariance(np.linalg.inv(pair.ground_truth()) @ mean, inv_gt_adj @ (covariance @ inv_gt_adj.T), ax, color='red', fill=False, linewidth=3)
+
+    ax.set_xlim([2.4e-3, 2.9e-3])
+    ax.set_ylim([-4.1e-3, -3.6e-3])
+    ax.set_xlabel('$x$ (m)')
+    ax.set_ylabel('$y$ (m)')
+    ax.ticklabel_format(style='sci', scilimits=(0,0))
+    # ax.axis('equal')
+
+    plt.gca().set_aspect('equal')
+    plt.subplots_adjust(left=0.2, bottom=0.2)
+    plt.savefig('clustered_samples.pdf')
+    plt.show()
+
+
+if __name__ == '__main__':
+    cli()

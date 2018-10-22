@@ -23,8 +23,8 @@ from recov.registration_batch import compute_registration_batch_qpc
 from recov.util import ln_se3
 
 from recova.alignment import IdentityAlignmentAlgorithm
-from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory
-from recova.covariance import covariance_algorithm_factory
+from recova.clustering import compute_distribution, CenteredClusteringAlgorithm, IdentityClusteringAlgorithm,  clustering_algorithm_factory, RegistrationPairClusteringAdapter
+from recova.covariance import covariance_algorithm_factory, SamplingDistributionComputationAlgorithm
 from recova.file_cache import FileCache
 from recova.util import eprint, run_subprocess, parallel_starmap_progressbar, rotation_around_z_matrix, transform_points, random_fifo
 from recova.merge_json_result import merge_result_files
@@ -462,16 +462,10 @@ def distribution_cli():
     pair = database.get_registration_pair(args.dataset, args.reading, args.reference)
     pair.rotation_around_z = args.rotation
 
-    clustering_algo = clustering_algorithm_factory(args.clustering)
-    covariance_algo = covariance_algorithm_factory(args.covariance)
-    covariance_algo.clustering_algorithm = clustering_algo
 
-    covariance = covariance_algo.compute(pair)
+    distribution_algo = SamplingDistributionComputationAlgorithm()
+    output_dict = distribution_algo.compute(pair)
 
-    output_dict = {
-        'mean': pair.transform().tolist(),
-        'covariance': covariance.tolist()
-    }
 
     json.dump(output_dict, sys.stdout)
 
